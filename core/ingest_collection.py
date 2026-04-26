@@ -92,6 +92,15 @@ def _build_tasks(
         if not parser_name or not serializer_name:
             continue
 
+        if parser_name not in registry.parsers or serializer_name not in registry.serializers:
+            if DEBUG:
+                print(
+                    f"⚠️ Skipping {file_path.name}: "
+                    f"parser/serializer not registered "
+                    f"({parser_name}/{serializer_name})"
+                )
+            continue
+
         filetype_template_config = ft_cfg.get("template_config", {}) or {}
         collection_template_config = collection_cfg.get("template_config", {}) or {}
 
