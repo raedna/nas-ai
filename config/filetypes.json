@@ -2,41 +2,51 @@
   "docs": {
     "extensions": ["txt", "md", "rtf", "docx"],
     "parser": "doc",
-    "serializer": "doc"
+    "serializer": "doc",
+    "template_config": {}
   },
   "tables": {
     "extensions": ["csv", "xlsx", "xls"],
     "parser": "table",
-    "serializer": "table"
+    "serializer": "table",
+    "template_config": {}
   },
   "xml": {
     "extensions": ["xml"],
     "parser": "xml",
-    "serializer": "xml"
+    "serializer": "xml",
+    "template_config": {}
   },
   "image": {
     "extensions": ["png", "jpg", "jpeg", "webp", "tif", "tiff"],
     "parser": "image",
-    "serializer": "image"
+    "serializer": "image",
+    "template_config": {
+      "enable_ocr": true
+    }
   },
   "pdf": {
     "extensions": ["pdf"],
     "parser": "pdf",
-    "serializer": "pdf"
+    "serializer": "pdf",
+    "template_config": {}
   },
   "astro": {
     "extensions": ["fit", "fits", "fts", "xisf"],
     "parser": "astro",
-    "serializer": "astro"
+    "serializer": "astro",
+    "template_config": {}
   },
   "audio": {
     "extensions": ["mp3", "wav", "m4a", "flac", "aac", "ogg"],
     "parser": "audio",
-    "serializer": "audio"
+    "serializer": "audio",
+    "template_config": {}
   },
   "video": {
     "extensions": ["mp4", "mov", "mkv", "avi", "wmv", "m4v"],
     "parser": "video",
-    "serializer": "video"
+    "serializer": "video",
+    "template_config": {}
   }
 }
