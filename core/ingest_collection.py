@@ -50,10 +50,9 @@ def _normalize_ext(ext: str) -> str:
     return str(ext or "").lower().lstrip(".")
 
 
-def _match_filetype(file_path: Path) -> str | None:
+def _match_filetype(file_path: Path, filetypes: Dict[str, Any]) -> str | None:
     suffix = _normalize_ext(file_path.suffix)
 
-    filetypes = load_filetypes()
     for filetype_name, cfg in filetypes.items():
         exts = [_normalize_ext(x) for x in cfg.get("extensions", [])]
         if suffix in exts:
@@ -76,16 +75,16 @@ def _build_tasks(
     source_files: List[Path],
 ) -> List[FileTask]:
     tasks: List[FileTask] = []
+    filetypes = load_filetypes()
 
     for file_path in source_files:
-        filetype_name = _match_filetype(file_path)
+        filetype_name = _match_filetype(file_path, filetypes)
         if not filetype_name:
             continue
 
         if not _is_allowed_filetype(filetype_name, collection_cfg):
             continue
 
-        filetypes = load_filetypes()
         ft_cfg = filetypes.get(filetype_name, {})
         parser_name = ft_cfg.get("parser")
         serializer_name = ft_cfg.get("serializer")
