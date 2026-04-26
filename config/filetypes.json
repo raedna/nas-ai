@@ -1,0 +1,42 @@
+{
+  "docs": {
+    "extensions": ["txt", "md", "rtf", "docx"],
+    "parser": "doc",
+    "serializer": "doc"
+  },
+  "tables": {
+    "extensions": ["csv", "xlsx", "xls"],
+    "parser": "table",
+    "serializer": "table"
+  },
+  "xml": {
+    "extensions": ["xml"],
+    "parser": "xml",
+    "serializer": "xml"
+  },
+  "image": {
+    "extensions": ["png", "jpg", "jpeg", "webp", "tif", "tiff"],
+    "parser": "image",
+    "serializer": "image"
+  },
+  "pdf": {
+    "extensions": ["pdf"],
+    "parser": "pdf",
+    "serializer": "pdf"
+  },
+  "astro": {
+    "extensions": ["fit", "fits", "fts", "xisf"],
+    "parser": "astro",
+    "serializer": "astro"
+  },
+  "audio": {
+    "extensions": ["mp3", "wav", "m4a", "flac", "aac", "ogg"],
+    "parser": "audio",
+    "serializer": "audio"
+  },
+  "video": {
+    "extensions": ["mp4", "mov", "mkv", "avi", "wmv", "m4v"],
+    "parser": "video",
+    "serializer": "video"
+  }
+}

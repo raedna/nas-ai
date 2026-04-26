@@ -1,0 +1,6 @@
+{
+  "enum_value": ["value", "values", "allowed", "codes", "code"],
+  "primary_name": ["name", "mnemonic", "symbol", "field", "tag"],
+  "description": ["description", "meaning", "explain", "definition"],
+  "identifier": ["id", "identifier"]
+}

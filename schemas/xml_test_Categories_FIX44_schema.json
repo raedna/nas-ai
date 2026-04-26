@@ -1,0 +1,24 @@
+{
+  "identifier": [
+    "CategoryID",
+    "SectionID"
+  ],
+  "primary_name": [
+    "FIXMLFileName"
+  ],
+  "aliases": [],
+  "description": [],
+  "type": [
+    "ComponentType"
+  ],
+  "enum_value": [],
+  "enum_name": [
+    "FIXMLFileName"
+  ],
+  "other": [
+    "NotReqXML",
+    "GenerateImplFile",
+    "Volume",
+    "IncludeFile"
+  ]
+}

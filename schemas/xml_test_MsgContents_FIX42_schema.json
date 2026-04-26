@@ -1,0 +1,20 @@
+{
+  "identifier": [
+    "ComponentID"
+  ],
+  "primary_name": [],
+  "aliases": [],
+  "description": [
+    "Description"
+  ],
+  "type": [],
+  "enum_value": [],
+  "enum_name": [],
+  "other": [
+    "added",
+    "TagText",
+    "Indent",
+    "Position",
+    "Reqd"
+  ]
+}

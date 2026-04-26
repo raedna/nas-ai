@@ -1,0 +1,29 @@
+{
+  "enum_value": [
+    "value",
+    "values",
+    "allowed",
+    "allowed values",
+    "list",
+    "codes",
+    "what values",
+    "possible values"
+  ],
+  "primary_name": ["what is", "which field", "which tag","mnemonic"],
+  "description": ["meaning", "explain", "definition", "describe"],
+  "identifier": ["id", "identifier"],
+  "exposure": ["exposure", "exposures", "exposure time", "exposure times", "exp time", "seconds", "sec"],
+  "filter_name": ["filter", "filter name", "band"],
+  "object_name": ["object", "object name", "target", "target name"],
+  "file_name": ["filename", "file name", "file"],
+  "rotation": ["rotation", "rotation angle", "rotation angles", "angle", "angles", "rotator"],
+  "capture_date": [
+    "date",
+    "capture date",
+    "observation date",
+    "taken on",
+    "taken after",
+    "taken before",
+    "taken"
+  ]
+}

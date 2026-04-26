@@ -1,0 +1,17 @@
+{
+  "subtype": {
+    "kb": "KB article",
+    "ticket": "Ticket",
+    "bbg": "BBG field dictionary",
+    "fix": "FIX dictionary"
+  },
+  "source_type": {
+    "xml": "XML source",
+    "table": "Table source"
+  },
+  "doc_type": {
+    "structured": "Structured source",
+    "entity_row": "Entity record",
+    "procedural": "Procedure"
+  }
+}

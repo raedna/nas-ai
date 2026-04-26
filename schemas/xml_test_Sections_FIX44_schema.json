@@ -1,0 +1,24 @@
+{
+  "identifier": [
+    "SectionID"
+  ],
+  "primary_name": [
+    "Name",
+    "FIXMLFileName"
+  ],
+  "aliases": [],
+  "description": [
+    "Description"
+  ],
+  "type": [],
+  "enum_value": [],
+  "enum_name": [
+    "Name",
+    "FIXMLFileName"
+  ],
+  "other": [
+    "DisplayOrder",
+    "Volume",
+    "NotReqXML"
+  ]
+}

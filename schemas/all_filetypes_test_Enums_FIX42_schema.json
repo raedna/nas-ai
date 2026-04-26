@@ -1,0 +1,24 @@
+{
+  "identifier": [
+    "Tag"
+  ],
+  "primary_name": [
+    "SymbolicName"
+  ],
+  "aliases": [],
+  "description": [
+    "Description"
+  ],
+  "type": [],
+  "enum_value": [
+    "Value"
+  ],
+  "enum_name": [
+    "SymbolicName"
+  ],
+  "other": [
+    "added",
+    "addedEP",
+    "Sort"
+  ]
+}

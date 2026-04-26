@@ -1,0 +1,20 @@
+{
+  "identifier": [
+    "Id"
+  ],
+  "primary_name": [
+    "Mnemonic"
+  ],
+  "aliases": [],
+  "description": [
+    "Description"
+  ],
+  "type": [
+    "DataType"
+  ],
+  "enum_value": [],
+  "enum_name": [],
+  "other": [
+    "Category"
+  ]
+}

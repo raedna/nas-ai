@@ -1,0 +1,82 @@
+{
+  "text_chunked": {
+  "description": "Text files (MD/TXT) split into chunks",
+  "parser": "text",
+  "serializer": "chunk",
+  "chunk_size": 700,
+  "overlap": 150,
+  "asset_search_roots": [
+    "/Volumes/raedsync/Notes/Obsidian/x_Media"
+  ],
+  "filters": {
+    "extensions": ["md", "txt", "rtf"]
+  }
+},
+
+  "docx_chunked": {
+    "description": "DOCX documents split into chunks",
+    "parser": "text",
+    "serializer": "chunk",
+    "chunk_size": 900,
+    "overlap": 150,
+    "filters": {
+      "extensions": ["docx"]
+    }
+  },
+
+  "pdf_chunked": {
+    "description": "PDF with extractable text (chunked)",
+    "parser": "text",
+    "serializer": "chunk",
+    "chunk_size": 900,
+    "overlap": 150,
+    "filters": {
+      "extensions": ["pdf"]
+    }
+  },
+
+  "xml_field_entries": {
+    "description": "XML fields (one vector per field)",
+    "parser": "xml",
+    "serializer": "xml_row",
+    "filters": {
+      "extensions": ["xml"]
+    }
+  },
+
+  "table_row_entries": {
+    "description": "CSV/XLSX (one vector per row)",
+    "parser": "table",
+    "serializer": "row",
+    "filters": {
+      "extensions": ["csv", "xlsx"]
+    }
+  },
+
+  "image_ocr_extracted": {
+    "description": "Images processed with OCR",
+    "parser": "image",
+    "serializer": "bullet",
+    "filters": {
+      "extensions": ["png", "jpg", "jpeg", "tiff", "bmp", "gif", "webp", "heic"]
+    }
+  },
+
+  "astro_fits_metadata": {
+    "description": "FITS astronomy metadata extraction",
+    "parser": "fits",
+    "serializer": "astro_metadata",
+    "filters": {
+      "extensions": ["fit", "fits"]
+    }
+  },
+
+  "astro_xisf_metadata": {
+    "description": "XISF astronomy metadata extraction",
+    "parser": "xisf",
+    "serializer": "astro_metadata",
+    "filters": {
+      "extensions": ["xisf"]
+    }
+  },
+}

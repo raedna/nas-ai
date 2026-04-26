@@ -1,0 +1,9 @@
+{
+  "identifier": ["tag", "id", "field_id"],
+  "primary_name": ["name", "symbol", "mnemonic", "abstract","summary"],
+  "aliases": ["alias", "abbrname", "shortname"],
+  "description": ["description", "definition", "explanation", "resolution"],
+  "type": ["type"],
+  "enum_value": ["value", "code", "enum"],
+  "enum_name": ["name", "symbolicname", "label"]
+}

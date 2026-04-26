@@ -1,0 +1,59 @@
+{
+  "execution": ["exec", "executing", "executed"],
+  "exec": ["execution", "executing"],
+  
+  "quantity": ["qty", "quant"],
+  "qty": ["quantity"],
+
+  "price": ["px", "prc"],
+  "px": ["price"],
+
+  "number": ["num"],
+  "num": ["number"],
+
+  "identifier": ["id"],
+  "id": ["identifier"],
+
+  "message": ["msg"],
+  "msg": ["message"],
+
+  "percentage": ["pct"],
+  "pct": ["percentage"],
+
+  "average": ["avg"],
+  "avg": ["average"],
+
+  "security": ["sec"],
+  "sec": ["security"],
+
+  "broker": ["brkr"],
+  "brkr": ["broker"],
+
+  "pull": ["pulling", "pulled"],
+  "pulling": ["pull", "pulled"],
+  "pulled": ["pull", "pulling"],
+
+  "check": ["checking", "checked"],
+  "checking": ["check", "checked"],
+  "checked": ["check", "checking"],
+
+  "create": ["creating", "created"],
+  "creating": ["create", "created"],
+  "created": ["create", "creating"],
+
+  "login": ["log in", "logging in", "logged in"],
+  "logging in": ["login", "log in", "logged in"],
+  "logged in": ["login", "log in", "logging in"],
+
+  "repo": ["repos", "repurchase agreement", "reverse repo", "term repo", "open repo"],
+  "repos": ["repo", "repurchase agreement", "reverse repo", "term repo", "open repo"],
+
+  "repurchase agreement": ["repo", "repos"],
+  "reverse repo": ["repo", "repos"],
+  "term repo": ["repo", "repos"],
+  "open repo": ["repo", "repos"],
+
+  "send": ["sender", "sending", "sent"],
+  "sender": ["send", "sending", "sent"],
+  "sending": ["send", "sender", "sent"]
+}

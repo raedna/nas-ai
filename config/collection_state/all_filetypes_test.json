@@ -1,0 +1,238 @@
+{
+  "files": {
+    "Ticket_Details_01192026.xlsx": {
+      "path": "/Users/raednasr/RaedsMacM1/nas-ai/all_completed_filetypes/Ticket_Details_01192026.xlsx",
+      "filetype": "tables",
+      "status": "ingested",
+      "chunks_created": 503,
+      "error": null,
+      "metadata": {
+        "items_serialized": 503
+      },
+      "last_ingested": "2026-03-31T20:55:57.972381",
+      "mtime": 1774594018.2690399,
+      "size": 102008
+    },
+    "OmniVista_WhitePaper_RN_ModernizingAdmin_250901.docx": {
+      "path": "/Users/raednasr/RaedsMacM1/nas-ai/all_completed_filetypes/OmniVista_WhitePaper_RN_ModernizingAdmin_250901.docx",
+      "filetype": "docs",
+      "status": "ingested",
+      "chunks_created": 11,
+      "error": null,
+      "metadata": {
+        "items_serialized": 11
+      },
+      "last_ingested": "2026-03-31T20:55:58.946109",
+      "mtime": 1756739098.0,
+      "size": 1064527
+    },
+    "KB_Articles RN_20260225.csv": {
+      "path": "/Users/raednasr/RaedsMacM1/nas-ai/all_completed_filetypes/KB_Articles RN_20260225.csv",
+      "filetype": "tables",
+      "status": "ingested",
+      "chunks_created": 199,
+      "error": null,
+      "metadata": {
+        "items_serialized": 199
+      },
+      "last_ingested": "2026-03-31T20:56:31.148527",
+      "mtime": 1772051902.1033723,
+      "size": 663710
+    },
+    "8-Zurich Policy Returns.png": {
+      "path": "/Users/raednasr/RaedsMacM1/nas-ai/all_completed_filetypes/8-Zurich Policy Returns.png",
+      "filetype": "image",
+      "status": "ingested",
+      "chunks_created": 1,
+      "error": null,
+      "metadata": {
+        "items_serialized": 1
+      },
+      "last_ingested": "2026-03-31T20:56:31.923335",
+      "mtime": 1774741280.7026262,
+      "size": 148951
+    },
+    "Enums_FIX42.xml": {
+      "path": "/Users/raednasr/RaedsMacM1/nas-ai/all_completed_filetypes/Enums_FIX42.xml",
+      "filetype": "xml",
+      "status": "ingested",
+      "chunks_created": 104,
+      "error": null,
+      "metadata": {
+        "items_serialized": 104
+      },
+      "last_ingested": "2026-03-31T20:56:35.352128",
+      "mtime": 1399468172.0,
+      "size": 107855
+    },
+    "Enums_FIX44.xml": {
+      "path": "/Users/raednasr/RaedsMacM1/nas-ai/all_completed_filetypes/Enums_FIX44.xml",
+      "filetype": "xml",
+      "status": "ingested",
+      "chunks_created": 248,
+      "error": null,
+      "metadata": {
+        "items_serialized": 248
+      },
+      "last_ingested": "2026-03-31T20:56:44.085595",
+      "mtime": 1399468194.0,
+      "size": 321003
+    },
+    "Fields_FIX42.xml": {
+      "path": "/Users/raednasr/RaedsMacM1/nas-ai/all_completed_filetypes/Fields_FIX42.xml",
+      "filetype": "xml",
+      "status": "ingested",
+      "chunks_created": 405,
+      "error": null,
+      "metadata": {
+        "items_serialized": 405
+      },
+      "last_ingested": "2026-03-31T20:56:57.290700",
+      "mtime": 1772050248.5249186,
+      "size": 100936
+    },
+    "Project Timelines 2.xlsx": {
+      "path": "/Users/raednasr/RaedsMacM1/nas-ai/all_completed_filetypes/Project Timelines 2.xlsx",
+      "filetype": "tables",
+      "status": "ingested",
+      "chunks_created": 26,
+      "error": null,
+      "metadata": {
+        "items_serialized": 26
+      },
+      "last_ingested": "2026-03-31T20:56:58.201445",
+      "mtime": 1762442523.0,
+      "size": 29939
+    },
+    "BBG_FIELDS_TEST.xlsx": {
+      "path": "/Users/raednasr/RaedsMacM1/nas-ai/all_completed_filetypes/BBG_FIELDS_TEST.xlsx",
+      "filetype": "tables",
+      "status": "ingested",
+      "chunks_created": 730,
+      "error": null,
+      "metadata": {
+        "items_serialized": 730
+      },
+      "last_ingested": "2026-03-31T20:57:21.717261",
+      "mtime": 1773008206.7995856,
+      "size": 44444
+    },
+    "derivatives.png": {
+      "path": "/Users/raednasr/RaedsMacM1/nas-ai/all_completed_filetypes/derivatives.png",
+      "filetype": "image",
+      "status": "ingested",
+      "chunks_created": 1,
+      "error": null,
+      "metadata": {
+        "items_serialized": 1
+      },
+      "last_ingested": "2026-03-31T20:57:22.639356",
+      "mtime": 1774739586.6501324,
+      "size": 128320
+    },
+    "support_call.png": {
+      "path": "/Users/raednasr/RaedsMacM1/nas-ai/all_completed_filetypes/support_call.png",
+      "filetype": "image",
+      "status": "ingested",
+      "chunks_created": 1,
+      "error": null,
+      "metadata": {
+        "items_serialized": 1
+      },
+      "last_ingested": "2026-03-31T20:57:23.325786",
+      "mtime": 1774739923.4447422,
+      "size": 139234
+    },
+    "CRD 23R3 Overview.md": {
+      "path": "/Users/raednasr/RaedsMacM1/nas-ai/all_completed_filetypes/CRD 23R3 Overview.md",
+      "filetype": "docs",
+      "status": "ingested",
+      "chunks_created": 2,
+      "error": null,
+      "metadata": {
+        "items_serialized": 2
+      },
+      "last_ingested": "2026-03-31T20:57:23.390265",
+      "mtime": 1767082247.3414273,
+      "size": 323
+    },
+    "Fields_FIX44.xml": {
+      "path": "/Users/raednasr/RaedsMacM1/nas-ai/all_completed_filetypes/Fields_FIX44.xml",
+      "filetype": "xml",
+      "status": "ingested",
+      "chunks_created": 912,
+      "error": null,
+      "metadata": {
+        "items_serialized": 912
+      },
+      "last_ingested": "2026-03-31T20:57:53.170990",
+      "mtime": 1399468196.0,
+      "size": 277743
+    },
+    "Corbin COF and CEOF Raw Tables.md": {
+      "path": "/Users/raednasr/RaedsMacM1/nas-ai/all_completed_filetypes/obsidian/Corbin COF and CEOF Raw Tables.md",
+      "filetype": "docs",
+      "status": "ingested",
+      "chunks_created": 3,
+      "error": null,
+      "metadata": {
+        "items_serialized": 3
+      },
+      "last_ingested": "2026-03-31T20:57:55.208672",
+      "mtime": 1767084495.0538895,
+      "size": 606
+    },
+    "Corbin Viteos Incoming email.png": {
+      "path": "/Users/raednasr/RaedsMacM1/nas-ai/all_completed_filetypes/obsidian/Corbin Viteos Incoming email.png",
+      "filetype": "image",
+      "status": "ingested",
+      "chunks_created": 1,
+      "error": null,
+      "metadata": {
+        "items_serialized": 1
+      },
+      "last_ingested": "2026-03-31T20:57:55.929805",
+      "mtime": 1767084027.1308992,
+      "size": 143325
+    },
+    "Corbin vitdetailedpnlraw Table.png": {
+      "path": "/Users/raednasr/RaedsMacM1/nas-ai/all_completed_filetypes/obsidian/Corbin vitdetailedpnlraw Table.png",
+      "filetype": "image",
+      "status": "ingested",
+      "chunks_created": 1,
+      "error": null,
+      "metadata": {
+        "items_serialized": 1
+      },
+      "last_ingested": "2026-03-31T20:57:56.920949",
+      "mtime": 1767082316.6464565,
+      "size": 366719
+    },
+    "Corbin Atr Clash email alert.png": {
+      "path": "/Users/raednasr/RaedsMacM1/nas-ai/all_completed_filetypes/obsidian/Corbin Atr Clash email alert.png",
+      "filetype": "image",
+      "status": "ingested",
+      "chunks_created": 1,
+      "error": null,
+      "metadata": {
+        "items_serialized": 1
+      },
+      "last_ingested": "2026-03-31T20:57:57.283005",
+      "mtime": 1767083378.411817,
+      "size": 40931
+    },
+    "Corbin new security addition to ITG template.png": {
+      "path": "/Users/raednasr/RaedsMacM1/nas-ai/all_completed_filetypes/obsidian/Corbin new security addition to ITG template.png",
+      "filetype": "image",
+      "status": "ingested",
+      "chunks_created": 1,
+      "error": null,
+      "metadata": {
+        "items_serialized": 1
+      },
+      "last_ingested": "2026-03-31T20:57:57.741227",
+      "mtime": 1767083269.6580472,
+      "size": 105392
+    }
+  }
+}

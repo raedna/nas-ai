@@ -1,0 +1,35 @@
+{
+  "identifier": [
+    "Tag",
+    "AssociatedDataTag"
+  ],
+  "primary_name": [
+    "Name",
+    "AbbrName",
+    "BaseCategoryAbbrName"
+  ],
+  "aliases": [
+    "AbbrName",
+    "BaseCategoryAbbrName"
+  ],
+  "description": [
+    "Description"
+  ],
+  "type": [
+    "Type",
+    "UnionDataType"
+  ],
+  "enum_value": [],
+  "enum_name": [
+    "Name",
+    "AbbrName",
+    "BaseCategoryAbbrName"
+  ],
+  "other": [
+    "added",
+    "NotReqXML",
+    "BaseCategory",
+    "issue",
+    "deprecated"
+  ]
+}

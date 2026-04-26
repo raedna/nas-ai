@@ -1,0 +1,127 @@
+{
+  "xml_test": {
+    "path": "/Volumes/raedsync/Documents/OmniVista/FIX Dict",
+    "allowed_filetypes": [
+      "xml"
+    ],
+    "source_label": "FIX Dictionaries",
+    "notes": "",
+    "filters": {
+      "field_filters": []
+    }
+  },
+  "kb_docs": {
+    "path": "/Volumes/raedsync/Documents/OmniVista/Support Desk/KB Articles/KB_Articles RN_20260225.csv",
+    "allowed_filetypes": [
+      "tables"
+    ],
+    "source_label": "Kb Docs",
+    "notes": "KB as of  20260225",
+    "filters": {
+      "field_filters": [
+        {
+          "field": "KBinactive",
+          "mode": "exclude_equals",
+          "values": [
+            "TRUE"
+          ]
+        }
+      ]
+    }
+  },
+  "kb_docs_nofilter": {
+    "path": "/Volumes/raedsync/Documents/OmniVista/Support Desk/KB Articles/KB_Articles RN_20260225.csv",
+    "allowed_filetypes": [
+      "tables"
+    ],
+    "source_label": "Kb Docs",
+    "notes": "KB as of  20260225",
+    "filters": {
+      "field_filters": []
+    }
+  },
+  "obsidian": {
+    "path": "/Volumes/raedsync/Notes/Obsidian",
+    "allowed_filetypes": [
+      "docs"
+    ],
+    "source_label": "Obsidian Notes",
+    "notes": "Notes as of 04/16/2026",
+    "filters": {
+      "field_filters": []
+    }
+  },
+  "CRD_Manual": {
+    "path": "/Volumes/raedsync/Documents/OmniVista/Intro to Charles River Inv Management System.pdf",
+    "allowed_filetypes": [
+      "pdf"
+    ],
+    "source_label": "CRD Scanned Manual",
+    "notes": "Should be OCR",
+    "filters": {
+      "field_filters": []
+    }
+  },
+  "M42": {
+    "path": "/Volumes/raedsync/From4TBDisk/astrophoto info/Targets/orion",
+    "allowed_filetypes": [
+      "astro"
+    ],
+    "source_label": "Orion Folder",
+    "notes": "Testing Astro images",
+    "filters": {
+      "field_filters": []
+    }
+  },
+  "docx_test": {
+    "path": "/Users/raednasr/Documents/OmniVista/Case Studies/OmniVista_WhitePaper_RN_ModernizingAdmin_250901.docx",
+    "allowed_filetypes": [
+      "docs"
+    ],
+    "source_label": "Omni_whitepaper",
+    "notes": "Modernizing admin feeds for Layer One",
+    "filters": {
+      "field_filters": []
+    }
+  },
+  "bbg_fields": {
+    "path": "/Users/raednasr/Documents/OmniVista/BBG_FIELDS_TEST.xlsx",
+    "allowed_filetypes": [
+      "tables"
+    ],
+    "source_label": "BBG Fields - short",
+    "notes": "",
+    "filters": {
+      "field_filters": []
+    }
+  },
+  "M51": {
+    "path": "/Users/raednasr/M51-Whirlpool",
+    "allowed_filetypes": [
+      "astro"
+    ],
+    "allowed_extensions": [
+      ".fit",
+      ".fits"
+    ],
+    "exclude_dirs": [
+      "cc",
+      "registered",
+      "debayered",
+      "calibrated",
+      "flat",
+      "flats",
+      "darkflat",
+      "darkflats"
+    ],
+    "exclude_extensions": [
+      ".xisf",
+      ".xdrz"
+    ],
+    "source_label": "M51",
+    "notes": "M5a as of 2026-04-23",
+    "filters": {
+      "field_filters": []
+    }
+  }
+}

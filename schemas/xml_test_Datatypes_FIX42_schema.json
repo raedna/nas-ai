@@ -1,0 +1,20 @@
+{
+  "identifier": [],
+  "primary_name": [
+    "Name"
+  ],
+  "aliases": [],
+  "description": [
+    "Description"
+  ],
+  "type": [
+    "BaseType"
+  ],
+  "enum_value": [],
+  "enum_name": [
+    "Name"
+  ],
+  "other": [
+    "added"
+  ]
+}

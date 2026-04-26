@@ -1,0 +1,15 @@
+{
+  "entity_row_ignore_terms": [
+    "exclude",
+    "excluding",
+    "not",
+    "without",
+    "fail",
+    "failed",
+    "failure",
+    "issue",
+    "issues",
+    "error",
+    "errors"
+  ]
+}

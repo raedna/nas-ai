@@ -1,0 +1,23 @@
+{
+  "embedder": {
+    "api": {
+      "url": "http://localhost:1234/v1/embeddings",
+      "model": "text-embedding-bge-large-en-v1.5",
+      "timeout": 30,
+      "retry": {
+        "max_attempts": 3,
+        "backoff_factor": 2
+      }
+    },
+    "response": {
+      "data_path": ["data"],
+      "embedding_key": "embedding"
+    }
+  },
+  "qdrant": {
+    "url": "http://192.168.1.141:6333",
+    "timeout": 30,
+    "collection": "documents",
+    "vector_size": 1024
+  }
+}

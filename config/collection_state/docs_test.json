@@ -1,0 +1,43 @@
+{
+  "files": {
+    "CRD 23R3 Overview.md": {
+      "path": "/Users/raednasr/RaedsMacM1/nas-ai/docs_docx_testfiles/CRD 23R3 Overview.md",
+      "filetype": "docs",
+      "status": "ingested",
+      "chunks_created": 2,
+      "error": null,
+      "metadata": {
+        "items_serialized": 2
+      },
+      "last_ingested": "2026-04-01T09:29:09.093928",
+      "mtime": 1767082247.3414273,
+      "size": 323
+    },
+    "OmniVista_WhitePaper_RN_ModernizingAdmin_250901.docx": {
+      "path": "/Users/raednasr/RaedsMacM1/nas-ai/docs_docx_testfiles/OmniVista_WhitePaper_RN_ModernizingAdmin_250901.docx",
+      "filetype": "docs",
+      "status": "ingested",
+      "chunks_created": 11,
+      "error": null,
+      "metadata": {
+        "items_serialized": 11
+      },
+      "last_ingested": "2026-04-01T09:29:08.943458",
+      "mtime": 1756739098.0,
+      "size": 1064527
+    },
+    "Corbin COF and CEOF Raw Tables.md": {
+      "path": "/Users/raednasr/RaedsMacM1/nas-ai/docs_docx_testfiles/obsidian/Corbin COF and CEOF Raw Tables.md",
+      "filetype": "docs",
+      "status": "ingested",
+      "chunks_created": 3,
+      "error": null,
+      "metadata": {
+        "items_serialized": 3
+      },
+      "last_ingested": "2026-04-01T09:29:11.182914",
+      "mtime": 1767084495.0538895,
+      "size": 606
+    }
+  }
+}

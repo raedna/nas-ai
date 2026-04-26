@@ -1,0 +1,28 @@
+{
+  "identifier": [
+    "id"
+  ],
+  "primary_name": [
+    "abstract"
+  ],
+  "aliases": [],
+  "description": [
+    "description",
+    "resolution"
+  ],
+  "type": [
+    "KBtype"
+  ],
+  "enum_value": [],
+  "enum_name": [],
+  "other": [
+    "whocreated",
+    "KBinactive",
+    "KBinternalMemo",
+    "kbtags",
+    "descriptionMarkdown",
+    "resolutionMarkdown",
+    "kbdocprocessed",
+    "kbdocneedsprocessing"
+  ]
+}
