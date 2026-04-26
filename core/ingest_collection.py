@@ -93,10 +93,6 @@ def _build_tasks(
         if not parser_name or not serializer_name:
             continue
 
-        base_template_config = {
-            "filters": collection_cfg.get("filters", {})
-        }
-
         filetype_template_config = ft_cfg.get("template_config", {}) or {}
         collection_template_config = collection_cfg.get("template_config", {}) or {}
 
