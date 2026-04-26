@@ -97,11 +97,23 @@ def _build_tasks(
             "filters": collection_cfg.get("filters", {})
         }
 
-        if filetype_name == "image":
-            base_template_config["enable_ocr"] = True
+        filetype_template_config = ft_cfg.get("template_config", {}) or {}
+        collection_template_config = collection_cfg.get("template_config", {}) or {}
 
-        if filetype_name == "docs":
-            base_template_config["asset_search_roots"] = collection_cfg.get("asset_search_roots", [])
+        base_template_config = {
+            **filetype_template_config,
+            **collection_template_config,
+            "filters": collection_cfg.get("filters", {}),
+        }
+
+        for key in [
+            "asset_search_roots",
+            "max_blocks_per_chunk",
+            "row_tag",
+            "header_row",
+        ]:
+            if key in collection_cfg:
+                base_template_config[key] = collection_cfg[key]
 
         tasks.append(
             FileTask(
