@@ -16,7 +16,7 @@ Status values:
 
 | ID | Area | Issue | Suggested Fix | Priority | Status |
 |---|---|---|---|---|---|
-| CORE-001 | core/ingest_collection.py | Core injects filetype-specific config for images and docs. | Move filetype defaults into config/filetypes.json and merge config generically. | High | Not Started |
+| CORE-001 | core/ingest_collection.py | Core injects filetype-specific config for images and docs. | Move filetype defaults into config/filetypes.json and merge config generically. | High | Completed |
 | CORE-002 | core/ingest_collection.py | filetypes.json is loaded multiple times during task building. | Load filetypes once and pass through helper functions. | Medium | Not Started |
 | CORE-003 | config/filetypes.json / registry_setup.py | Audio/video are configured but parsers/serializers are not registered. | Disable audio/video or skip unregistered filetypes until implemented. | High | Not Started |
 | CORE-004 | core/orchestrator.py | merge_collection_docs runs for all filetypes. | Make merge behavior type-safe and eventually configurable per filetype. | High | Not Started |
