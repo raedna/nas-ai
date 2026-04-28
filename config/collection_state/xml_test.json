@@ -204,7 +204,7 @@
       "metadata": {
         "reason": "buffered_waiting_for_finalize"
       },
-      "last_ingested": "2026-04-28T20:56:49.081093",
+      "last_ingested": "2026-04-28T21:05:38.870623",
       "mtime": 1399468172.0,
       "size": 8642
     },
@@ -217,7 +217,7 @@
       "metadata": {
         "items_serialized": 405
       },
-      "last_ingested": "2026-04-28T20:57:05.961247",
+      "last_ingested": "2026-04-28T21:05:56.029312",
       "mtime": 1772050248.5249186,
       "size": 100936
     },
@@ -230,7 +230,7 @@
       "metadata": {
         "items_serialized": 61
       },
-      "last_ingested": "2026-04-28T20:57:08.773260",
+      "last_ingested": "2026-04-28T21:05:58.808086",
       "mtime": 1399468176.0,
       "size": 21311
     },
@@ -243,7 +243,7 @@
       "metadata": {
         "items_serialized": 48
       },
-      "last_ingested": "2026-04-28T20:57:10.586444",
+      "last_ingested": "2026-04-28T21:06:00.675193",
       "mtime": 1399468180.0,
       "size": 377367
     },
@@ -256,7 +256,7 @@
       "metadata": {
         "items_serialized": 3
       },
-      "last_ingested": "2026-04-28T20:57:10.784770",
+      "last_ingested": "2026-04-28T21:06:00.842474",
       "mtime": 1399468170.0,
       "size": 3194
     },
@@ -269,7 +269,7 @@
       "metadata": {
         "items_serialized": 104
       },
-      "last_ingested": "2026-04-28T20:57:15.537127",
+      "last_ingested": "2026-04-28T21:06:05.281699",
       "mtime": 1399468172.0,
       "size": 107855
     },
@@ -282,7 +282,7 @@
       "metadata": {
         "reason": "buffered_waiting_for_finalize"
       },
-      "last_ingested": "2026-04-28T20:57:15.571953",
+      "last_ingested": "2026-04-28T21:06:05.307414",
       "mtime": 1399468190.0,
       "size": 21131
     },
@@ -295,7 +295,7 @@
       "metadata": {
         "items_serialized": 4
       },
-      "last_ingested": "2026-04-28T20:57:15.872397",
+      "last_ingested": "2026-04-28T21:06:05.498228",
       "mtime": 1399468200.0,
       "size": 3904
     },
@@ -308,7 +308,7 @@
       "metadata": {
         "items_serialized": 912
       },
-      "last_ingested": "2026-04-28T20:57:54.701134",
+      "last_ingested": "2026-04-28T21:06:44.998159",
       "mtime": 1399468196.0,
       "size": 277743
     },
@@ -321,7 +321,7 @@
       "metadata": {
         "reason": "buffered_waiting_for_finalize"
       },
-      "last_ingested": "2026-04-28T20:57:54.727141",
+      "last_ingested": "2026-04-28T21:06:45.023531",
       "mtime": 1399468194.0,
       "size": 21184
     },
@@ -334,7 +334,7 @@
       "metadata": {
         "items_serialized": 21
       },
-      "last_ingested": "2026-04-28T20:57:55.401841",
+      "last_ingested": "2026-04-28T21:06:45.679777",
       "mtime": 1399468192.0,
       "size": 8891
     },
@@ -347,7 +347,7 @@
       "metadata": {
         "items_serialized": 116
       },
-      "last_ingested": "2026-04-28T20:57:59.879287",
+      "last_ingested": "2026-04-28T21:06:50.454920",
       "mtime": 1399468200.0,
       "size": 756773
     },
@@ -360,7 +360,7 @@
       "metadata": {
         "items_serialized": 115
       },
-      "last_ingested": "2026-04-28T20:58:04.597525",
+      "last_ingested": "2026-04-28T21:06:55.685452",
       "mtime": 1399468198.0,
       "size": 45168
     },
@@ -373,7 +373,7 @@
       "metadata": {
         "items_serialized": 248
       },
-      "last_ingested": "2026-04-28T20:58:15.143948",
+      "last_ingested": "2026-04-28T21:07:06.219934",
       "mtime": 1399468194.0,
       "size": 321003
     },
@@ -386,7 +386,7 @@
       "metadata": {
         "items_serialized": 122
       },
-      "last_ingested": "2026-04-28T20:58:20.255826",
+      "last_ingested": "2026-04-28T21:07:10.785622",
       "mtime": 1399468192.0,
       "size": 37979
     },
@@ -399,7 +399,7 @@
       "metadata": {
         "items_serialized": 405
       },
-      "last_ingested": "2026-04-28T20:58:38.413908",
+      "last_ingested": "2026-04-28T21:07:28.616766",
       "mtime": 1772050248.5249186,
       "size": 100936
     },
