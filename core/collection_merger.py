@@ -103,35 +103,31 @@ def merge_structured_docs(docs):
     all_rows, schema_map = _structured_docs_to_rows(docs_with_identifier)
     link_index = build_link_index(all_rows, schema_map)
 
-        for identifier, entry in link_index.get("identifier", {}).items():
-            text_parts = []
+    for identifier, entry in link_index.get("identifier", {}).items():
+        text_parts = []
 
-            if entry.get("primary_name"):
-                text_parts.append(entry["primary_name"])
+        if entry.get("primary_name"):
+            text_parts.append(entry["primary_name"])
 
-            if entry.get("description"):
-                text_parts.append(entry["description"])
+        if entry.get("description"):
+            text_parts.append(entry["description"])
 
-            if entry.get("type"):
-                text_parts.append(f"Type: {entry['type']}")
+        if entry.get("type"):
+            text_parts.append(f"Type: {entry['type']}")
 
-            text = "\n\n".join([p for p in text_parts if p]).strip()
+        text = "\n\n".join([p for p in text_parts if p]).strip()
 
-            merged.append({
-                "text": text,
-                "identifier": identifier,
-                "primary_name": entry.get("primary_name"),
-                "description": entry.get("description"),
-                "enum_values": entry.get("enum_values", []),
-                "type": entry.get("type"),
-                "doc_type": "structured",
-                "source_files": entry.get("source_files", []),
-                "related_identifiers": entry.get("related_identifiers", []),
-                "source_file": source_file,
-                "source_files": source_files,
-                "source_type": "structured_merge",
-                "file_type": "structured"
-            })
+        merged.append({
+            "text": text,
+            "identifier": identifier,
+            "primary_name": entry.get("primary_name"),
+            "description": entry.get("description"),
+            "enum_values": entry.get("enum_values", []),
+            "type": entry.get("type"),
+            "doc_type": "structured",
+            "source_files": entry.get("source_files", []),
+            "related_identifiers": entry.get("related_identifiers", []),
+        })
 
     # preserve structured docs that do not have identifiers
     merged.extend(docs_without_identifier)
