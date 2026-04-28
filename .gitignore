@@ -1,0 +1,5 @@
+__pycache__/
+*.pyc
+
+schemas/*.json
+config/schema_overrides.json
