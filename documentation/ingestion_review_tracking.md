@@ -19,7 +19,7 @@ Status values:
 | CORE-001 | core/ingest_collection.py | Core injects filetype-specific config for images and docs. | Move filetype defaults into config/filetypes.json and merge config generically. | High | Done |
 | CORE-002 | core/ingest_collection.py | filetypes.json is loaded multiple times during task building. | Load filetypes once and pass through helper functions. | Medium | Done |
 | CORE-003 | config/filetypes.json / registry_setup.py | Audio/video are configured but parsers/serializers are not registered. | Disable audio/video or skip unregistered filetypes until implemented. | High | Done |
-| CORE-004 | core/orchestrator.py | merge_collection_docs runs for all filetypes. | Make merge behavior type-safe and eventually configurable per filetype. | High | Not Started |
+| CORE-004 | core/orchestrator.py | merge_collection_docs runs for all filetypes. | Make merge behavior type-safe and eventually configurable per filetype. | High | Safety Pass Done |
 | CORE-005 | core/collection_state.py | File state key uses filename only, which can collide across folders. | Use normalized source path or path hash as state key. | Medium | Not Started |
 | CORE-006 | core/qdrant_client.py | Delete-before-upsert depends on inconsistent source_file metadata. | Standardize payload metadata and delete key. | High | Not Started |
 
