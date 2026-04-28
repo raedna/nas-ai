@@ -7,6 +7,17 @@ def load_roles_config(path):
     with open(path, "r", encoding="utf-8") as f:
         return json.load(f)
 
+def refine_schema_roles(schema):
+    reference_ids = set(schema.get("reference_identifier", []))
+
+    if reference_ids and "identifier" in schema:
+        schema["identifier"] = [
+            col for col in schema.get("identifier", [])
+            if col not in reference_ids
+        ]
+
+    return schema
+
 
 def infer_schema(rows, roles_config):
 
@@ -42,7 +53,7 @@ def infer_schema(rows, roles_config):
         if not any(col in schema[r] for r in roles_config):
             schema["other"].append(col)
 
-    return schema
+    return refine_schema_roles(schema)
 
 def save_schema(schema, source_file, output_dir, collection_name):
     output_dir = Path(output_dir)
