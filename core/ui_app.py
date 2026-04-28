@@ -199,6 +199,7 @@ st.title("NAS AI")
 tabs = st.tabs([
     "Collections",
     "Ingestion",
+    "Validation",
     "Ask",
     "Preview",
     "Qdrant Debug",
@@ -604,6 +605,10 @@ with tabs[1]:
         st.rerun()
 
 with tabs[2]:
+    st.subheader("Validation")
+    st.info("Schema and payload validation tools will appear here.")
+
+with tabs[3]:
     st.subheader("Ask")
 
     collections_cfg = load_json(COLLECTIONS_PATH, {})
@@ -984,7 +989,7 @@ with tabs[2]:
                 with st.expander("Returned Answer Payload", expanded=False):
                     st.write(debug_data.get("final_result"))
 
-with tabs[3]:
+with tabs[4]:
     st.subheader("Preview / Inspector")
 
     system_cfg = load_json(SYSTEM_CONFIG_PATH, {})
@@ -1108,18 +1113,18 @@ with tabs[3]:
             except Exception as e:
                 st.error(e)
 
-with tabs[4]:
+with tabs[5]:
     st.subheader("Qdrant Debug")
     st.info("Qdrant Debug tab scaffold ready.")
 
-with tabs[5]:
+with tabs[6]:
     st.subheader("System Config")
     st.info("System Config tab scaffold ready.")
 
-with tabs[6]:
+with tabs[7]:
     st.subheader("Chat")
     st.info("Chat tab scaffold ready.")
 
-with tabs[7]:
+with tabs[8]:
     st.subheader("Filetypes")
     st.info("Filetypes tab scaffold ready.")
