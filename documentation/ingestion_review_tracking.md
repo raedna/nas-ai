@@ -21,7 +21,7 @@ Status values:
 | CORE-003 | config/filetypes.json / registry_setup.py | Audio/video are configured but parsers/serializers are not registered. | Disable audio/video or skip unregistered filetypes until implemented. | High | Done |
 | CORE-004 | core/orchestrator.py | merge_collection_docs runs for all filetypes. | Make merge behavior type-safe and eventually configurable per filetype. | High | Done |
 | CORE-005 | core/collection_state.py | File state key uses filename only, which can collide across folders. | Use normalized source path or path hash as state key. | Medium | Done |
-| CORE-006 | core/qdrant_client.py | Delete-before-upsert depends on inconsistent source_file metadata. | Standardize payload metadata and delete key. | High | Not Started |
+| CORE-006 | core/qdrant_client.py | Delete-before-upsert depends on inconsistent source_file metadata. | Standardize payload metadata and delete key. | High | Done |
 | CORE-007 | core/collection_merger.py | Merge strategies are not configurable per filetype. | Add filetype-level merge_strategy later. | Medium | Not Started |
 
 ---
