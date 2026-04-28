@@ -606,7 +606,56 @@ with tabs[1]:
 
 with tabs[2]:
     st.subheader("Validation")
-    st.info("Schema and payload validation tools will appear here.")
+
+    SCHEMAS_DIR = BASE_DIR / "schemas"
+
+    schema_files = sorted(SCHEMAS_DIR.glob("*_schema.json"))
+
+    if not schema_files:
+        st.info("No schema files found.")
+    else:
+        selected_schema = st.selectbox(
+            "Select schema file",
+            [p.name for p in schema_files],
+            key="validation_schema_select"
+        )
+
+        schema_path = SCHEMAS_DIR / selected_schema
+        schema = load_json(schema_path, {})
+
+        st.markdown("### Schema")
+        st.json(schema)
+
+        warnings = []
+
+        identifier_fields = schema.get("identifier", [])
+        enum_value_fields = schema.get("enum_value", [])
+        primary_name_fields = schema.get("primary_name", [])
+        description_fields = schema.get("description", [])
+
+        if len(identifier_fields) > 1:
+            warnings.append(
+                f"Multiple identifier fields detected: {', '.join(identifier_fields)}"
+            )
+
+        if enum_value_fields and not schema.get("enum_name"):
+            warnings.append("Enum value fields exist, but enum name fields are missing.")
+
+        if not identifier_fields:
+            warnings.append("No identifier field detected.")
+
+        if not primary_name_fields and not enum_value_fields:
+            warnings.append("No primary name field detected.")
+
+        if not description_fields and not enum_value_fields:
+            warnings.append("No description field detected.")
+
+        if warnings:
+            st.markdown("### Warnings")
+            for w in warnings:
+                st.warning(w)
+        else:
+            st.success("No basic schema warnings.")
 
 with tabs[3]:
     st.subheader("Ask")
