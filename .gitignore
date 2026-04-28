@@ -51,3 +51,4 @@ core/__pycache__/embedder.cpython-311.pyc
 core/__pycache__/ingest_collection.cpython-311.pyc
 core/__pycache__/nlp_generator.cpython-311.pyc
 core/__pycache__/schema_inference.cpython-311.pyc
+config/collection_state/xml_test.json
