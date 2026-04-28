@@ -95,12 +95,13 @@ def merge_structured_docs(docs):
         else:
             docs_without_identifier.append(doc)
 
+    if len(docs_with_identifier) <= 1:
+        return docs
+
     merged = []
 
-    # existing merge path for identifier-backed structured docs
-    if docs_with_identifier:
-        all_rows, schema_map = _structured_docs_to_rows(docs_with_identifier)
-        link_index = build_link_index(all_rows, schema_map)
+    all_rows, schema_map = _structured_docs_to_rows(docs_with_identifier)
+    link_index = build_link_index(all_rows, schema_map)
 
         for identifier, entry in link_index.get("identifier", {}).items():
             text_parts = []
@@ -125,7 +126,11 @@ def merge_structured_docs(docs):
                 "type": entry.get("type"),
                 "doc_type": "structured",
                 "source_files": entry.get("source_files", []),
-                "related_identifiers": entry.get("related_identifiers", [])
+                "related_identifiers": entry.get("related_identifiers", []),
+                "source_file": source_file,
+                "source_files": source_files,
+                "source_type": "structured_merge",
+                "file_type": "structured"
             })
 
     # preserve structured docs that do not have identifiers
