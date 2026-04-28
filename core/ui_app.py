@@ -811,7 +811,7 @@ with tabs[2]:
         else:
             st.success("No basic schema warnings.")
 
-                st.markdown("---")
+        st.markdown("---")
         st.markdown("### Payload Inspector")
 
         qdrant_collections_for_validation = get_qdrant_collections(qdrant_url)
