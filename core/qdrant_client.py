@@ -62,6 +62,23 @@ def delete_points_by_source_file(collection_name, source_file):
         wait=True
     )
 
+def delete_points_by_ingest_source(collection_name, ingest_source):
+    if not ingest_source:
+        return
+
+    client.delete(
+        collection_name=collection_name,
+        points_selector=Filter(
+            must=[
+                FieldCondition(
+                    key="ingest_source",
+                    match=MatchValue(value=str(ingest_source))
+                )
+            ]
+        ),
+        wait=True
+    )
+
 # =========================================================
 # VECTOR UPSERT
 # =========================================================
@@ -87,17 +104,25 @@ def upsert_vectors(collection_name, vectors, payloads, source_file=None, force_r
     print("[UPSERT] first payload source_file:", payloads[0].get("source_file") if payloads else None)
     print("[UPSERT] effective_source_file:", effective_source_file)
 
-    if effective_source_file:
+    if source_file:
+        delete_points_by_ingest_source(collection_name, str(source_file))
+        print("[UPSERT] delete complete for ingest_source:", source_file)
+    elif effective_source_file:
         delete_points_by_source_file(collection_name, effective_source_file)
-        print("[UPSERT] delete complete for:", effective_source_file)
+        print("[UPSERT] delete complete for source_file:", effective_source_file)
 
     points = []
 
     for vec, payload in zip(vectors, payloads):
+        enriched_payload = dict(payload)
+
+        if source_file:
+            enriched_payload["ingest_source"] = str(source_file)
+
         point = PointStruct(
             id=str(uuid.uuid4()),
             vector=vec,
-            payload=payload
+            payload=enriched_payload
         )
         points.append(point)
 
