@@ -32,6 +32,8 @@ CONFIG_DIR = BASE_DIR / "config"
 COLLECTIONS_PATH = CONFIG_DIR / "collections.json"
 SYSTEM_CONFIG_PATH = CONFIG_DIR / "system.json"
 FILETYPES_PATH = CONFIG_DIR / "filetypes.json"
+SCHEMA_OVERRIDES_PATH = CONFIG_DIR / "schema_overrides.json"
+SCHEMAS_DIR = BASE_DIR / "schemas"
 
 DEBUG = True
 
@@ -607,15 +609,14 @@ with tabs[1]:
 with tabs[2]:
     st.subheader("Validation")
 
-    SCHEMAS_DIR = BASE_DIR / "schemas"
-
     schema_files = sorted(SCHEMAS_DIR.glob("*_schema.json"))
+    schema_overrides = load_json(SCHEMA_OVERRIDES_PATH, {})
 
     if not schema_files:
         st.info("No schema files found.")
     else:
         selected_schema = st.selectbox(
-            "Select schema file",
+            "Select schema output file",
             [p.name for p in schema_files],
             key="validation_schema_select"
         )
@@ -623,35 +624,188 @@ with tabs[2]:
         schema_path = SCHEMAS_DIR / selected_schema
         schema = load_json(schema_path, {})
 
-        st.markdown("### Schema")
+        st.markdown("### Generated Schema Output")
+        st.caption("This is the schema produced by ingestion. It is not edited directly.")
         st.json(schema)
+
+        current_override = schema_overrides.get(selected_schema, {})
+
+        st.markdown("### Schema Override")
+
+        all_fields = []
+        for values in schema.values():
+            if isinstance(values, list):
+                for v in values:
+                    if v not in all_fields:
+                        all_fields.append(v)
+
+        all_fields = sorted(all_fields)
+
+        identifier_default = current_override.get(
+            "identifier",
+            schema.get("identifier", [])
+        )
+
+        reference_identifier_default = current_override.get(
+            "reference_identifier",
+            []
+        )
+
+        primary_name_default = current_override.get(
+            "primary_name",
+            schema.get("primary_name", [])
+        )
+
+        aliases_default = current_override.get(
+            "aliases",
+            schema.get("aliases", [])
+        )
+
+        description_default = current_override.get(
+            "description",
+            schema.get("description", [])
+        )
+
+        type_default = current_override.get(
+            "type",
+            schema.get("type", [])
+        )
+
+        enum_value_default = current_override.get(
+            "enum_value",
+            schema.get("enum_value", [])
+        )
+
+        enum_name_default = current_override.get(
+            "enum_name",
+            schema.get("enum_name", [])
+        )
+
+        structured_subtype_default = current_override.get(
+            "structured_subtype",
+            ""
+        )
+
+        identifier_override = st.multiselect(
+            "Primary identifier field(s)",
+            all_fields,
+            default=[x for x in identifier_default if x in all_fields],
+            key=f"override_identifier_{selected_schema}"
+        )
+
+        reference_identifier_override = st.multiselect(
+            "Reference identifier field(s)",
+            all_fields,
+            default=[x for x in reference_identifier_default if x in all_fields],
+            key=f"override_reference_identifier_{selected_schema}"
+        )
+
+        primary_name_override = st.multiselect(
+            "Primary name field(s)",
+            all_fields,
+            default=[x for x in primary_name_default if x in all_fields],
+            key=f"override_primary_name_{selected_schema}"
+        )
+
+        aliases_override = st.multiselect(
+            "Alias field(s)",
+            all_fields,
+            default=[x for x in aliases_default if x in all_fields],
+            key=f"override_aliases_{selected_schema}"
+        )
+
+        description_override = st.multiselect(
+            "Description field(s)",
+            all_fields,
+            default=[x for x in description_default if x in all_fields],
+            key=f"override_description_{selected_schema}"
+        )
+
+        type_override = st.multiselect(
+            "Type field(s)",
+            all_fields,
+            default=[x for x in type_default if x in all_fields],
+            key=f"override_type_{selected_schema}"
+        )
+
+        enum_value_override = st.multiselect(
+            "Enum value field(s)",
+            all_fields,
+            default=[x for x in enum_value_default if x in all_fields],
+            key=f"override_enum_value_{selected_schema}"
+        )
+
+        enum_name_override = st.multiselect(
+            "Enum name field(s)",
+            all_fields,
+            default=[x for x in enum_name_default if x in all_fields],
+            key=f"override_enum_name_{selected_schema}"
+        )
+
+        subtype_options = [
+            "",
+            "definition",
+            "enum_values",
+            "relationship",
+            "structured"
+        ]
+
+        structured_subtype_override = st.selectbox(
+            "Structured subtype",
+            subtype_options,
+            index=subtype_options.index(structured_subtype_default)
+            if structured_subtype_default in subtype_options else 0,
+            key=f"override_structured_subtype_{selected_schema}"
+        )
+
+        if st.button("Save schema override", key=f"save_override_{selected_schema}"):
+            schema_overrides[selected_schema] = {
+                "identifier": identifier_override,
+                "reference_identifier": reference_identifier_override,
+                "primary_name": primary_name_override,
+                "aliases": aliases_override,
+                "description": description_override,
+                "type": type_override,
+                "enum_value": enum_value_override,
+                "enum_name": enum_name_override,
+                "structured_subtype": structured_subtype_override,
+            }
+
+            save_json(SCHEMA_OVERRIDES_PATH, schema_overrides)
+            st.success(f"Saved override for {selected_schema}")
+            st.rerun()
+
+        if current_override:
+            with st.expander("Current Saved Override", expanded=False):
+                st.json(current_override)
 
         warnings = []
 
-        identifier_fields = schema.get("identifier", [])
-        enum_value_fields = schema.get("enum_value", [])
-        primary_name_fields = schema.get("primary_name", [])
-        description_fields = schema.get("description", [])
+        identifier_fields = current_override.get("identifier", schema.get("identifier", []))
+        enum_value_fields = current_override.get("enum_value", schema.get("enum_value", []))
+        primary_name_fields = current_override.get("primary_name", schema.get("primary_name", []))
+        description_fields = current_override.get("description", schema.get("description", []))
 
         if len(identifier_fields) > 1:
             warnings.append(
-                f"Multiple identifier fields detected: {', '.join(identifier_fields)}"
+                f"Multiple primary identifier fields selected: {', '.join(identifier_fields)}"
             )
 
-        if enum_value_fields and not schema.get("enum_name"):
+        if enum_value_fields and not current_override.get("enum_name", schema.get("enum_name", [])):
             warnings.append("Enum value fields exist, but enum name fields are missing.")
 
         if not identifier_fields:
-            warnings.append("No identifier field detected.")
+            warnings.append("No primary identifier field selected.")
 
         if not primary_name_fields and not enum_value_fields:
-            warnings.append("No primary name field detected.")
+            warnings.append("No primary name field selected.")
 
         if not description_fields and not enum_value_fields:
-            warnings.append("No description field detected.")
+            warnings.append("No description field selected.")
+
+        st.markdown("### Validation Warnings")
 
         if warnings:
-            st.markdown("### Warnings")
             for w in warnings:
                 st.warning(w)
         else:
