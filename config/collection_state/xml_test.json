@@ -204,7 +204,7 @@
       "metadata": {
         "reason": "buffered_waiting_for_finalize"
       },
-      "last_ingested": "2026-04-28T21:05:38.870623",
+      "last_ingested": "2026-04-28T21:11:11.184116",
       "mtime": 1399468172.0,
       "size": 8642
     },
@@ -217,7 +217,7 @@
       "metadata": {
         "items_serialized": 405
       },
-      "last_ingested": "2026-04-28T21:05:56.029312",
+      "last_ingested": "2026-04-28T21:11:27.535891",
       "mtime": 1772050248.5249186,
       "size": 100936
     },
@@ -230,7 +230,7 @@
       "metadata": {
         "items_serialized": 61
       },
-      "last_ingested": "2026-04-28T21:05:58.808086",
+      "last_ingested": "2026-04-28T21:11:29.927836",
       "mtime": 1399468176.0,
       "size": 21311
     },
@@ -243,7 +243,7 @@
       "metadata": {
         "items_serialized": 48
       },
-      "last_ingested": "2026-04-28T21:06:00.675193",
+      "last_ingested": "2026-04-28T21:11:31.716473",
       "mtime": 1399468180.0,
       "size": 377367
     },
@@ -256,7 +256,7 @@
       "metadata": {
         "items_serialized": 3
       },
-      "last_ingested": "2026-04-28T21:06:00.842474",
+      "last_ingested": "2026-04-28T21:11:31.877619",
       "mtime": 1399468170.0,
       "size": 3194
     },
@@ -269,7 +269,7 @@
       "metadata": {
         "items_serialized": 104
       },
-      "last_ingested": "2026-04-28T21:06:05.281699",
+      "last_ingested": "2026-04-28T21:11:36.090093",
       "mtime": 1399468172.0,
       "size": 107855
     },
@@ -282,7 +282,7 @@
       "metadata": {
         "reason": "buffered_waiting_for_finalize"
       },
-      "last_ingested": "2026-04-28T21:06:05.307414",
+      "last_ingested": "2026-04-28T21:11:36.113263",
       "mtime": 1399468190.0,
       "size": 21131
     },
@@ -295,7 +295,7 @@
       "metadata": {
         "items_serialized": 4
       },
-      "last_ingested": "2026-04-28T21:06:05.498228",
+      "last_ingested": "2026-04-28T21:11:36.303116",
       "mtime": 1399468200.0,
       "size": 3904
     },
@@ -412,7 +412,7 @@
       "metadata": {
         "items_serialized": 912
       },
-      "last_ingested": "2026-04-28T20:59:16.399279",
+      "last_ingested": "2026-04-28T21:08:07.872915",
       "mtime": 1399468196.0,
       "size": 277743
     },
@@ -425,7 +425,7 @@
       "metadata": {
         "items_serialized": 104
       },
-      "last_ingested": "2026-04-28T20:59:20.990294",
+      "last_ingested": "2026-04-28T21:08:12.468691",
       "mtime": 1399468172.0,
       "size": 107855
     },
@@ -438,7 +438,7 @@
       "metadata": {
         "items_serialized": 248
       },
-      "last_ingested": "2026-04-28T20:59:31.722171",
+      "last_ingested": "2026-04-28T21:08:23.666620",
       "mtime": 1399468194.0,
       "size": 321003
     }
