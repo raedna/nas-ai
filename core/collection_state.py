@@ -37,8 +37,9 @@ def update_file_state(
 ):
     state = load_collection_state(collection_name)
 
-    file_key = Path(file_path).name
-    stat = Path(file_path).stat() if Path(file_path).exists() else None
+    path_obj = Path(file_path)
+    file_key = str(path_obj.resolve())
+    stat = path_obj.stat() if path_obj.exists() else None
 
     entry = {
         "path": str(file_path),
@@ -63,9 +64,13 @@ def update_file_state(
     save_collection_state(collection_name, state)
 
 
-def remove_file_state(collection_name, file_name):
+def remove_file_state(collection_name, file_path):
     state = load_collection_state(collection_name)
 
-    if file_name in state.get("files", {}):
-        del state["files"][file_name]
+    file_key = str(Path(file_path).resolve())
+
+    if file_key in state.get("files", {}):
+        del state["files"][file_key]
         save_collection_state(collection_name, state)
+
+        
