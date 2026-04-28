@@ -15,6 +15,8 @@ The purpose is to protect FIX field lookup and enum lookup behavior.
 | REG-XML-003 | What does SecurityIDSource mean? | Must identify SecurityIDSource as tag 22 and explain it. | Not Started |
 | REG-XML-004 | What tag is Symbol? | Must identify Symbol as tag 55. | Not Started |
 | REG-XML-005 | What values can SecurityIDSource have? | Must return enum values for tag 22. | Not Started |
+| XML-006 | XML/schema/linking | Identifier values collide across different identifier fields such as Tag, ComponentID, SectionID, and MsgType. | Add identifier_namespace derived from schema identifier field name and use namespace + identifier for cross-linking. | Critical | Not Started |
+| XML-007 | UI validation | No UI view to validate schema inference and payload quality before retrieval. | Add Streamlit schema/payload validation panel showing schema roles, inferred subtype, identifier collisions, and payload completeness. | High | Not Started |
 
 ---
 
