@@ -811,6 +811,80 @@ with tabs[2]:
         else:
             st.success("No basic schema warnings.")
 
+                st.markdown("---")
+        st.markdown("### Payload Inspector")
+
+        qdrant_collections_for_validation = get_qdrant_collections(qdrant_url)
+
+        if not qdrant_collections_for_validation:
+            st.info("No Qdrant collections found.")
+        else:
+            validation_collection = st.selectbox(
+                "Select Qdrant collection",
+                sorted(qdrant_collections_for_validation),
+                key="validation_payload_collection"
+            )
+
+            identifier_to_inspect = st.text_input(
+                "Identifier to inspect",
+                value="22",
+                key="validation_payload_identifier"
+            )
+
+            if st.button("Inspect payloads", key="validation_inspect_payloads"):
+                try:
+                    from qdrant_client import QdrantClient
+                    from qdrant_client.models import Filter, FieldCondition, MatchValue
+
+                    qclient = QdrantClient(url=qdrant_url)
+
+                    points, _ = qclient.scroll(
+                        collection_name=validation_collection,
+                        scroll_filter=Filter(
+                            must=[
+                                FieldCondition(
+                                    key="identifier",
+                                    match=MatchValue(value=str(identifier_to_inspect).strip())
+                                )
+                            ]
+                        ),
+                        limit=100,
+                        with_payload=True,
+                        with_vectors=False
+                    )
+
+                    rows = []
+
+                    for p in points:
+                        payload = p.payload or {}
+                        enum_values = payload.get("enum_values") or []
+
+                        rows.append({
+                            "identifier": payload.get("identifier"),
+                            "identifier_field": payload.get("identifier_field"),
+                            "identifier_namespace": payload.get("identifier_namespace"),
+                            "structured_subtype": payload.get("structured_subtype"),
+                            "primary_name": payload.get("primary_name"),
+                            "doc_type": payload.get("doc_type"),
+                            "enum_count": len(enum_values) if isinstance(enum_values, list) else 0,
+                            "source_file": payload.get("source_file"),
+                            "ingest_source": payload.get("ingest_source"),
+                        })
+
+                    if rows:
+                        st.success(f"Found {len(rows)} payload(s).")
+                        st.dataframe(rows, width="stretch")
+
+                        with st.expander("Raw payloads", expanded=False):
+                            for i, p in enumerate(points, start=1):
+                                st.markdown(f"#### Payload {i}")
+                                st.json(p.payload or {})
+                    else:
+                        st.warning("No payloads found for that identifier.")
+
+                except Exception as e:
+                    st.exception(e)
+
 with tabs[3]:
     st.subheader("Ask")
 
