@@ -44,3 +44,10 @@ schemas/all_filetypes_test_Fields_FIX42_schema.json
 schemas/all_filetypes_test_Enums_FIX44_schema.json
 schemas/all_filetypes_test_Enums_FIX42_schema.json
 schemas/all_filetypes_test_BBG_FIELDS_TEST_schema.json
+config/collection_state/xml_test.json
+core/__pycache__/collection_merger.cpython-311.pyc
+core/__pycache__/collection_state.cpython-311.pyc
+core/__pycache__/embedder.cpython-311.pyc
+core/__pycache__/ingest_collection.cpython-311.pyc
+core/__pycache__/nlp_generator.cpython-311.pyc
+core/__pycache__/schema_inference.cpython-311.pyc

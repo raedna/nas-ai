@@ -194,6 +194,214 @@
       "last_ingested": "2026-04-16T06:48:11.086925",
       "mtime": 1399468192.0,
       "size": 37979
+    },
+    "/Volumes/raedsync/Documents/OmniVista/FIX Dict/Datatypes_FIX42.xml": {
+      "path": "/Volumes/raedsync/Documents/OmniVista/FIX Dict/Datatypes_FIX42.xml",
+      "filetype": "xml",
+      "status": "ingested",
+      "chunks_created": 0,
+      "error": null,
+      "metadata": {
+        "reason": "buffered_waiting_for_finalize"
+      },
+      "last_ingested": "2026-04-28T20:56:49.081093",
+      "mtime": 1399468172.0,
+      "size": 8642
+    },
+    "/Volumes/raedsync/Documents/OmniVista/FIX Dict/Fields_FIX42.xml": {
+      "path": "/Volumes/raedsync/Documents/OmniVista/FIX Dict/Fields_FIX42.xml",
+      "filetype": "xml",
+      "status": "ingested",
+      "chunks_created": 405,
+      "error": null,
+      "metadata": {
+        "items_serialized": 405
+      },
+      "last_ingested": "2026-04-28T20:57:05.961247",
+      "mtime": 1772050248.5249186,
+      "size": 100936
+    },
+    "/Volumes/raedsync/Documents/OmniVista/FIX Dict/Messages_FIX42.xml": {
+      "path": "/Volumes/raedsync/Documents/OmniVista/FIX Dict/Messages_FIX42.xml",
+      "filetype": "xml",
+      "status": "ingested",
+      "chunks_created": 61,
+      "error": null,
+      "metadata": {
+        "items_serialized": 61
+      },
+      "last_ingested": "2026-04-28T20:57:08.773260",
+      "mtime": 1399468176.0,
+      "size": 21311
+    },
+    "/Volumes/raedsync/Documents/OmniVista/FIX Dict/MsgContents_FIX42.xml": {
+      "path": "/Volumes/raedsync/Documents/OmniVista/FIX Dict/MsgContents_FIX42.xml",
+      "filetype": "xml",
+      "status": "ingested",
+      "chunks_created": 48,
+      "error": null,
+      "metadata": {
+        "items_serialized": 48
+      },
+      "last_ingested": "2026-04-28T20:57:10.586444",
+      "mtime": 1399468180.0,
+      "size": 377367
+    },
+    "/Volumes/raedsync/Documents/OmniVista/FIX Dict/Components_FIX42.xml": {
+      "path": "/Volumes/raedsync/Documents/OmniVista/FIX Dict/Components_FIX42.xml",
+      "filetype": "xml",
+      "status": "ingested",
+      "chunks_created": 3,
+      "error": null,
+      "metadata": {
+        "items_serialized": 3
+      },
+      "last_ingested": "2026-04-28T20:57:10.784770",
+      "mtime": 1399468170.0,
+      "size": 3194
+    },
+    "/Volumes/raedsync/Documents/OmniVista/FIX Dict/Enums_FIX42.xml": {
+      "path": "/Volumes/raedsync/Documents/OmniVista/FIX Dict/Enums_FIX42.xml",
+      "filetype": "xml",
+      "status": "ingested",
+      "chunks_created": 104,
+      "error": null,
+      "metadata": {
+        "items_serialized": 104
+      },
+      "last_ingested": "2026-04-28T20:57:15.537127",
+      "mtime": 1399468172.0,
+      "size": 107855
+    },
+    "/Volumes/raedsync/Documents/OmniVista/FIX Dict/Abbreviations_FIX44.xml": {
+      "path": "/Volumes/raedsync/Documents/OmniVista/FIX Dict/Abbreviations_FIX44.xml",
+      "filetype": "xml",
+      "status": "ingested",
+      "chunks_created": 0,
+      "error": null,
+      "metadata": {
+        "reason": "buffered_waiting_for_finalize"
+      },
+      "last_ingested": "2026-04-28T20:57:15.571953",
+      "mtime": 1399468190.0,
+      "size": 21131
+    },
+    "/Volumes/raedsync/Documents/OmniVista/FIX Dict/Sections_FIX44.xml": {
+      "path": "/Volumes/raedsync/Documents/OmniVista/FIX Dict/Sections_FIX44.xml",
+      "filetype": "xml",
+      "status": "ingested",
+      "chunks_created": 4,
+      "error": null,
+      "metadata": {
+        "items_serialized": 4
+      },
+      "last_ingested": "2026-04-28T20:57:15.872397",
+      "mtime": 1399468200.0,
+      "size": 3904
+    },
+    "/Volumes/raedsync/Documents/OmniVista/FIX Dict/Fields_FIX44.xml": {
+      "path": "/Volumes/raedsync/Documents/OmniVista/FIX Dict/Fields_FIX44.xml",
+      "filetype": "xml",
+      "status": "ingested",
+      "chunks_created": 912,
+      "error": null,
+      "metadata": {
+        "items_serialized": 912
+      },
+      "last_ingested": "2026-04-28T20:57:54.701134",
+      "mtime": 1399468196.0,
+      "size": 277743
+    },
+    "/Volumes/raedsync/Documents/OmniVista/FIX Dict/Datatypes_FIX44.xml": {
+      "path": "/Volumes/raedsync/Documents/OmniVista/FIX Dict/Datatypes_FIX44.xml",
+      "filetype": "xml",
+      "status": "ingested",
+      "chunks_created": 0,
+      "error": null,
+      "metadata": {
+        "reason": "buffered_waiting_for_finalize"
+      },
+      "last_ingested": "2026-04-28T20:57:54.727141",
+      "mtime": 1399468194.0,
+      "size": 21184
+    },
+    "/Volumes/raedsync/Documents/OmniVista/FIX Dict/Categories_FIX44.xml": {
+      "path": "/Volumes/raedsync/Documents/OmniVista/FIX Dict/Categories_FIX44.xml",
+      "filetype": "xml",
+      "status": "ingested",
+      "chunks_created": 21,
+      "error": null,
+      "metadata": {
+        "items_serialized": 21
+      },
+      "last_ingested": "2026-04-28T20:57:55.401841",
+      "mtime": 1399468192.0,
+      "size": 8891
+    },
+    "/Volumes/raedsync/Documents/OmniVista/FIX Dict/MsgContents_FIX44.xml": {
+      "path": "/Volumes/raedsync/Documents/OmniVista/FIX Dict/MsgContents_FIX44.xml",
+      "filetype": "xml",
+      "status": "ingested",
+      "chunks_created": 116,
+      "error": null,
+      "metadata": {
+        "items_serialized": 116
+      },
+      "last_ingested": "2026-04-28T20:57:59.879287",
+      "mtime": 1399468200.0,
+      "size": 756773
+    },
+    "/Volumes/raedsync/Documents/OmniVista/FIX Dict/Messages_FIX44.xml": {
+      "path": "/Volumes/raedsync/Documents/OmniVista/FIX Dict/Messages_FIX44.xml",
+      "filetype": "xml",
+      "status": "ingested",
+      "chunks_created": 115,
+      "error": null,
+      "metadata": {
+        "items_serialized": 115
+      },
+      "last_ingested": "2026-04-28T20:58:04.597525",
+      "mtime": 1399468198.0,
+      "size": 45168
+    },
+    "/Volumes/raedsync/Documents/OmniVista/FIX Dict/Enums_FIX44.xml": {
+      "path": "/Volumes/raedsync/Documents/OmniVista/FIX Dict/Enums_FIX44.xml",
+      "filetype": "xml",
+      "status": "ingested",
+      "chunks_created": 248,
+      "error": null,
+      "metadata": {
+        "items_serialized": 248
+      },
+      "last_ingested": "2026-04-28T20:58:15.143948",
+      "mtime": 1399468194.0,
+      "size": 321003
+    },
+    "/Volumes/raedsync/Documents/OmniVista/FIX Dict/Components_FIX44.xml": {
+      "path": "/Volumes/raedsync/Documents/OmniVista/FIX Dict/Components_FIX44.xml",
+      "filetype": "xml",
+      "status": "ingested",
+      "chunks_created": 122,
+      "error": null,
+      "metadata": {
+        "items_serialized": 122
+      },
+      "last_ingested": "2026-04-28T20:58:20.255826",
+      "mtime": 1399468192.0,
+      "size": 37979
+    },
+    "/Volumes/raedsync/Documents/OmniVista/FIX Dict/fix_dict_test/Fields_FIX42.xml": {
+      "path": "/Volumes/raedsync/Documents/OmniVista/FIX Dict/fix_dict_test/Fields_FIX42.xml",
+      "filetype": "xml",
+      "status": "ingested",
+      "chunks_created": 405,
+      "error": null,
+      "metadata": {
+        "items_serialized": 405
+      },
+      "last_ingested": "2026-04-28T20:58:38.413908",
+      "mtime": 1772050248.5249186,
+      "size": 100936
     }
   }
 }
