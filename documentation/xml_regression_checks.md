@@ -31,7 +31,7 @@ Required schema roles:
 
 | Role | Purpose |
 |---|---|
-| identifier | Field/tag identifier, for example tag 22 |
+| identifier | Field/tag identifier, for example tag 22 | In progress |
 | primary_name | Main field name, for example SecurityIDSource |
 | description | Field description |
 | enum_value | Enum value/code |
