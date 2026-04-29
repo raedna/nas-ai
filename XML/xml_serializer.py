@@ -137,6 +137,9 @@ def xml_finalize(file_path, collection_name, file_tags):
             continue
 
         payload = {
+            "identifier_field": doc.get("identifier_field"),
+            "identifier_namespace": doc.get("identifier_namespace"),
+            "source_files": doc.get("raw", {}).get("source_files", []),
             "identifier": doc.get("identifier"),
             "primary_name": doc.get("primary_name"),
             "description": doc.get("description"),
