@@ -11,7 +11,9 @@ def normalize_link_index(link_index, schema=None):
         primary_name = entry.get("primary_name")
 
         doc = {
-            "identifier": str(identifier) if identifier is not None else None,
+            "identifier": str(entry.get("identifier") or identifier).split(":", 1)[-1],
+            "identifier_field": entry.get("identifier_field"),
+            "identifier_namespace": entry.get("identifier_namespace"),
             "primary_name": str(primary_name).strip() if primary_name else None,
             "description": str(description).strip() if description else None,
             "aliases": entry.get("aliases", []),

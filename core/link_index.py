@@ -1,6 +1,22 @@
 import re
 
 
+def _normalize_namespace(field_name):
+    return re.sub(r"[^a-z0-9]+", "", str(field_name or "").lower())
+
+
+def _get_first_identifier(row_norm, id_fields):
+    for f in id_fields:
+        val = row_norm.get(f.lower())
+        if val not in [None, ""]:
+            identifier = str(val).strip()
+            identifier_field = f
+            identifier_namespace = _normalize_namespace(f)
+            link_key = f"{identifier_namespace}:{identifier}"
+            return identifier, identifier_field, identifier_namespace, link_key
+
+    return None, None, None, None
+
 def _extract_related_identifiers_from_text(text, known_identifiers, self_identifier=None):
     text = str(text or "").strip()
     if not text:
@@ -71,11 +87,13 @@ def build_link_index(all_rows, schema_map):
             row_norm = {k.lower(): v for k, v in row.items()}
 
             # --- IDENTIFIER ---
-            identifiers = []
-            for f in id_fields:
-                val = row_norm.get(f.lower())
-                if val:
-                    identifiers.append(val)
+            identifier, identifier_field, identifier_namespace, link_key = _get_first_identifier(
+                row_norm,
+                id_fields
+            )
+
+            if not link_key:
+                continue
 
             # --- NAMES ---
             names = []
@@ -91,12 +109,13 @@ def build_link_index(all_rows, schema_map):
                 if val:
                     descs.append(val)
 
-            for ident in identifiers:
-
-                key = str(ident).strip()
+            for key in [link_key]:
 
                 if key not in link_index["identifier"]:
                     link_index["identifier"][key] = {
+                        "identifier": identifier,
+                        "identifier_field": identifier_field,
+                        "identifier_namespace": identifier_namespace,
                         "primary_name": None,
                         "aliases": [],
                         "description": None,
@@ -173,19 +192,21 @@ def build_link_index(all_rows, schema_map):
             # =========================
             # IDENTIFIER (schema-driven)
             # =========================
-            key = None
+            identifier, identifier_field, identifier_namespace, link_key = _get_first_identifier(
+                row_norm,
+                id_fields
+            )
 
-            for f in id_fields:
-                val = row_norm.get(f.lower())
-                if val:
-                    key = str(val).strip()
-                    break
-
-            if not key:
+            if not link_key:
                 continue
+
+            key = link_key
 
             if key not in link_index["identifier"]:
                 link_index["identifier"][key] = {
+                    "identifier": identifier,
+                    "identifier_field": identifier_field,
+                    "identifier_namespace": identifier_namespace,
                     "primary_name": None,
                     "aliases": [],
                     "description": None,
