@@ -1,8 +1,6 @@
 __pycache__/
 *.pyc
-
+config/collection_state/*.json
 schemas/*.json
 config/schema_overrides.json
-core/__pycache__/
-config/collection_state/*.json
 .DS_Store
