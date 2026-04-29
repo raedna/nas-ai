@@ -17,8 +17,7 @@
     "serializer": "xml",
     "template_config": {
       "batch_finalize": true
-  }
-}
+    }
   },
   "image": {
     "extensions": ["png", "jpg", "jpeg", "webp", "tif", "tiff"],
