@@ -3,57 +3,6 @@ __pycache__/
 
 schemas/*.json
 config/schema_overrides.json
-schemas/xml_test_Sections_FIX44_schema.json
-schemas/xml_test_MsgContents_FIX44_schema.json
-schemas/xml_test_MsgContents_FIX42_schema.json
-schemas/xml_test_Messages_FIX44_schema.json
-schemas/xml_test_Messages_FIX42_schema.json
-schemas/xml_test_Fields_FIX44_schema.json
-schemas/xml_test_Fields_FIX42_schema.json
-schemas/xml_test_Enums_FIX44_schema.json
-schemas/xml_test_Enums_FIX42_schema.json
-schemas/xml_test_Datatypes_FIX44_schema.json
-schemas/xml_test_Datatypes_FIX42_schema.json
-schemas/xml_test_Components_FIX44_schema.json
-schemas/xml_test_Components_FIX42_schema.json
-schemas/xml_test_Categories_FIX44_schema.json
-schemas/xml_test_Abbreviations_FIX44_schema.json
-schemas/tables_test_Ticket_Details_01192026_schema.json
-schemas/tables_test_Project Timelines 2_schema.json
-schemas/tables_test_KB_Articles RN_20260225_schema.json
-schemas/tables_test_BBG_FIELDS_TEST_schema.json
-schemas/support_mix_test_Ticket_Details_01192026_schema.json
-schemas/support_mix_test_KB_Articles RN_20260225_schema.json
-schemas/kb_test_KB_Articles RN_20260225_schema.json
-schemas/kb_docs_nofilter_KB_Articles RN_20260225_schema.json
-schemas/kb_docs_KB_Articles RN_20260225_schema.json
-schemas/fix_test_Fields_FIX44_schema.json
-schemas/fix_test_Fields_FIX42_schema.json
-schemas/fix_test_Enums_FIX44_schema.json
-schemas/fix_test_Enums_FIX42_schema.json
-schemas/bbg_test_Ticket_Details_01192026_schema.json
-schemas/bbg_test_Project Timelines 2_schema.json
-schemas/bbg_test_KB_Articles RN_20260225_schema.json
-schemas/bbg_test_BBG_FIELDS_TEST_schema.json
-schemas/bbg_fields_BBG_FIELDS_TEST_schema.json
-schemas/all_filetypes_test_Ticket_Details_01192026_schema.json
-schemas/all_filetypes_test_Project Timelines 2_schema.json
-schemas/all_filetypes_test_KB_Articles RN_20260225_schema.json
-schemas/all_filetypes_test_Fields_FIX44_schema.json
-schemas/all_filetypes_test_Fields_FIX42_schema.json
-schemas/all_filetypes_test_Enums_FIX44_schema.json
-schemas/all_filetypes_test_Enums_FIX42_schema.json
-schemas/all_filetypes_test_BBG_FIELDS_TEST_schema.json
-config/collection_state/xml_test.json
-core/__pycache__/collection_merger.cpython-311.pyc
-core/__pycache__/collection_state.cpython-311.pyc
-core/__pycache__/embedder.cpython-311.pyc
-core/__pycache__/ingest_collection.cpython-311.pyc
-core/__pycache__/nlp_generator.cpython-311.pyc
-core/__pycache__/schema_inference.cpython-311.pyc
-config/collection_state/xml_test.json
-config/collection_state/xml_test.json
-config/collection_state/xml_test.json
-config/collection_state/kb_docs.json
+core/__pycache__/
 config/collection_state/*.json
 .DS_Store
