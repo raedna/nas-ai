@@ -55,3 +55,5 @@ config/collection_state/xml_test.json
 config/collection_state/xml_test.json
 config/collection_state/xml_test.json
 config/collection_state/kb_docs.json
+config/collection_state/*.json
+.DS_Store

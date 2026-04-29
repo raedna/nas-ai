@@ -77,6 +77,13 @@ def _build_tasks(
     tasks: List[FileTask] = []
     filetypes = load_filetypes()
 
+    filetype_counts = {}
+
+    for f in source_files:
+        matched_filetype = _match_filetype(f, filetypes)
+        if matched_filetype:
+            filetype_counts[matched_filetype] = filetype_counts.get(matched_filetype, 0) + 1
+
     for file_path in source_files:
         filetype_name = _match_filetype(file_path, filetypes)
         if not filetype_name:
@@ -109,6 +116,9 @@ def _build_tasks(
             **collection_template_config,
             "filters": collection_cfg.get("filters", {}),
         }
+
+        if base_template_config.get("batch_finalize"):
+            base_template_config["expected_files"] = filetype_counts.get(filetype_name, 1)
 
         for key in [
             "asset_search_roots",
