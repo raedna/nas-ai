@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 from typing import Any, Dict, List
-
+from core.paths import FILETYPES_PATH
 from core.embedder import embed_texts
 from core.orchestrator import FileTask, IngestionOrchestrator
 from core.qdrant_client import upsert_vectors
@@ -14,7 +14,7 @@ import traceback
 DEBUG = True
 
 def load_filetypes():
-    path = Path("config/filetypes.json")
+    path = FILETYPES_PATH
     with open(path, "r", encoding="utf-8") as f:
         return json.load(f)
 
