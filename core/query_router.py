@@ -4,7 +4,7 @@ from core.query_helpers import (
     normalize_simple_text,
     expand_terms_with_synonyms,
 )
-
+from core.paths import CONFIG_DIR, SCHEMAS_DIR
 from core.embedder import embed_texts
 from qdrant_client import QdrantClient
 from qdrant_client.models import Filter, FieldCondition, MatchValue
@@ -27,7 +27,7 @@ DEBUG = True
 
 
 def load_query_terms():
-    path = Path("config/query_terms.json")
+    path = CONFIG_DIR / "query_terms.json"
     if not path.exists():
         return {}
     with open(path, "r", encoding="utf-8") as f:
@@ -285,7 +285,7 @@ def detect_requested_roles(question, field_maps):
 
 def load_collection_schemas(collection_name):
 
-    schema_dir = Path("schemas")
+    schema_dir = SCHEMAS_DIR
 
     schemas = {}
 
@@ -366,7 +366,7 @@ def get_source_label(collection_name, payload):
     return f"Source file: {source_file}"
 
 def load_source_labels():
-    with open("config/source_labels.json", "r", encoding="utf-8") as f:
+    with open(CONFIG_DIR / "source_labels.json", "r", encoding="utf-8") as f:
         return json.load(f)
 
 # --- GENERIC IDENTIFIER DETECTION ---
@@ -1178,7 +1178,7 @@ def has_structured_candidates(points):
     return False
 
 def load_synonyms():
-        path = Path("config/synonyms.json")
+        path = Path(CONFIG_DIR / "synonyms.json")
         if not path.exists():
             return {}
         with open(path, "r", encoding="utf-8") as f:
