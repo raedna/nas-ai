@@ -23,7 +23,7 @@ Status values:
 | CORE-005 | core/collection_state.py | File state key uses filename only, which can collide across folders. | Use normalized source path or path hash as state key. | Medium | Done |
 | CORE-006 | core/qdrant_client.py | Delete-before-upsert depends on inconsistent source_file metadata. | Standardize payload metadata and delete key. | High | Done |
 | CORE-007 | core/collection_merger.py | Merge strategies are not configurable per filetype. | Add filetype-level merge_strategy later. | Medium | Not Started |
-| CORE-008 | UI validation | Ingestion has no generic validation dashboard for schemas and Qdrant payloads. | Add validation tab for schema and payload checks across filetypes. | High | Not Started |
+| CORE-008 | UI validation | Ingestion has no generic validation dashboard for schemas and Qdrant payloads. | Add validation tab for schema and payload checks across filetypes. | High | Done |
 | CORE-009 | path handling | Some scripts use relative paths like config/ and schemas/ which depend on launch folder. | Centralize project-root path resolution and use it across config/schema/state files. | High | Not Started |
 ---
 
@@ -32,9 +32,12 @@ Status values:
 | ID | Area | Issue | Suggested Fix | Priority | Status |
 |---|---|---|---|---|---|
 | XML-001 | XML/xml_serializer.py | Serializer stores batch state on function attributes. | Replace with explicit batch context or orchestrator-supported finalize flow. | Critical | Not Started |
-| XML-002 | XML/xml_serializer.py | expected_files is not clearly set by core. | Core should pass expected file count or batch info explicitly. | Critical | Not Started |
+| XML-002 | XML/xml_serializer.py | expected_files is not clearly set by core. | Core should pass expected file count or batch info explicitly. | Critical | Done |
 | XML-003 | XML/xml_parser.py | Row tag is auto-detected only by most frequent tag. | Add optional row_tag override in template config. | Medium | Not Started |
-| XML-004 | core/link_index.py | Enum linking depends heavily on schema inference. | Add regression checks for tag enum questions before changing logic. | Critical | Not Started |
+| XML-004 | core/link_index.py | Enum linking depends heavily on schema inference. | Add regression checks for tag enum questions before changing logic. | Critical | Done |
+| XML-005 | XML schema/linking | XML files with different row meanings share identifier values and collide. | Add namespace-aware identifiers using identifier_field and identifier_namespace. | Critical | Done |
+| XML-006 | XML serializer/linking | Field definitions and enum values from separate XML files were stored as split payloads. | Use batch finalization to assemble same-entity XML records before embedding. | Critical | Done |
+| XML-007 | XML relationship linking | Same-file and same-collection relationships, such as tag 48 referencing tag 22, are not namespace-aware. | Add link_keys and related_link_keys without merging separate entities. | High | Not Started |
 
 ---
 
@@ -101,3 +104,11 @@ Status values:
 | REG-IMG-001 | Images | Screenshot OCR works. | Not Started |
 | REG-PDF-001 | PDF | Readable PDF ingestion works. | Not Started |
 | REG-PDF-002 | PDF | Scanned PDF OCR ingestion works. | Not Started |
+
+## 9. Post-ingestion linking
+
+| ID | Area | Issue | Suggested Fix | Priority | Status |
+|---|---|---|---|---|---|
+| LINK-001 | Cross-filetype linking | Payloads from docs, tables, XML, logs, and tickets are not linked after ingestion. | Add generic link_keys and related_link_keys metadata model. | High | Not Started |
+| LINK-002 | Cross-collection linking | Related entities across collections cannot be discovered or expanded reliably. | Build post-ingestion crosslink index across collections using link_keys. | High | Not Started |
+| LINK-003 | Retrieval expansion | Retrieval does not yet expand from one entity to linked chunks/docs/logs/tickets. | Add retrieval-time expansion using related_link_keys and crosslink index. | High | Not Started |
