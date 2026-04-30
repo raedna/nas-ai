@@ -1,9 +1,10 @@
 from pathlib import Path
 import json
+from core.paths import SCHEMAS_DIR
+schema_dir = SCHEMAS_DIR
 
 def load_collection_schemas(collection_name):
 
-    schema_dir = Path("schemas")
     schemas = {}
 
     for file in schema_dir.iterdir():   # 🔥 CHANGE HERE
