@@ -105,6 +105,8 @@ Status values:
 | REG-PDF-001 | PDF | Readable PDF ingestion works. | Not Started |
 | REG-PDF-002 | PDF | Scanned PDF OCR ingestion works. | Not Started |
 
+---
+
 ## 9. Post-ingestion linking
 
 | ID | Area | Issue | Suggested Fix | Priority | Status |

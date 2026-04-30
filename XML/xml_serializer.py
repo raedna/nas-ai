@@ -150,6 +150,8 @@ def xml_finalize(file_path, collection_name, file_tags):
             "source_file": primary_source_file,
             "source_files": source_files,
             "ingest_source": primary_source_file,
+            "link_keys": doc.get("link_keys", []),
+            "related_link_keys": doc.get("related_link_keys", []),
             **file_tags
         }
 

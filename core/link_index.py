@@ -4,6 +4,27 @@ import re
 def _normalize_namespace(field_name):
     return re.sub(r"[^a-z0-9]+", "", str(field_name or "").lower())
 
+def _extract_related_link_keys_from_text(text, known_identifiers, namespace, self_identifier=None):
+    text = str(text or "").strip()
+    if not text or not namespace:
+        return set()
+
+    token_matches = set(re.findall(r"[A-Za-z0-9_]+", text))
+    related = set()
+
+    for ident in known_identifiers:
+        ident_str = str(ident).strip()
+        if not ident_str:
+            continue
+
+        if self_identifier is not None and ident_str == str(self_identifier).strip():
+            continue
+
+        if ident_str in token_matches:
+            related.add(f"{namespace}:{ident_str}")
+
+    return related
+
 
 def _get_first_identifier(row_norm, id_fields):
     for f in id_fields:
@@ -48,6 +69,7 @@ def build_link_index(all_rows, schema_map):
     # COLLECT KNOWN IDENTIFIERS
     # =========================
     known_identifiers = set()
+    known_identifiers_by_namespace = {}
 
     for source_file, rows in all_rows.items():
         schema = schema_map.get(source_file, {})
@@ -92,6 +114,10 @@ def build_link_index(all_rows, schema_map):
                 id_fields
             )
 
+            if identifier and identifier_namespace:
+                known_identifiers.add(identifier)
+                known_identifiers_by_namespace.setdefault(identifier_namespace, set()).add(identifier)
+
             if not link_key:
                 continue
 
@@ -121,7 +147,9 @@ def build_link_index(all_rows, schema_map):
                         "description": None,
                         "enum_values": [],
                         "source_files": set(),
-                        "related_identifiers": set()
+                        "related_identifiers": set(),
+                        "link_keys": set([link_key]),
+                        "related_link_keys": set(),
                     }
 
                 entry = link_index["identifier"][key]
@@ -161,12 +189,16 @@ def build_link_index(all_rows, schema_map):
                 # explicit identifier refs in description text
                 # =========================
                 for desc in descs:
-                    related = _extract_related_identifiers_from_text(
+                    same_namespace_ids = known_identifiers_by_namespace.get(identifier_namespace, set())
+
+                    related_link_keys = _extract_related_link_keys_from_text(
                         desc,
-                        known_identifiers=known_identifiers,
-                        self_identifier=key
+                        known_identifiers=same_namespace_ids,
+                        namespace=identifier_namespace,
+                        self_identifier=identifier
                     )
-                    entry["related_identifiers"].update(related)
+
+                    entry["related_link_keys"].update(related_link_keys)
 
                 entry["source_files"].add(source_file)
 
@@ -269,6 +301,13 @@ def build_link_index(all_rows, schema_map):
         )
         link_index["identifier"][k]["related_identifiers"] = sorted(
             list(link_index["identifier"][k]["related_identifiers"])
+        )
+        link_index["identifier"][k]["link_keys"] = sorted(
+            list(link_index["identifier"][k].get("link_keys", []))
+        )
+
+        link_index["identifier"][k]["related_link_keys"] = sorted(
+            list(link_index["identifier"][k].get("related_link_keys", []))
         )
 
     return link_index
