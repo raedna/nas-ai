@@ -3,8 +3,6 @@ from __future__ import annotations
 from pathlib import Path
 import sys
 
-CURRENT_DIR = Path(__file__).resolve().parent
-PROJECT_ROOT = CURRENT_DIR.parent
 
 # remove /core from import path so it does not shadow installed packages
 sys.path = [p for p in sys.path if Path(p).resolve() != CURRENT_DIR]
