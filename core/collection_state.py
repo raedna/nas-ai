@@ -1,9 +1,10 @@
 import json
 from datetime import datetime
 from pathlib import Path
+from core.paths import COLLECTION_STATE_DIR
 
 
-STATE_DIR = Path("config/collection_state")
+STATE_DIR = COLLECTION_STATE_DIR
 
 
 def _state_path(collection_name):
