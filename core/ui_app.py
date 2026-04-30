@@ -27,13 +27,17 @@ from core.crosslink_engine import run_comparison_query
 # =========================================================
 # PATHS / CONFIG
 # =========================================================
-BASE_DIR = Path(__file__).resolve().parent.parent
-CONFIG_DIR = BASE_DIR / "config"
-COLLECTIONS_PATH = CONFIG_DIR / "collections.json"
-SYSTEM_CONFIG_PATH = CONFIG_DIR / "system.json"
-FILETYPES_PATH = CONFIG_DIR / "filetypes.json"
-SCHEMA_OVERRIDES_PATH = CONFIG_DIR / "schema_overrides.json"
-SCHEMAS_DIR = BASE_DIR / "schemas"
+from core.paths import (
+    PROJECT_ROOT,
+    CONFIG_DIR,
+    COLLECTIONS_PATH,
+    SYSTEM_CONFIG_PATH,
+    FILETYPES_PATH,
+    SCHEMA_OVERRIDES_PATH,
+    SCHEMAS_DIR,
+)
+
+BASE_DIR = PROJECT_ROOT
 
 DEBUG = True
 
