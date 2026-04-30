@@ -1,8 +1,5 @@
 import json
-from pathlib import Path
-
-
-COLLECTIONS_PATH = Path("config/collections.json")
+from core.paths import COLLECTIONS_PATH
 
 
 def load_collections():
