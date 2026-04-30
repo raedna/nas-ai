@@ -81,10 +81,14 @@ def build_link_index(all_rows, schema_map):
 
             row_norm = {k.lower(): v for k, v in row.items()}
 
-            for f in id_fields:
-                val = row_norm.get(f.lower())
-                if val:
-                    known_identifiers.add(str(val).strip())
+            identifier, identifier_field, identifier_namespace, link_key = _get_first_identifier(
+                row_norm,
+                id_fields
+            )
+
+            if identifier and identifier_namespace:
+                known_identifiers.add(identifier)
+                known_identifiers_by_namespace.setdefault(identifier_namespace, set()).add(identifier)
 
     # =========================
     # BASE PASS (FIELDS)
@@ -113,10 +117,6 @@ def build_link_index(all_rows, schema_map):
                 row_norm,
                 id_fields
             )
-
-            if identifier and identifier_namespace:
-                known_identifiers.add(identifier)
-                known_identifiers_by_namespace.setdefault(identifier_namespace, set()).add(identifier)
 
             if not link_key:
                 continue
