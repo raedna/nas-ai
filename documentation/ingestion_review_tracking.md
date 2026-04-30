@@ -24,7 +24,7 @@ Status values:
 | CORE-006 | core/qdrant_client.py | Delete-before-upsert depends on inconsistent source_file metadata. | Standardize payload metadata and delete key. | High | Done |
 | CORE-007 | core/collection_merger.py | Merge strategies are not configurable per filetype. | Add filetype-level merge_strategy later. | Medium | Not Started |
 | CORE-008 | UI validation | Ingestion has no generic validation dashboard for schemas and Qdrant payloads. | Add validation tab for schema and payload checks across filetypes. | High | Not Started |
-
+| CORE-009 | path handling | Some scripts use relative paths like config/ and schemas/ which depend on launch folder. | Centralize project-root path resolution and use it across config/schema/state files. | High | Not Started |
 ---
 
 ## 2. XML ingestion

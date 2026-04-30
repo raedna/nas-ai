@@ -136,16 +136,20 @@ def xml_finalize(file_path, collection_name, file_tags):
         if not text:
             continue
 
+        source_files = doc.get("raw", {}).get("source_files", [])
+        primary_source_file = source_files[0] if source_files else str(file_path)
+
         payload = {
             "identifier_field": doc.get("identifier_field"),
             "identifier_namespace": doc.get("identifier_namespace"),
-            "source_files": doc.get("raw", {}).get("source_files", []),
             "identifier": doc.get("identifier"),
             "primary_name": doc.get("primary_name"),
             "description": doc.get("description"),
             "enum_values": doc.get("enum_values"),
             "type": doc.get("type"),
-            "source_file": str(file_path),
+            "source_file": primary_source_file,
+            "source_files": source_files,
+            "ingest_source": primary_source_file,
             **file_tags
         }
 

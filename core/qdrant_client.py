@@ -116,7 +116,7 @@ def upsert_vectors(collection_name, vectors, payloads, source_file=None, force_r
     for vec, payload in zip(vectors, payloads):
         enriched_payload = dict(payload)
 
-        if source_file:
+        if source_file and not enriched_payload.get("ingest_source"):
             enriched_payload["ingest_source"] = str(source_file)
 
         point = PointStruct(
