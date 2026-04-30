@@ -25,6 +25,7 @@ Status values:
 | CORE-007 | core/collection_merger.py | Merge strategies are not configurable per filetype. | Add filetype-level merge_strategy later. | Medium | Not Started |
 | CORE-008 | UI validation | Ingestion has no generic validation dashboard for schemas and Qdrant payloads. | Add validation tab for schema and payload checks across filetypes. | High | Done |
 | CORE-009 | path handling | Some scripts use relative paths like config/ and schemas/ which depend on launch folder. | Centralize project-root path resolution and use it across config/schema/state files. | High | Not Started |
+| CORE-010 | UI validation | Payload Inspector hides link_keys and related_link_keys in raw payload only. | Add link_keys and related_link_keys columns to the Payload Inspector table. | Low | Not Started |
 ---
 
 ## 2. XML ingestion
@@ -37,7 +38,7 @@ Status values:
 | XML-004 | core/link_index.py | Enum linking depends heavily on schema inference. | Add regression checks for tag enum questions before changing logic. | Critical | Done |
 | XML-005 | XML schema/linking | XML files with different row meanings share identifier values and collide. | Add namespace-aware identifiers using identifier_field and identifier_namespace. | Critical | Done |
 | XML-006 | XML serializer/linking | Field definitions and enum values from separate XML files were stored as split payloads. | Use batch finalization to assemble same-entity XML records before embedding. | Critical | Done |
-| XML-007 | XML relationship linking | Same-file and same-collection relationships, such as tag 48 referencing tag 22, are not namespace-aware. | Add link_keys and related_link_keys without merging separate entities. | High | Not Started |
+| XML-007 | XML relationship linking | Same-file and same-collection relationships, such as tag 48 referencing tag 22, are not namespace-aware. | Add link_keys and related_link_keys without merging separate entities. | High | Done |
 
 ---
 
