@@ -1,9 +1,10 @@
 import json
 import re
 from pathlib import Path
+from core.paths import CONFIG_DIR
 
 
-DOC_QUERY_HINTS_PATH = Path("config/doc_query_hints.json")
+DOC_QUERY_HINTS_PATH = CONFIG_DIR / "doc_query_hints.json"
 
 
 def infer_doc_type(payload):
@@ -66,7 +67,7 @@ def expand_terms_with_synonyms(words):
 
 
 def load_synonyms():
-        path = Path("config/synonyms.json")
+        path = CONFIG_DIR / "synonyms.json"
         if not path.exists():
             return {}
         with open(path, "r", encoding="utf-8") as f:
