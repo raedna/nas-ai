@@ -1,3 +1,4 @@
+from core.paths import SCHEMAS_DIR, CONFIG_DIR
 from core.schema_inference import infer_schema, load_roles_config
 from core.link_index import build_link_index
 from core.normalizer import normalize_link_index
@@ -29,7 +30,7 @@ def xml_serializer(parsed, file_path, template_config, file_tags, collection_nam
 
     # 🔥 ensure schema exists
     if not schema:
-        roles = load_roles_config("config/structured_roles.json")
+        roles = load_roles_config(CONFIG_DIR / "structured_roles.json")
         schema = infer_schema(rows, roles)
 
     if isinstance(rows, dict):
@@ -82,7 +83,7 @@ def xml_finalize(file_path, collection_name, file_tags):
             save_schema(
                 schema,
                 src_file,
-                "schemas",
+                SCHEMAS_DIR,
                 collection_name
             )
 
