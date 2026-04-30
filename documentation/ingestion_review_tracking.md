@@ -39,6 +39,7 @@ Status values:
 | XML-005 | XML schema/linking | XML files with different row meanings share identifier values and collide. | Add namespace-aware identifiers using identifier_field and identifier_namespace. | Critical | Done |
 | XML-006 | XML serializer/linking | Field definitions and enum values from separate XML files were stored as split payloads. | Use batch finalization to assemble same-entity XML records before embedding. | Critical | Done |
 | XML-007 | XML relationship linking | Same-file and same-collection relationships, such as tag 48 referencing tag 22, are not namespace-aware. | Add link_keys and related_link_keys without merging separate entities. | High | Done |
+| XML-008 | XML/xml_ingestion.py | Legacy standalone XML ingestion script bypasses orchestrator and contains hardcoded paths/Qdrant URL. | Confirm unused, then remove or move to archive. | Medium | Not Started |
 
 ---
 
