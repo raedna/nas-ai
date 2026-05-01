@@ -1213,7 +1213,32 @@ def has_structured_candidates(points):
     for p in points or []:
         payload = p.payload or {}
         if infer_doc_type(payload) == "structured":
-            return True
+            lines = []
+
+            if identifier_value and primary_name:
+                lines.append(f"{identifier_field} {identifier_value} is {primary_name}.")
+            elif primary_name:
+                lines.append(str(primary_name))
+
+            if description:
+                lines.append(f"\nDescription: {description}")
+
+            if enum_values:
+                lines.append("\nAllowed values:")
+                for e in enum_values:
+                    if isinstance(e, dict):
+                        val = e.get("Value") or e.get("value")
+                        name = e.get("SymbolicName") or e.get("symbolicname") or e.get("Name") or e.get("name")
+                        if val and name:
+                            lines.append(f"- {val}: {name}")
+                        elif val:
+                            lines.append(f"- {val}")
+                        elif name:
+                            lines.append(f"- {name}")
+                    else:
+                        lines.append(f"- {e}")
+
+            return "\n".join(lines).strip()
     return False
 
 def load_synonyms():
@@ -1774,6 +1799,12 @@ def synthesize_answer(payload, roles, collection_name):
     doc_type = payload.get("doc_type")
     source_label = get_source_label(collection_name, payload)
     source_type = str(payload.get("source_type") or "").lower()
+
+    identifier_field = payload.get("identifier_field") or get_display_labels(collection).get("identifier", "identifier")
+    identifier_value = payload.get("identifier")
+    primary_name = payload.get("primary_name")
+    description = payload.get("description")
+    enum_values = payload.get("enum_values") or []
 
     if DEBUG:
         print("ENUMS:", enums)
