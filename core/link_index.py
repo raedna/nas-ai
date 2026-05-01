@@ -9,7 +9,6 @@ def _extract_related_link_keys_from_text(text, known_identifiers, namespace, sel
     if not text or not namespace:
         return set()
 
-    token_matches = set(re.findall(r"[A-Za-z0-9_]+", text))
     related = set()
 
     for ident in known_identifiers:
@@ -20,7 +19,15 @@ def _extract_related_link_keys_from_text(text, known_identifiers, namespace, sel
         if self_identifier is not None and ident_str == str(self_identifier).strip():
             continue
 
-        if ident_str in token_matches:
+        escaped = re.escape(ident_str)
+
+        explicit_patterns = [
+            rf"\btag\s*\(?\s*{escaped}\s*\)?\b",
+            rf"\bfield\s*\(?\s*{escaped}\s*\)?\b",
+            rf"\({escaped}\)",
+        ]
+
+        if any(re.search(pattern, text, flags=re.IGNORECASE) for pattern in explicit_patterns):
             related.add(f"{namespace}:{ident_str}")
 
     return related
