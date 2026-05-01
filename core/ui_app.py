@@ -2,15 +2,6 @@ from __future__ import annotations
 
 from pathlib import Path
 import sys
-
-
-# remove /core from import path so it does not shadow installed packages
-sys.path = [p for p in sys.path if Path(p).resolve() != CURRENT_DIR]
-
-# ensure project root is first
-if str(PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(PROJECT_ROOT))
-
 import json
 from datetime import datetime
 
