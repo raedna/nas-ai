@@ -13,6 +13,7 @@ from core.field_map_loader import load_field_maps
 from core.collection_config import get_collection
 from core.crosslink_engine import (
     fetch_points_by_identifier,
+    fetch_points_by_identifier_namespace,
     merge_payloads_for_identifier,
     expand_related_identifiers,
     reverse_lookup_by_enum_value,
@@ -79,6 +80,27 @@ def extract_explicit_identifier(question: str):
             return m.group(1)
 
     return None
+
+def extract_explicit_identifier_namespace(question: str):
+    q = normalize_simple_text(question)
+
+    m = re.search(r"\b([a-z][a-z0-9_]*)\s+([0-9]{1,8})\b", q)
+    if not m:
+        return None, None
+
+    namespace = m.group(1).strip()
+    identifier = m.group(2).strip()
+
+    noise_namespaces = {
+        "what", "which", "where", "when", "how", "why",
+        "can", "does", "is", "are", "have", "has",
+        "value", "values"
+    }
+
+    if namespace in noise_namespaces:
+        return None, None
+
+    return namespace, identifier
 
 def extract_negative_terms(question: str):
     q = normalize_simple_text(question)
@@ -239,6 +261,23 @@ def lexical_short_query_search(collection, question, limit=25):
 
 def run_query_with_method(collection, question, mode="best", limit=25):
     intent = detect_ask_intent(question)
+
+    namespace, identifier = extract_explicit_identifier_namespace(question)
+    if namespace and identifier:
+        points = fetch_points_by_identifier_namespace(
+            collection,
+            identifier=identifier,
+            identifier_namespace=namespace,
+            limit=5
+        )
+
+        if points:
+            payload = points[0].payload or {}
+            return {
+                "method": "structured_namespace_lookup",
+                "reason": f"explicit namespace+identifier detected: {namespace}:{identifier}",
+                "result": synthesize_answer(payload, [], collection)
+            }
 
     if intent["mode"] in ["discovery_count", "discovery_list"]:
         return run_discovery_with_method(collection, question, limit=limit)
