@@ -970,21 +970,18 @@ with tabs[3]:
                             st.session_state.ask_discovery_result = None
                             result = query_run["result"]
 
-                        elif intent["mode"] in {"discovery_count", "discovery_list"}:
-                            query_run = run_discovery_with_method(
-                                selected_collection,
-                                question,
-                                limit=200
-                            )
-                            st.session_state.ask_discovery_result = query_run["result"]
-                            result = query_run["result"]
                         else:
                             query_run = run_query_with_method(
                                 selected_collection,
                                 question,
                                 limit=int(debug_top_k)
                             )
-                            st.session_state.ask_discovery_result = None
+
+                            if query_run.get("method") in {"discovery_count", "discovery_list"}:
+                                st.session_state.ask_discovery_result = query_run["result"]
+                            else:
+                                st.session_state.ask_discovery_result = None
+
                             result = query_run["result"]
 
                     st.session_state.ask_result = result
