@@ -42,6 +42,7 @@ Status values:
 | XML-008 | XML/xml_ingestion.py | Legacy standalone XML ingestion script bypasses orchestrator and contains hardcoded paths/Qdrant URL. | Confirm unused, then remove or move to archive. | Medium | Not Started |
 | XML-009 | XML relationship validation | related_link_keys are extracted from any matching identifier number in description text, which may create false positives. | Add relationship confidence / relation_source / relation_text metadata and review filters. | Medium | Not Started |
 | XML-010 | XML relationship validation | related_link_keys are extracted from any matching identifier number in description text, which creates false positives. | Require explicit reference patterns such as “tag 22”, “field 22”, “(22)”, or known field-name references before creating related_link_keys. | High | Done |
+| XML-011 | Structured enum normalization | enum_values preserve source column names, forcing retrieval to guess keys like Value/SymbolicName. | Normalize enum entries during ingestion using schema roles into enum_value / enum_name / description keys. | High | Done |
 
 ---
 
