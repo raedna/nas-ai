@@ -11,8 +11,8 @@ The purpose is to protect FIX field lookup and enum lookup behavior.
 | ID | Question | Expected Behavior | Status |
 |---|---|---|---|
 | REG-XML-001 | XML | Ask can answer “what values can tag 22 have?” using namespace-aware structured lookup and normalized enum_values. | Done |
-| REG-XML-002 | What is tag 55? | Must identify tag 55 as Symbol / field name and explain its meaning. | Not Started |
-| REG-XML-003 | What does SecurityIDSource mean? | Must identify SecurityIDSource as tag 22 and explain it. | Not Started |
+| REG-XML-002 | XML | Ask can answer “what is tag 55?” using namespace-aware structured lookup. | Done |
+| REG-XML-003 | XML | Ask can answer “what does SecurityIDSource mean?” by matching primary_name or namespace lookup. | In Progress |
 | REG-XML-004 | What tag is Symbol? | Must identify Symbol as tag 55. | Not Started |
 | REG-XML-005 | What values can SecurityIDSource have? | Must return enum values for tag 22. | Not Started |
 | XML-006 | XML/schema/linking | Identifier values collide across different identifier fields such as Tag, ComponentID, SectionID, and MsgType. | Add identifier_namespace derived from schema identifier field name and use namespace + identifier for cross-linking. | Critical | Not Started |
