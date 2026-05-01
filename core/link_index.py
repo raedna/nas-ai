@@ -277,24 +277,24 @@ def build_link_index(all_rows, schema_map):
                     break
 
             if enum_val:
-                enum_entry = {}
+                enum_entry = {
+                    "enum_value": str(enum_val),
+                    "enum_name": enum_name,
+                }
 
-                # assign using schema column names
-                for f in value_fields:
+                # optional enum description, schema-driven
+                enum_description = None
+                for f in desc_fields:
                     v = row_norm.get(f.lower())
                     if v:
-                        enum_entry[f] = str(v)
+                        enum_description = str(v)
+                        break
 
-                for f in name_fields:
-                    v = row_norm.get(f.lower())
-                    if v:
-                        enum_entry[f] = str(v)
+                if enum_description:
+                    enum_entry["description"] = enum_description
 
                 def is_duplicate(e):
-                    for f in value_fields:
-                        if e.get(f) == enum_val:
-                            return True
-                    return False
+                    return str(e.get("enum_value") or "") == str(enum_val)
 
                 if not any(is_duplicate(e) for e in entry["enum_values"]):
                     entry["enum_values"].append(enum_entry)
