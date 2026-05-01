@@ -1784,20 +1784,13 @@ def synthesize_answer(payload, roles, collection_name):
             lines.append("\nAllowed values:")
             for e in enum_values:
                 if isinstance(e, dict):
-                    val = (
-                        e.get("Value")
-                        or e.get("value")
-                        or e.get("enum_value")
-                    )
-                    name = (
-                        e.get("SymbolicName")
-                        or e.get("symbolicname")
-                        or e.get("Name")
-                        or e.get("name")
-                        or e.get("enum_name")
-                    )
+                    val = e.get("enum_value")
+                    name = e.get("enum_name")
+                    desc = e.get("description")
 
-                    if val and name:
+                    if val and name and desc:
+                        lines.append(f"- {val}: {name} — {desc}")
+                    elif val and name:
                         lines.append(f"- {val}: {name}")
                     elif val:
                         lines.append(f"- {val}")
