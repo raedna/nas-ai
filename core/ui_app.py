@@ -2,17 +2,25 @@ from __future__ import annotations
 
 from pathlib import Path
 import sys
+
+CURRENT_DIR = Path(__file__).resolve().parent
+LOCAL_PROJECT_ROOT = CURRENT_DIR.parent
+
+# ensure project root is first so "core" imports work
+if str(LOCAL_PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(LOCAL_PROJECT_ROOT))
+
+# remove /core from import path so it does not shadow installed packages
+sys.path = [
+    p for p in sys.path
+    if Path(p).resolve() != CURRENT_DIR
+]
+
 import json
 from datetime import datetime
 
 import requests
 import streamlit as st
-
-from core.ingest_collection import ingest_collection
-from core.query_router import route_query, semantic_search, debug_route_query, fetch_entity_row_by_title, run_query_with_method, get_display_labels
-from core.discovery_engine import detect_ask_intent, run_discovery_with_method
-from core.crosslink_engine import run_comparison_query
-
 # =========================================================
 # PATHS / CONFIG
 # =========================================================
