@@ -344,6 +344,25 @@ def fetch_points_by_identifier(collection, identifier, limit=20):
     )
     return results.points
 
+def fetch_points_by_identifier_namespace(collection, identifier, identifier_namespace, limit=20):
+    results = client.query_points(
+        collection_name=collection,
+        query_filter=Filter(
+            must=[
+                FieldCondition(
+                    key="identifier",
+                    match=MatchValue(value=str(identifier))
+                ),
+                FieldCondition(
+                    key="identifier_namespace",
+                    match=MatchValue(value=str(identifier_namespace))
+                )
+            ]
+        ),
+        limit=limit
+    )
+    return results.points
+
 def reverse_lookup_structured_by_requested_role(collection, search_text, requested_role, limit=10):
     from core.query_router import infer_doc_type, normalize_simple_text
 
