@@ -41,7 +41,7 @@ Status values:
 | XML-007 | XML relationship linking | Same-file and same-collection relationships, such as tag 48 referencing tag 22, are not namespace-aware. | Add link_keys and related_link_keys without merging separate entities. | High | Done |
 | XML-008 | XML/xml_ingestion.py | Legacy standalone XML ingestion script bypasses orchestrator and contains hardcoded paths/Qdrant URL. | Confirm unused, then remove or move to archive. | Medium | Not Started |
 | XML-009 | XML relationship validation | related_link_keys are extracted from any matching identifier number in description text, which may create false positives. | Add relationship confidence / relation_source / relation_text metadata and review filters. | Medium | Not Started |
-| XML-010 | XML relationship validation | related_link_keys are extracted from any matching identifier number in description text, which creates false positives. | Require explicit reference patterns such as “tag 22”, “field 22”, “(22)”, or known field-name references before creating related_link_keys. | High | Not Started |
+| XML-010 | XML relationship validation | related_link_keys are extracted from any matching identifier number in description text, which creates false positives. | Require explicit reference patterns such as “tag 22”, “field 22”, “(22)”, or known field-name references before creating related_link_keys. | High | Done |
 
 ---
 
