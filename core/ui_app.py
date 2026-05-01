@@ -861,6 +861,9 @@ with tabs[2]:
                         payload = p.payload or {}
                         enum_values = payload.get("enum_values") or []
 
+                        link_keys = payload.get("link_keys") or []
+                        related_link_keys = payload.get("related_link_keys") or []
+
                         rows.append({
                             "identifier": payload.get("identifier"),
                             "identifier_field": payload.get("identifier_field"),
@@ -869,6 +872,8 @@ with tabs[2]:
                             "primary_name": payload.get("primary_name"),
                             "doc_type": payload.get("doc_type"),
                             "enum_count": len(enum_values) if isinstance(enum_values, list) else 0,
+                            "link_keys": ", ".join(link_keys) if isinstance(link_keys, list) else str(link_keys),
+                            "related_link_keys": ", ".join(related_link_keys) if isinstance(related_link_keys, list) else str(related_link_keys),
                             "source_file": payload.get("source_file"),
                             "ingest_source": payload.get("ingest_source"),
                         })
