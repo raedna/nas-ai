@@ -142,6 +142,41 @@ def reverse_lookup_by_enum_value(collection, search_text, limit=10):
             break
 
     return results
+
+def fetch_structured_points_by_primary_name(collection, search_text, limit=10):
+    from core.query_router import infer_doc_type, normalize_simple_text
+
+    q_norm = normalize_simple_text(search_text)
+    if not q_norm:
+        return []
+
+    points, _ = client.scroll(
+        collection_name=collection,
+        limit=5000,
+        with_payload=True,
+        with_vectors=False
+    )
+
+    matches = []
+
+    for p in points:
+        payload = p.payload or {}
+
+        if infer_doc_type(payload) != "structured":
+            continue
+
+        primary_name = normalize_simple_text(payload.get("primary_name"))
+        aliases = payload.get("aliases") or []
+        alias_norms = [normalize_simple_text(a) for a in aliases]
+
+        if q_norm == primary_name or q_norm in alias_norms:
+            matches.append(p)
+
+        if len(matches) >= limit:
+            break
+
+    return matches
+
 def fetch_points_by_primary_name(collection, primary_name, limit=20):
     title_norm = primary_name.strip().lower()
     points, _ = client.scroll(
