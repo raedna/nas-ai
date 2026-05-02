@@ -80,5 +80,15 @@
     "what is this document",
     "what is this white paper about",
     "document name"
+  ],
+  "relationship_query_terms": [
+  "related",
+  "linked",
+  "links",
+  "references",
+  "referenced",
+  "depends",
+  "dependency",
+  "dependencies"
   ]
 }
