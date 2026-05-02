@@ -177,6 +177,41 @@ def fetch_structured_points_by_primary_name(collection, search_text, limit=10):
 
     return matches
 
+def fetch_points_by_link_key(collection, link_key, limit=20):
+    points, _ = client.scroll(
+        collection_name=collection,
+        scroll_filter=Filter(
+            must=[
+                FieldCondition(
+                    key="link_keys",
+                    match=MatchValue(value=str(link_key))
+                )
+            ]
+        ),
+        limit=limit,
+        with_payload=True,
+        with_vectors=False
+    )
+    return points
+
+
+def fetch_points_related_to_link_key(collection, link_key, limit=50):
+    points, _ = client.scroll(
+        collection_name=collection,
+        scroll_filter=Filter(
+            must=[
+                FieldCondition(
+                    key="related_link_keys",
+                    match=MatchValue(value=str(link_key))
+                )
+            ]
+        ),
+        limit=limit,
+        with_payload=True,
+        with_vectors=False
+    )
+    return points
+
 def fetch_structured_points_by_name_in_question(collection, question, limit=10):
     from core.query_router import infer_doc_type, normalize_simple_text
 
