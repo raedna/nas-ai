@@ -62,86 +62,6 @@ def pick_canonical_identifier_payload(points):
 
     return best_payload or {}
 
-def reverse_lookup_by_enum_value(collection, query_text, limit=10):
-    from core.query_router import infer_doc_type, normalize_simple_text
-
-    q_norm = normalize_simple_text(query_text)
-    if not q_norm:
-        return []
-
-    points, _ = client.scroll(
-        collection_name=collection,
-        limit=5000,
-        with_payload=True,
-        with_vectors=False
-    )
-
-    results = []
-    seen = set()
-
-    for p in points:
-        payload = p.payload or {}
-
-        if infer_doc_type(payload) != "structured":
-            continue
-
-        enum_values = payload.get("enum_values") or []
-        if not enum_values:
-            continue
-
-        matched = False
-
-        for e in enum_values:
-            if isinstance(e, dict):
-                for _, v in e.items():
-                    v_norm = normalize_simple_text(v)
-                    if q_norm and q_norm == v_norm:
-                        matched = True
-                        break
-                    if q_norm and q_norm in v_norm:
-                        matched = True
-                        break
-            else:
-                v_norm = normalize_simple_text(e)
-                if q_norm and q_norm == v_norm:
-                    matched = True
-                elif q_norm and q_norm in v_norm:
-                    matched = True
-
-            if matched:
-                break
-
-        if not matched:
-            continue
-
-        identifier = str(payload.get("identifier") or "").strip()
-        primary_name = normalize_simple_text(payload.get("primary_name") or "")
-
-        if identifier:
-            key = f"id:{identifier}"
-        elif primary_name:
-            key = f"name:{primary_name}"
-        else:
-            key = str(id(payload))
-
-        if key in seen:
-            continue
-
-        seen.add(key)
-
-        results.append({
-            "identifier": payload.get("identifier"),
-            "primary_name": payload.get("primary_name"),
-            "description": payload.get("description"),
-            "score": 100.0,
-            "payload": payload
-        })
-
-        if len(results) >= limit:
-            break
-
-    return results
-
 def reverse_lookup_by_enum_value(collection, search_text, limit=10):
     from core.query_router import infer_doc_type, normalize_simple_text
 
@@ -169,48 +89,59 @@ def reverse_lookup_by_enum_value(collection, search_text, limit=10):
         if not enum_values:
             continue
 
-        matched = False
+        matched_enum = None
 
         for e in enum_values:
-            if isinstance(e, dict):
-                for _, v in e.items():
-                    v_norm = normalize_simple_text(v)
-                    if q_norm == v_norm or q_norm in v_norm:
-                        matched = True
-                        break
-            else:
-                v_norm = normalize_simple_text(e)
-                if q_norm == v_norm or q_norm in v_norm:
-                    matched = True
+            if not isinstance(e, dict):
+                continue
 
-            if matched:
+            enum_value = normalize_simple_text(e.get("enum_value"))
+            enum_name = normalize_simple_text(e.get("enum_name"))
+            enum_description = normalize_simple_text(e.get("description"))
+
+            if q_norm in {enum_value, enum_name, enum_description}:
+                matched_enum = e
                 break
 
-        if not matched:
+        if not matched_enum:
             continue
 
+        link_keys = payload.get("link_keys") or []
         identifier = str(payload.get("identifier") or "").strip()
-        if not identifier or identifier in seen:
+        namespace = str(payload.get("identifier_namespace") or "").strip()
+        primary_name = normalize_simple_text(payload.get("primary_name") or "")
+
+        if link_keys:
+            key = "|".join(sorted(str(k) for k in link_keys))
+        elif namespace and identifier:
+            key = f"{namespace}:{identifier}"
+        elif identifier:
+            key = f"id:{identifier}"
+        elif primary_name:
+            key = f"name:{primary_name}"
+        else:
+            key = str(id(payload))
+
+        if key in seen:
             continue
 
-        seen.add(identifier)
-
-        full_points = fetch_points_by_identifier(collection, identifier, limit=20)
-        merged_payload = merge_payloads_for_identifier(full_points, identifier)
+        seen.add(key)
 
         results.append({
-            "identifier": merged_payload.get("identifier"),
-            "primary_name": merged_payload.get("primary_name"),
-            "description": merged_payload.get("description"),
+            "identifier": payload.get("identifier"),
+            "identifier_field": payload.get("identifier_field"),
+            "identifier_namespace": payload.get("identifier_namespace"),
+            "primary_name": payload.get("primary_name"),
+            "description": payload.get("description"),
+            "matched_enum": matched_enum,
             "score": 100.0,
-            "payload": merged_payload
+            "payload": payload
         })
 
         if len(results) >= limit:
             break
 
     return results
-
 def fetch_points_by_primary_name(collection, primary_name, limit=20):
     title_norm = primary_name.strip().lower()
     points, _ = client.scroll(

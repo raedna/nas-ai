@@ -44,6 +44,10 @@ import json
 
 import re
 
+def looks_like_reverse_enum_query(question: str):
+    q = normalize_simple_text(question)
+    return bool(re.search(r"\b(value|values|allowed|valid|option|options)\b", q))
+
 def extract_reverse_lookup_candidate(question, field_maps):
     q_norm = normalize_simple_text(question)
 
@@ -258,6 +262,46 @@ def lexical_short_query_search(collection, question, limit=25):
         for score, p in scored[:limit]
     ]
 
+def synthesize_reverse_enum_answer(matches, collection_name):
+    lines = []
+
+    for item in matches:
+        payload = item.get("payload") or {}
+        matched_enum = item.get("matched_enum") or {}
+
+        identifier_field = payload.get("identifier_field") or "identifier"
+        identifier = payload.get("identifier")
+        primary_name = payload.get("primary_name")
+
+        enum_value = matched_enum.get("enum_value")
+        enum_name = matched_enum.get("enum_name")
+        enum_desc = matched_enum.get("description")
+
+        owner = ""
+        if identifier and primary_name:
+            owner = f"{identifier_field} {identifier} ({primary_name})"
+        elif identifier:
+            owner = f"{identifier_field} {identifier}"
+        elif primary_name:
+            owner = str(primary_name)
+
+        enum_text = ""
+        if enum_value and enum_name:
+            enum_text = f"{enum_value}: {enum_name}"
+        elif enum_value:
+            enum_text = str(enum_value)
+        elif enum_name:
+            enum_text = str(enum_name)
+
+        if enum_desc and enum_desc != enum_name:
+            enum_text = f"{enum_text} — {enum_desc}" if enum_text else str(enum_desc)
+
+        if owner and enum_text:
+            lines.append(f"- {owner} has allowed value {enum_text}.")
+        elif owner:
+            lines.append(f"- {owner}")
+
+    return "\n".join(lines).strip()
 
 def run_query_with_method(collection, question, mode="best", limit=25):
     intent = detect_ask_intent(question)
@@ -278,6 +322,24 @@ def run_query_with_method(collection, question, mode="best", limit=25):
                 "reason": f"explicit namespace+identifier detected: {namespace}:{identifier}",
                 "result": synthesize_answer(payload, [], collection)
             }
+
+    if looks_like_reverse_enum_query(question):
+        field_maps = load_field_maps()
+        candidate = extract_reverse_lookup_candidate(question, field_maps)
+
+        if candidate:
+            enum_matches = reverse_lookup_by_enum_value(
+                collection,
+                candidate,
+                limit=10
+            )
+
+            if enum_matches:
+                return {
+                    "method": "reverse_enum_lookup",
+                    "reason": f"matched normalized enum value/name/description: {candidate}",
+                    "result": synthesize_reverse_enum_answer(enum_matches, collection)
+                }
 
     if intent["mode"] in ["discovery_count", "discovery_list"]:
         return run_discovery_with_method(collection, question, limit=limit)
