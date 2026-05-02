@@ -391,10 +391,10 @@ def run_query_with_method(collection, question, mode="best", limit=25):
                 "result": synthesize_answer(payload, [], collection)
             }
 
-        if looks_like_relationship_query(question):
+    if looks_like_relationship_query(question):
         namespace, identifier = extract_explicit_identifier_namespace(question)
 
-    if namespace and identifier:
+        if namespace and identifier:
             base_points = fetch_points_by_identifier_namespace(
                 collection,
                 identifier=identifier,
