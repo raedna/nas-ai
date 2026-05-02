@@ -14,6 +14,7 @@ from core.collection_config import get_collection
 from core.crosslink_engine import (
     fetch_points_by_identifier,
     fetch_points_by_identifier_namespace,
+    fetch_structured_points_by_primary_name,
     merge_payloads_for_identifier,
     expand_related_identifiers,
     reverse_lookup_by_enum_value,
@@ -84,6 +85,52 @@ def extract_explicit_identifier(question: str):
             return m.group(1)
 
     return None
+
+def fetch_structured_points_by_name_in_question(collection, question, limit=10):
+    from core.query_router import infer_doc_type, normalize_simple_text
+
+    q_norm = normalize_simple_text(question)
+    tokens = [t for t in q_norm.split() if t]
+    if not tokens:
+        return []
+
+    spans = []
+    for start in range(len(tokens)):
+        for end in range(start + 1, len(tokens) + 1):
+            spans.append(" ".join(tokens[start:end]))
+
+    # prefer longer spans first
+    spans = sorted(set(spans), key=lambda x: len(x), reverse=True)
+
+    points, _ = client.scroll(
+        collection_name=collection,
+        limit=5000,
+        with_payload=True,
+        with_vectors=False
+    )
+
+    matches = []
+
+    for p in points:
+        payload = p.payload or {}
+        if infer_doc_type(payload) != "structured":
+            continue
+
+        names = []
+        primary_name = normalize_simple_text(payload.get("primary_name"))
+        if primary_name:
+            names.append(primary_name)
+
+        aliases = payload.get("aliases") or []
+        names.extend(normalize_simple_text(a) for a in aliases if a)
+
+        if any(name in spans for name in names):
+            matches.append(p)
+
+        if len(matches) >= limit:
+            break
+
+    return matches
 
 def extract_explicit_identifier_namespace(question: str):
     q = normalize_simple_text(question)
