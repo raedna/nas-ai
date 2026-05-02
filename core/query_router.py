@@ -374,23 +374,7 @@ def synthesize_reverse_enum_answer(matches, collection_name):
 def run_query_with_method(collection, question, mode="best", limit=25):
     intent = detect_ask_intent(question)
 
-    namespace, identifier = extract_explicit_identifier_namespace(question)
-    if namespace and identifier:
-        points = fetch_points_by_identifier_namespace(
-            collection,
-            identifier=identifier,
-            identifier_namespace=namespace,
-            limit=5
-        )
-
-        if points:
-            payload = points[0].payload or {}
-            return {
-                "method": "structured_namespace_lookup",
-                "reason": f"explicit namespace+identifier detected: {namespace}:{identifier}",
-                "result": synthesize_answer(payload, [], collection)
-            }
-
+    # 1. Relationship queries must run before plain namespace lookup
     if looks_like_relationship_query(question):
         namespace, identifier = extract_explicit_identifier_namespace(question)
 
@@ -409,13 +393,13 @@ def run_query_with_method(collection, question, mode="best", limit=25):
                 related_points = []
 
                 for link_key in base_link_keys:
-                    # forward links: this payload points to others
+                    # forward links: base payload points to others
                     for related_key in base_payload.get("related_link_keys") or []:
                         related_points.extend(
                             fetch_points_by_link_key(collection, related_key, limit=10)
                         )
 
-                    # reverse links: others point to this payload
+                    # reverse links: others point to base payload
                     related_points.extend(
                         fetch_points_related_to_link_key(collection, link_key, limit=50)
                     )
@@ -430,6 +414,25 @@ def run_query_with_method(collection, question, mode="best", limit=25):
                     )
                 }
 
+    # 2. Plain namespace lookup
+    namespace, identifier = extract_explicit_identifier_namespace(question)
+    if namespace and identifier:
+        points = fetch_points_by_identifier_namespace(
+            collection,
+            identifier=identifier,
+            identifier_namespace=namespace,
+            limit=5
+        )
+
+        if points:
+            payload = points[0].payload or {}
+            return {
+                "method": "structured_namespace_lookup",
+                "reason": f"explicit namespace+identifier detected: {namespace}:{identifier}",
+                "result": synthesize_answer(payload, [], collection)
+            }
+
+    # 3. Value / enum-style lookups
     if looks_like_reverse_enum_query(question):
         name_points = fetch_structured_points_by_name_in_question(
             collection,
@@ -472,6 +475,7 @@ def run_query_with_method(collection, question, mode="best", limit=25):
         "reason": method_info["reason"],
         "result": route_query(collection, question, mode=mode, limit=limit)
     }
+    
 # OLD QUERY replaced with above
 #def run_query_with_method(collection, question, mode="best", limit=25):
 #    method_info = detect_query_mode(question)
