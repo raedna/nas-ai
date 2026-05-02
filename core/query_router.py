@@ -16,6 +16,8 @@ from core.crosslink_engine import (
     fetch_points_by_identifier_namespace,
     fetch_structured_points_by_primary_name,
     fetch_structured_points_by_name_in_question,
+    fetch_points_by_link_key,
+    fetch_points_related_to_link_key,
     merge_payloads_for_identifier,
     expand_related_identifiers,
     reverse_lookup_by_enum_value,
@@ -107,6 +109,70 @@ def extract_explicit_identifier_namespace(question: str):
         return None, None
 
     return namespace, identifier
+
+def looks_like_relationship_query(question: str):
+    q = normalize_simple_text(question)
+    hints = load_doc_query_hints()
+    terms = hints.get("relationship_query_terms", [])
+
+    for term in terms:
+        term_norm = normalize_simple_text(term)
+        if term_norm and re.search(rf"\b{re.escape(term_norm)}\b", q):
+            return True
+
+    return False
+
+
+def synthesize_relationship_answer(base_payload, related_points, collection_name):
+    base_field = base_payload.get("identifier_field") or "identifier"
+    base_id = base_payload.get("identifier")
+    base_name = base_payload.get("primary_name")
+
+    if base_id and base_name:
+        header = f"{base_field} {base_id} ({base_name}) is related to:"
+    elif base_id:
+        header = f"{base_field} {base_id} is related to:"
+    elif base_name:
+        header = f"{base_name} is related to:"
+    else:
+        header = "Related items:"
+
+    lines = [header]
+
+    seen = set()
+
+    for p in related_points or []:
+        payload = p.payload or {}
+
+        link_keys = payload.get("link_keys") or []
+        key = "|".join(sorted(str(k) for k in link_keys)) or str(id(payload))
+        if key in seen:
+            continue
+        seen.add(key)
+
+        identifier_field = payload.get("identifier_field") or "identifier"
+        identifier = payload.get("identifier")
+        primary_name = payload.get("primary_name")
+        description = payload.get("description")
+
+        if identifier and primary_name:
+            line = f"- {identifier_field} {identifier}: {primary_name}"
+        elif identifier:
+            line = f"- {identifier_field} {identifier}"
+        elif primary_name:
+            line = f"- {primary_name}"
+        else:
+            continue
+
+        if description:
+            line += f" — {description}"
+
+        lines.append(line)
+
+    if len(lines) == 1:
+        lines.append("- No related items found.")
+
+    return "\n".join(lines)
 
 def extract_negative_terms(question: str):
     q = normalize_simple_text(question)
@@ -325,7 +391,60 @@ def run_query_with_method(collection, question, mode="best", limit=25):
                 "result": synthesize_answer(payload, [], collection)
             }
 
+        if looks_like_relationship_query(question):
+        namespace, identifier = extract_explicit_identifier_namespace(question)
+
+    if namespace and identifier:
+            base_points = fetch_points_by_identifier_namespace(
+                collection,
+                identifier=identifier,
+                identifier_namespace=namespace,
+                limit=5
+            )
+
+            if base_points:
+                base_payload = base_points[0].payload or {}
+                base_link_keys = base_payload.get("link_keys") or []
+
+                related_points = []
+
+                for link_key in base_link_keys:
+                    # forward links: this payload points to others
+                    for related_key in base_payload.get("related_link_keys") or []:
+                        related_points.extend(
+                            fetch_points_by_link_key(collection, related_key, limit=10)
+                        )
+
+                    # reverse links: others point to this payload
+                    related_points.extend(
+                        fetch_points_related_to_link_key(collection, link_key, limit=50)
+                    )
+
+                return {
+                    "method": "relationship_lookup",
+                    "reason": f"matched link_keys / related_link_keys for {namespace}:{identifier}",
+                    "result": synthesize_relationship_answer(
+                        base_payload,
+                        related_points,
+                        collection
+                    )
+                }
+
     if looks_like_reverse_enum_query(question):
+        name_points = fetch_structured_points_by_name_in_question(
+            collection,
+            question,
+            limit=5
+        )
+
+        if name_points:
+            payload = name_points[0].payload or {}
+            return {
+                "method": "structured_primary_name_lookup",
+                "reason": "matched structured primary_name/alias in question",
+                "result": synthesize_answer(payload, [], collection)
+            }
+
         field_maps = load_field_maps()
         candidate = extract_reverse_lookup_candidate(question, field_maps)
 
