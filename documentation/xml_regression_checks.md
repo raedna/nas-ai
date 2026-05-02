@@ -14,7 +14,7 @@ The purpose is to protect FIX field lookup and enum lookup behavior.
 | REG-XML-002 | XML | Ask can answer “what is tag 55?” using namespace-aware structured lookup. | Done |
 | REG-XML-003 | XML | Ask can answer “what does SecurityIDSource mean?” by matching primary_name or namespace lookup. | In Progress |
 | REG-XML-004 | What tag is Symbol? | Must identify Symbol as tag 55. | Not Started |
-| REG-XML-005 | What values can SecurityIDSource have? | Must return enum values for tag 22. | Not Started |
+| REG-XML-005 | XML | Ask can answer “what values can Rule80A have?” using structured primary_name lookup. | Done |
 | XML-006 | XML/schema/linking | Identifier values collide across different identifier fields such as Tag, ComponentID, SectionID, and MsgType. | Add identifier_namespace derived from schema identifier field name and use namespace + identifier for cross-linking. | Critical | Not Started |
 | XML-007 | UI validation | No UI view to validate schema inference and payload quality before retrieval. | Add Streamlit schema/payload validation panel showing schema roles, inferred subtype, identifier collisions, and payload completeness. | High | Not Started |
 
