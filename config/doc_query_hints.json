@@ -114,5 +114,15 @@
     "present",
     "value",
     "values"
+  ],
+  "role_target_cleanup_terms": {
+    "exposure": [
+      "images",
+      "image",
+      "files",
+      "file",
+      "frames",
+      "frame"
     ]
+  }
 }
