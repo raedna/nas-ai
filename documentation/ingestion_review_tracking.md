@@ -26,6 +26,8 @@ Status values:
 | CORE-008 | UI validation | Ingestion has no generic validation dashboard for schemas and Qdrant payloads. | Add validation tab for schema and payload checks across filetypes. | High | Done |
 | CORE-009 | path handling | Some scripts use relative paths like config/ and schemas/ which depend on launch folder. | Centralize project-root path resolution and use it across config/schema/state files. | High | Done |
 | CORE-010 | UI validation | Payload Inspector hides link_keys and related_link_keys in raw payload only. | Add link_keys and related_link_keys columns to the Payload Inspector table. | Low | Done |
+| CORE-011 | Query router modularization | query_router.py is too large and mixes routing, synthesis, scoring, discovery fallbacks, and legacy helpers. | Split into structured_lookup, relationship_lookup, synthesis, and scoring modules after XML regression is stable. | Medium | Not Started |
+| CORE-012 | Legacy test scripts | core/test_upload.py contains hardcoded local FIX paths and is not part of orchestrated ingestion. | Move to archive. | Low | Done |
 ---
 
 ## 2. XML ingestion
@@ -39,7 +41,7 @@ Status values:
 | XML-005 | XML schema/linking | XML files with different row meanings share identifier values and collide. | Add namespace-aware identifiers using identifier_field and identifier_namespace. | Critical | Done |
 | XML-006 | XML serializer/linking | Field definitions and enum values from separate XML files were stored as split payloads. | Use batch finalization to assemble same-entity XML records before embedding. | Critical | Done |
 | XML-007 | XML relationship linking | Same-file and same-collection relationships, such as tag 48 referencing tag 22, are not namespace-aware. | Add link_keys and related_link_keys without merging separate entities. | High | Done |
-| XML-008 | XML/xml_ingestion.py | Legacy standalone XML ingestion script bypasses orchestrator and contains hardcoded paths/Qdrant URL. | Confirm unused, then remove or move to archive. | Medium | Not Started |
+| XML-008 | XML/xml_ingestion.py | Legacy standalone XML ingestion script bypasses orchestrator and contains hardcoded paths/Qdrant URL. | Confirm unused, then move to archive. | Medium | Done |
 | XML-009 | XML relationship validation | related_link_keys are extracted from any matching identifier number in description text, which may create false positives. | Add relationship confidence / relation_source / relation_text metadata and review filters. | Medium | Not Started |
 | XML-010 | XML relationship validation | related_link_keys are extracted from any matching identifier number in description text, which creates false positives. | Require explicit reference patterns such as “tag 22”, “field 22”, “(22)”, or known field-name references before creating related_link_keys. | High | Done |
 | XML-011 | Structured enum normalization | enum_values preserve source column names, forcing retrieval to guess keys like Value/SymbolicName. | Normalize enum entries during ingestion using schema roles into enum_value / enum_name / description keys. | High | Done |
