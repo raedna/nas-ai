@@ -22,7 +22,7 @@ from datetime import datetime
 import requests
 import streamlit as st
 from core.ingest_collection import ingest_collection
-from core.query_router import route_query, semantic_search, debug_route_query, fetch_entity_row_by_title, run_query_with_method, get_display_labels
+from core.query_router import route_query, semantic_search, debug_route_query, fetch_entity_row_by_title, run_query_with_method, get_display_labels, explain_query_routing,
 from core.discovery_engine import detect_ask_intent, run_discovery_with_method
 from core.crosslink_engine import run_comparison_query
 
@@ -1229,6 +1229,18 @@ with tabs[3]:
 
                 st.markdown("---")
                 st.markdown("### Debug Details")
+
+                with st.expander("Routing Decision", expanded=True):
+                    try:
+                        st.json(explain_query_routing(selected_collection, question))
+                    except Exception as e:
+                        st.warning(f"Could not build routing debug: {e}")
+
+                    if "query_run" in locals():
+                        st.write({
+                            "selected_method": query_run.get("method"),
+                            "selected_reason": query_run.get("reason"),
+                        })
 
                 with st.expander("Semantic Candidates", expanded=True):
                     st.dataframe(points_to_rows(debug_data.get("semantic_points")), width="stretch")
