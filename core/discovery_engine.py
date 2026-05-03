@@ -19,6 +19,14 @@ cfg = load_system_config()
 client = QdrantClient(url=cfg["qdrant_url"])
 
 
+def _matches_any_term(q, terms):
+    for term in terms or []:
+        term_norm = normalize_simple_text(term)
+        if term_norm and re.search(rf"\b{re.escape(term_norm)}\b", q):
+            return True
+    return False
+
+
 def detect_ask_intent(question: str):
     q = normalize_simple_text(question)
     words = [w for w in q.split() if w]
@@ -26,17 +34,47 @@ def detect_ask_intent(question: str):
     if not words:
         return {"mode": "answer", "reason": "empty query"}
 
-    if re.search(r"\bhow many\b|\bcount\b", q):
-        return {"mode": "discovery_count", "reason": "count-style query detected"}
+    hints = load_doc_query_hints()
 
-    if re.search(r"\blist\b|\bshow\b|\bfind\b", q):
-        return {"mode": "discovery_list", "reason": "list/show/find query detected"}
+    intent_rules = [
+        {
+            "mode": "discovery_count",
+            "reason": "count-style query detected",
+            "terms_key": "discovery_count_terms",
+            "requires_question_word": False,
+        },
+        {
+            "mode": "discovery_list",
+            "reason": "list/show/find query detected",
+            "terms_key": "discovery_list_terms",
+            "requires_question_word": False,
+        },
+        {
+            "mode": "comparison",
+            "reason": "comparison query detected",
+            "terms_key": "comparison_query_terms",
+            "requires_question_word": False,
+        },
+        {
+            "mode": "discovery_list",
+            "reason": "distinct-values query detected",
+            "terms_key": "distinct_value_query_terms",
+            "requires_question_word": True,
+        },
+    ]
 
-    if re.search(r"\bdifference\b|\bcompare\b|\bvs\b|\bversus\b", q):
-        return {"mode": "comparison", "reason": "comparison query detected"}
+    question_words = set(hints.get("question_words", []))
+    has_question_word = any(w in question_words for w in words)
 
-    if re.search(r"\bwhat\b.*\b(used|exist|exists|available|present|value|values|angle|angles|filter|filters|exposure|exposures|time|times|rotation|rotations)\b", q):
-        return {"mode": "discovery_list", "reason": "distinct-values query detected"}
+    for rule in intent_rules:
+        if rule.get("requires_question_word") and not has_question_word:
+            continue
+
+        if _matches_any_term(q, hints.get(rule["terms_key"], [])):
+            return {
+                "mode": rule["mode"],
+                "reason": rule["reason"],
+            }
 
     return {"mode": "answer", "reason": "default answer mode"}
 
