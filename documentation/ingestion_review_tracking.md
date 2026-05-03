@@ -135,5 +135,12 @@ Status values:
 | RET-005 | Structured primary-name lookup | Asks like “what values can tag SecurityIDSource have?” do not resolve the structured payload by primary_name. | Detect structured value/name questions, search primary_name/aliases using n-gram spans from the question, and synthesize from the matched payload. | High | Done |
 | RET-006 | Fuzzy structured name lookup | Misspelled names like “seucityIdSource” do not resolve to SecurityIDSource. | Add conservative fuzzy matching over primary_name and aliases. | Medium | Not Started |
 
+---
 
+## 11. Discovery harcoding fix
+
+| ID | Area | Issue | Suggested Fix | Priority | Status |
+| DISC-001 | Discovery intent terms | detect_ask_intent() hardcodes count/list/comparison/distinct-value query terms. | Move terms to config/doc_query_hints.json and read them dynamically. | High | Done |
+| DISC-002 | Discovery role field resolution | discovery_engine.py hardcodes role_to_payload_fields for exposure/rotation/filter/object/date. | Add schema-driven resolve_payload_fields_for_role(collection, requested_role), then replace hardcoded dictionaries in match and distinct-value discovery. | Critical | Not Started |
+| DISC-003 | Discovery operator parsing | parse_structured_filter_query() hardcodes query operators like greater than, less than, after, before. | Move operator phrases to config/query_operators.json after DISC-002 is stable. | Medium | Not Started |
 
