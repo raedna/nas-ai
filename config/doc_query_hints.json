@@ -82,13 +82,37 @@
     "document name"
   ],
   "relationship_query_terms": [
-  "related",
-  "linked",
-  "links",
-  "references",
-  "referenced",
-  "depends",
-  "dependency",
-  "dependencies"
-  ]
+    "related",
+    "linked",
+    "links",
+    "references",
+    "referenced",
+    "depends",
+    "dependency",
+    "dependencies"
+  ],
+  "discovery_count_terms": [
+    "how many",
+    "count"
+  ],
+  "discovery_list_terms": [
+    "list",
+    "show",
+    "find"
+  ],
+  "comparison_query_terms": [
+    "difference",
+    "compare",
+    "vs",
+    "versus"
+  ],
+  "distinct_value_query_terms": [
+    "used",
+    "exist",
+    "exists",
+    "available",
+    "present",
+    "value",
+    "values"
+    ]
 }
