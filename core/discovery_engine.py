@@ -579,21 +579,27 @@ def parse_structured_filter_query(question, requested_role, field_maps):
     operator = "contains"
     value = ""
 
-    patterns = [
-        ("gte", r"\b(?:greater than or equal to|at least|>=)\b\s*(.+)$"),
-        ("lte", r"\b(?:less than or equal to|at most|<=)\b\s*(.+)$"),
-        ("gt", r"\b(?:greater than|more than|over|>)\b\s*(.+)$"),
-        ("lt", r"\b(?:less than|under|below|<)\b\s*(.+)$"),
-        ("after", r"\bafter\b\s*(.+)$"),
-        ("before", r"\bbefore\b\s*(.+)$"),
-        ("eq", r"\bon\b\s*(.+)$"),
-    ]
+    hints = load_doc_query_hints()
+    operator_rules = hints.get("structured_filter_operators", [])
 
-    for op, pattern in patterns:
-        m = re.search(pattern, raw_q, flags=re.IGNORECASE)
-        if m:
-            operator = op
-            value = m.group(1).strip()
+    for rule in operator_rules:
+        op = rule.get("operator")
+        terms = rule.get("terms", [])
+
+        for term in terms:
+            term_norm = str(term or "").strip()
+            if not term_norm:
+                continue
+
+            pattern = rf"\b{re.escape(term_norm)}\b\s*(.+)$"
+            m = re.search(pattern, raw_q, flags=re.IGNORECASE)
+
+            if m:
+                operator = op
+                value = m.group(1).strip()
+                break
+
+        if value:
             break
 
     if not value:
