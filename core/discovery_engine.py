@@ -343,6 +343,9 @@ def discover_collection_items(collection, question, limit=200):
 def discover_structured_role_matches(collection, question, requested_role, target_text, limit=200):
     payload_fields = resolve_payload_fields_for_role(collection, requested_role)
 
+    if not payload_fields:
+        return None
+
     field_maps = load_field_maps()
     parsed_filter = parse_structured_filter_query(question, requested_role, field_maps)
     operator = parsed_filter.get("operator", "contains")
@@ -514,6 +517,9 @@ def extract_role_target_text(question, requested_role, field_maps):
 
 def discover_structured_role_distinct_values(collection, requested_role, limit=200):
     payload_fields = resolve_payload_fields_for_role(collection, requested_role)
+
+    if not payload_fields:
+        return None
 
     points, _ = client.scroll(
         collection_name=collection,
