@@ -73,10 +73,9 @@ def extract_reverse_lookup_candidate(question, field_maps):
         if kw_norm:
             cleaned = cleaned.replace(kw_norm, " ")
 
-    noise = {
-        "what", "which", "tag", "field", "has", "have", "can", "a", "an", "the",
-        "of", "for", "is", "are", "with"
-    }
+    hints = load_doc_query_hints()
+    noise = set(hints.get("discovery_noise_words", []))
+    noise.update(hints.get("enum_lookup_query_terms", []))
 
     words = [w for w in cleaned.split() if w and w not in noise]
     return " ".join(words).strip()
