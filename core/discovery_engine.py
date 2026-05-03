@@ -611,10 +611,11 @@ def run_discovery_with_method(collection, question, limit=200):
         if requested_role:
             break
 
-    distinct_value_query = bool(re.search(
-        r"\bwhat\b.*\b(values|used|exist|exists|available|present|angles|filters|exposures)\b",
-        q_norm
-    ))
+    hints = load_doc_query_hints()
+    distinct_value_query = (
+        "what" in q_norm.split()
+        and _matches_any_term(q_norm, hints.get("distinct_value_query_terms", []))
+    )
 
     if requested_role:
         if intent["mode"] == "discovery_list" and distinct_value_query:
