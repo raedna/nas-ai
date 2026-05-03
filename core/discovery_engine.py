@@ -599,9 +599,18 @@ def parse_structured_filter_query(question, requested_role, field_maps):
     if not value:
         value = extract_role_target_text(question, requested_role, field_maps)
 
-        if requested_role == "exposure":
-            value = re.sub(r"\b(images|image|files|file|frames|frame)\b", " ", value, flags=re.IGNORECASE)
-            value = " ".join(value.split())
+        hints = load_doc_query_hints()
+        cleanup_terms = (
+            hints.get("role_target_cleanup_terms", {})
+            .get(requested_role, [])
+        )
+
+        for term in cleanup_terms:
+            term_norm = normalize_simple_text(term)
+            if term_norm:
+                value = re.sub(rf"\b{re.escape(term_norm)}\b", " ", value, flags=re.IGNORECASE)
+
+        value = " ".join(value.split())
 
     return {
         "role": requested_role,
