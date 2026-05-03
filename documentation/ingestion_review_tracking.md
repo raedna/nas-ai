@@ -144,4 +144,6 @@ Status values:
 | DISC-002 | Discovery role field resolution | discovery_engine.py hardcodes role_to_payload_fields for exposure/rotation/filter/object/date. | Add schema-driven resolve_payload_fields_for_role(collection, requested_role), then replace hardcoded dictionaries in match and distinct-value discovery. | Critical | Done |
 | DISC-002b | Role-specific query cleanup | parse_structured_filter_query() has special handling for requested_role == "exposure". | Move role-specific cleanup terms to config or remove once schema-driven role parsing is stable. | Medium | Not Started |
 | DISC-003 | Discovery operator parsing | parse_structured_filter_query() hardcodes query operators like greater than, less than, after, before. | Move operator phrases to config/query_operators.json after DISC-002 is stable. | Medium | Not Started |
+| DISC-004 | LLM query parser fallback | Discovery filters currently rely on configured operator terms only. | Add optional LLM fallback that outputs role/operator/value JSON, validated against schema roles and allowed operators. | Medium | Not Started |
+
 
