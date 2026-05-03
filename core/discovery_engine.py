@@ -78,6 +78,41 @@ def detect_ask_intent(question: str):
 
     return {"mode": "answer", "reason": "default answer mode"}
 
+def resolve_payload_fields_for_role(collection, requested_role):
+    from core.schema_loader import load_collection_schemas
+
+    role = str(requested_role or "").strip()
+    if not role:
+        return []
+
+    fields = []
+    seen = set()
+
+    def add(field):
+        field = str(field or "").strip()
+        if field and field not in seen:
+            seen.add(field)
+            fields.append(field)
+
+    # normalized payload roles
+    normalized_role_fields = {
+        "identifier": ["identifier"],
+        "primary_name": ["primary_name"],
+        "description": ["description", "text"],
+    }
+
+    for field in normalized_role_fields.get(role, []):
+        add(field)
+
+    schemas = load_collection_schemas(collection)
+
+    for schema in schemas.values():
+        for field in schema.get(role, []) or []:
+            add(field)
+            add(field.lower())
+
+    return fields
+
 
 def score_discovery_payload(payload, question: str):
     q_norm = normalize_simple_text(question)
@@ -306,21 +341,7 @@ def discover_collection_items(collection, question, limit=200):
     }
 
 def discover_structured_role_matches(collection, question, requested_role, target_text, limit=200):
-    role_to_payload_fields = {
-        "primary_name": ["primary_name"],
-        "identifier": ["identifier"],
-        "description": ["description", "text"],
-        "exposure": ["exposure_sec", "exptime", "exposure", "file_exposure_sec"],
-        "rotation": ["rotation_angle", "rotator"],
-        "filter_name": ["filter_name", "filter"],
-        "object_name": ["primary_name", "object", "target", "file_target"],
-        "file_name": ["source_file", "file_stem"],
-        "capture_date": ["date-obs", "file_capture_datetime"],
-    }
-
-    payload_fields = role_to_payload_fields.get(requested_role)
-    if not payload_fields:
-        return None
+    payload_fields = resolve_payload_fields_for_role(collection, requested_role)
 
     field_maps = load_field_maps()
     parsed_filter = parse_structured_filter_query(question, requested_role, field_maps)
@@ -492,20 +513,7 @@ def extract_role_target_text(question, requested_role, field_maps):
     return " ".join(words).strip()
 
 def discover_structured_role_distinct_values(collection, requested_role, limit=200):
-    role_to_payload_fields = {
-        "primary_name": ["primary_name"],
-        "identifier": ["identifier"],
-        "description": ["description"],
-        "exposure": ["exposure_sec", "exptime", "exposure", "file_exposure_sec"],
-        "rotation": ["rotation_angle", "rotator"],
-        "filter_name": ["filter_name", "filter"],
-        "object_name": ["primary_name", "object", "target", "file_target"],
-        "file_name": ["source_file", "file_stem"],
-    }
-
-    payload_fields = role_to_payload_fields.get(requested_role)
-    if not payload_fields:
-        return None
+    payload_fields = resolve_payload_fields_for_role(collection, requested_role)
 
     points, _ = client.scroll(
         collection_name=collection,
