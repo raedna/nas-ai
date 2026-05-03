@@ -151,7 +151,7 @@ def explain_query_routing(collection, question):
         "identifier": identifier,
         "reverse_enum_candidate": enum_candidate,
     }
-    
+
 def synthesize_relationship_answer(base_payload, related_points, collection_name):
     base_field = base_payload.get("identifier_field") or "identifier"
     base_id = base_payload.get("identifier")
@@ -1661,10 +1661,8 @@ def route_query(collection, question, mode="best", limit=25):
             if kw_norm:
                 cleaned = cleaned.replace(kw_norm, " ")
 
-        noise = {
-            "what", "which", "tag", "field", "has", "have", "can", "a", "an", "the",
-            "of", "for", "is", "are", "with"
-        }
+        hints = load_doc_query_hints()
+        noise = set(hints.get("discovery_noise_words", []))
 
         words = [w for w in cleaned.split() if w and w not in noise]
         return " ".join(words).strip()
