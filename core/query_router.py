@@ -75,7 +75,7 @@ def extract_reverse_lookup_candidate(question, field_maps):
 
     hints = load_doc_query_hints()
     noise = set(hints.get("discovery_noise_words", []))
-    noise.update(hints.get("enum_lookup_query_terms", []))
+    noise.update(hints.get("structured_namespace_terms", []))
 
     words = [w for w in cleaned.split() if w and w not in noise]
     return " ".join(words).strip()
