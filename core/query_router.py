@@ -130,7 +130,28 @@ def looks_like_relationship_query(question: str):
 
     return False
 
+def explain_query_routing(collection, question):
+    intent = detect_ask_intent(question)
 
+    namespace, identifier = extract_explicit_identifier_namespace(question)
+
+    enum_lookup_query = looks_like_reverse_enum_query(question)
+    enum_candidate = None
+    if enum_lookup_query:
+        field_maps = load_field_maps()
+        enum_candidate = extract_reverse_lookup_candidate(question, field_maps)
+
+    return {
+        "question": question,
+        "intent_mode": intent.get("mode"),
+        "intent_reason": intent.get("reason"),
+        "relationship_query": looks_like_relationship_query(question),
+        "enum_lookup_query": enum_lookup_query,
+        "namespace": namespace,
+        "identifier": identifier,
+        "reverse_enum_candidate": enum_candidate,
+    }
+    
 def synthesize_relationship_answer(base_payload, related_points, collection_name):
     base_field = base_payload.get("identifier_field") or "identifier"
     base_id = base_payload.get("identifier")
