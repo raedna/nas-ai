@@ -73,6 +73,18 @@
     "a",
     "an"
   ],
+  "enum_lookup_query_terms": [
+    "value",
+    "values",
+    "allowed",
+    "valid",
+    "option",
+    "options",
+    "have",
+    "has",
+    "contain",
+    "contains"
+  ],
   "title_query_keywords": [
     "title",
     "document title",

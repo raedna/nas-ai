@@ -50,7 +50,15 @@ import re
 
 def looks_like_reverse_enum_query(question: str):
     q = normalize_simple_text(question)
-    return bool(re.search(r"\b(value|values|allowed|valid|option|options)\b", q))
+    hints = load_doc_query_hints()
+    terms = hints.get("enum_lookup_query_terms", [])
+
+    for term in terms:
+        term_norm = normalize_simple_text(term)
+        if term_norm and re.search(rf"\b{re.escape(term_norm)}\b", q):
+            return True
+
+    return False
 
 def extract_reverse_lookup_candidate(question, field_maps):
     q_norm = normalize_simple_text(question)
@@ -475,7 +483,7 @@ def run_query_with_method(collection, question, mode="best", limit=25):
         "reason": method_info["reason"],
         "result": route_query(collection, question, mode=mode, limit=limit)
     }
-    
+
 # OLD QUERY replaced with above
 #def run_query_with_method(collection, question, mode="best", limit=25):
 #    method_info = detect_query_mode(question)
