@@ -166,5 +166,11 @@
       "operator": "eq",
       "terms": ["on"]
     }
+  ],
+  "structured_namespace_terms": [
+    "tag",
+    "field",
+    "component",
+    "componentid"
   ]
 }
