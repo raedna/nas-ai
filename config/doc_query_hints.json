@@ -124,5 +124,35 @@
       "frames",
       "frame"
     ]
-  }
+  },
+  "structured_filter_operators": [
+    {
+      "operator": "gte",
+      "terms": ["greater than or equal to", "at least", ">="]
+    },
+    {
+      "operator": "lte",
+      "terms": ["less than or equal to", "at most", "<="]
+    },
+    {
+      "operator": "gt",
+      "terms": ["greater than", "more than", "over", ">"]
+    },
+    {
+      "operator": "lt",
+      "terms": ["less than", "under", "below", "<"]
+    },
+    {
+      "operator": "after",
+      "terms": ["after"]
+    },
+    {
+      "operator": "before",
+      "terms": ["before"]
+    },
+    {
+      "operator": "eq",
+      "terms": ["on"]
+    }
+  ]
 }
