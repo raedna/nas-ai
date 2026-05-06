@@ -32,6 +32,10 @@ def _all_values(row_norm, fields):
             values.append(str(val).strip())
     return values
 
+def _namespace_from_field(field):
+    field = str(field or "").strip().lower()
+    return "".join(ch for ch in field if ch.isalnum() or ch == "_")
+
 
 # =========================================================
 # STRUCTURED TABLE DOC BUILDER
@@ -46,6 +50,13 @@ def _build_structured_doc(row, schema, source_file):
     type_fields = schema.get("type", [])
 
     identifier = _first_value(row_n, id_fields)
+    identifier_field = id_fields[0] if id_fields else None
+    identifier_namespace = _namespace_from_field(identifier_field)
+
+    link_keys = []
+    if identifier and identifier_namespace:
+        link_keys.append(f"{identifier_namespace}:{identifier}")
+
     primary_name = _first_value(row_n, name_fields)
     description = _first_value(row_n, desc_fields)
     aliases = _all_values(row_n, alias_fields)
@@ -59,9 +70,13 @@ def _build_structured_doc(row, schema, source_file):
     return {
         "text": text,
         "identifier": identifier or None,
+        "identifier_field": identifier_field,
+        "identifier_namespace": identifier_namespace or None,
         "primary_name": primary_name or None,
         "description": description or None,
         "enum_values": [],
+        "link_keys": link_keys,
+        "related_link_keys": [],
         "type": type_value or "structured",
         "source_file": str(source_file),
         "doc_type": "structured",
@@ -194,6 +209,7 @@ def table_serializer(parsed, file_path, template_config, file_tags, collection_n
         )
 
     source_file = Path(file_path).name
+    source_path = str(file_path)
     table_type = detect_table_type(rows, schema)
 
     if DEBUG:
