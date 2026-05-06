@@ -234,8 +234,8 @@ def table_serializer(parsed, file_path, template_config, file_tags, collection_n
 
     source_file = Path(file_path).name
     source_path = str(file_path)
-    table_type = detect_table_type(rows, schema)
-
+    table_type = detect_table_type(rows, schema, template_config)
+    
     if DEBUG:
         print(f"[TABLE SERIALIZER] {source_file} -> {table_type}")
 

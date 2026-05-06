@@ -1,45 +1,76 @@
-def detect_table_type(rows, schema):
+def _clean_type(value):
+    value = str(value or "").strip().lower()
+    allowed = {"structured", "entity_row", "procedural"}
+    return value if value in allowed else ""
+
+
+def detect_table_type(rows, schema, template_config=None):
     """
-    Detect table type:
-    - structured: dictionary/catalog style rows (e.g. BBG fields)
-    - entity_row: one row = one record/document (e.g. KB CSV)
-    - procedural: no meaningful structural roles found
+    Detect table type without source-specific column names.
+
+    Priority:
+    1. Explicit template override
+    2. Explicit schema override
+    3. Generic schema-role inference
     """
 
     if not rows:
         return "procedural"
 
-    id_fields = schema.get("identifier", [])
-    name_fields = schema.get("primary_name", [])
-    desc_fields = schema.get("description", [])
-    type_fields = schema.get("type", [])
-    other_fields = [str(f).lower() for f in schema.get("other", [])]
+    template_config = template_config or {}
+    schema = schema or {}
 
-    # no meaningful structure
-    if not id_fields and not name_fields and not desc_fields:
+    # 1. Template-level override
+    explicit_type = _clean_type(
+        template_config.get("table_type")
+        or template_config.get("doc_type")
+    )
+    if explicit_type:
+        return explicit_type
+
+    # 2. Schema-level override
+    explicit_schema_type = _clean_type(
+        schema.get("table_type")
+        or schema.get("doc_type")
+        or schema.get("structured_subtype")
+    )
+    if explicit_schema_type:
+        return explicit_schema_type
+
+    id_fields = schema.get("identifier", []) or []
+    name_fields = schema.get("primary_name", []) or []
+    desc_fields = schema.get("description", []) or []
+    type_fields = schema.get("type", []) or []
+    enum_value_fields = schema.get("enum_value", []) or []
+    enum_name_fields = schema.get("enum_name", []) or []
+    reference_fields = schema.get("reference_identifier", []) or []
+
+    has_identifier = bool(id_fields)
+    has_name = bool(name_fields)
+    has_description = bool(desc_fields)
+    has_type = bool(type_fields)
+    has_enum = bool(enum_value_fields or enum_name_fields)
+    has_reference = bool(reference_fields)
+
+    # No meaningful roles found
+    if not (has_identifier or has_name or has_description):
         return "procedural"
 
-    # KB-style signals
-    kb_signals = {
-        "resolution",
-        "kbtags",
-        "kbinactive",
-        "kbinternalmemo",
-        "descriptionmarkdown",
-        "resolutionmarkdown",
-        "kbdocprocessed",
-        "kbdocneedsprocessing",
-    }
-
-    if kb_signals.intersection(other_fields) or "resolution" in [f.lower() for f in desc_fields]:
-        return "entity_row"
-
-    # structured/catalog signal like BBG
-    if id_fields and name_fields and desc_fields and type_fields:
+    # Dictionary/reference/code-list style
+    if has_identifier and has_name and (has_description or has_type) and (has_enum or has_reference):
         return "structured"
 
-    # fallback
-    if id_fields or name_fields or desc_fields:
+    # Strong reference/catalog style, but no enum/reference links
+    if has_identifier and has_name and has_description and has_type:
+        return "structured"
+
+    # One row represents a document/article/entity
+    if has_name and has_description and not has_enum:
         return "entity_row"
 
-    return "procedural"
+    # Identifier + description without a strong name often behaves like procedural/reference notes
+    if has_identifier and has_description and not has_name:
+        return "entity_row"
+
+    # Fallback: meaningful row-level structure
+    return "entity_row"
