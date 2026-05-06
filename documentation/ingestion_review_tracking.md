@@ -52,7 +52,7 @@ Status values:
 
 | ID | Area | Issue | Suggested Fix | Priority | Status |
 |---|---|---|---|---|---|
-| TBL-001 | TABLES/table_detector.py | Detector hardcodes KB/Halo columns. | Replace with schema/template-driven detection. | Critical | Not Started |
+| TBL-001 | TABLES/table_detector.py | Detector hardcodes KB/Halo columns. | Replace with schema/template-driven detection. | Critical | Done |
 | TBL-002 | TABLES/table_parser.py | Header detection is heuristic only. | Add optional header_row override in template config. | Medium | Done |
 | TBL-002b | TABLES/table_serializer.py | Entity-row table payloads do not emit identifier_field, identifier_namespace, link_keys, related_link_keys, and file_path. | Apply the same normalized identity fields to _build_entity_row_doc(). | High | Done |
 | TBL-002c | TABLES/table_serializer.py / retrieval | KB-style entity rows use source IDs that are not natural user query targets. | Ensure entity-row retrieval prioritizes primary_name, aliases, and description/text over identifier lookup. | High | Done |
@@ -152,4 +152,11 @@ Status values:
 | DISC-003b | Symbol operator matching | Operator parser may not match symbol-only terms like >=, <=, >, < because the regex uses word boundaries. | Adjust pattern generation based on whether the operator term is alphanumeric or symbolic. | Low | Not Started |
 | DISC-004 | LLM query parser fallback | Discovery filters currently rely on configured operator terms only. | Add optional LLM fallback that outputs role/operator/value JSON, validated against schema roles and allowed operators. | Medium | Not Started |
 
+
+---
+
+## 12. UI
+
+| ID | Area | Issue | Suggested Fix | Priority | Status |
+| UI-002 | Validation payload inspector | Inspector only searches by identifier, which is weak for entity_row/source-ID records. | Allow lookup by identifier, primary_name, and link_keys. | Medium | Not Started |
 

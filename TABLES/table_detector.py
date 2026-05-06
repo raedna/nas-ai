@@ -60,10 +60,6 @@ def detect_table_type(rows, schema, template_config=None):
     if has_identifier and has_name and (has_description or has_type) and (has_enum or has_reference):
         return "structured"
 
-    # Strong reference/catalog style, but no enum/reference links
-    if has_identifier and has_name and has_description and has_type:
-        return "structured"
-
     # One row represents a document/article/entity
     if has_name and has_description and not has_enum:
         return "entity_row"
