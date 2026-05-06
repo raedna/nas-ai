@@ -54,6 +54,7 @@ Status values:
 |---|---|---|---|---|---|
 | TBL-001 | TABLES/table_detector.py | Detector hardcodes KB/Halo columns. | Replace with schema/template-driven detection. | Critical | Not Started |
 | TBL-002 | TABLES/table_parser.py | Header detection is heuristic only. | Add optional header_row override in template config. | Medium | Done |
+| TBL-002b | TABLES/table_serializer.py | Entity-row table payloads do not emit identifier_field, identifier_namespace, link_keys, related_link_keys, and file_path. | Apply the same normalized identity fields to _build_entity_row_doc(). | High | Not Started |
 | TBL-003 | TABLES/schema_inference_table.py | Global roles may overfit one dataset. | Support collection/template role overrides later. | High | Not Started |
 | TBL-004 | TABLES/table_serializer.py | Table behavior depends on detector classification quality. | Improve detector before serializer changes. | High | Not Started |
 
