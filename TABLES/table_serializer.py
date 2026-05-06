@@ -72,6 +72,7 @@ def _build_structured_doc(row, schema, source_file):
         "identifier": identifier or None,
         "identifier_field": identifier_field,
         "identifier_namespace": identifier_namespace or None,
+        "identifier_kind": "canonical",
         "primary_name": primary_name or None,
         "description": description or None,
         "enum_values": [],
@@ -118,6 +119,7 @@ def _build_entity_row_doc(row, schema, source_file):
         "identifier": identifier or None,
         "identifier_field": identifier_field,
         "identifier_namespace": identifier_namespace or None,
+        "identifier_kind": "source",
         "primary_name": primary_name or None,
         "description": "\n\n".join(description_values) if description_values else None,
         "enum_values": [],
@@ -141,6 +143,13 @@ def _build_procedural_doc(row, schema, source_file, row_index):
     desc_fields = schema.get("description", [])
 
     identifier = _first_value(row_n, id_fields) or f"row_{row_index}"
+    identifier_field = id_fields[0] if id_fields else "row_index"
+    identifier_namespace = _namespace_from_field(identifier_field)
+
+    link_keys = []
+    if identifier and identifier_namespace:
+        link_keys.append(f"{identifier_namespace}:{identifier}")
+
     primary_name = _first_value(row_n, name_fields)
     description_values = _all_values(row_n, desc_fields)
 
@@ -152,9 +161,14 @@ def _build_procedural_doc(row, schema, source_file, row_index):
     return {
         "text": text,
         "identifier": identifier,
+        "identifier_field": identifier_field,
+        "identifier_namespace": identifier_namespace or None,
+        "identifier_kind": "generated",
         "primary_name": primary_name or None,
         "description": "\n\n".join(description_values) if description_values else None,
         "enum_values": [],
+        "link_keys": link_keys,
+        "related_link_keys": [],
         "type": "procedural",
         "source_file": str(source_file),
         "doc_type": "procedural"
