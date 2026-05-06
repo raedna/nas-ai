@@ -137,7 +137,7 @@ Status values:
 | RET-004 | Structured answer formatting | Structured answers previously used collection-level schema labels, causing wrong labels like FIXMLFileName / CategoryID. | Prefer payload fields such as identifier_field, identifier, primary_name, description, and normalized enum_values. | High | Done |
 | RET-005 | Structured primary-name lookup | Asks like “what values can tag SecurityIDSource have?” do not resolve the structured payload by primary_name. | Detect structured value/name questions, search primary_name/aliases using n-gram spans from the question, and synthesize from the matched payload. | High | Done |
 | RET-006 | Fuzzy structured name lookup | Misspelled names like “seucityIdSource” do not resolve to SecurityIDSource. | Add conservative fuzzy matching over primary_name and aliases. | Medium | Not Started |
-| RET-007 | Procedural/entity-row action-title ranking | Questions like “how to pull recon files from sftp” retrieve an adjacent article with stronger body keyword overlap instead of the action-specific article title. | For entity_row/procedural docs, boost primary_name/title matches and action-term overlap before body semantic score. | High | Not Started |
+| RET-007 | Entity/procedural reranking | Entity-row/procedural KB articles should be retrieved by topic/action/title, but final reranker can promote a neighboring article with stronger body keyword overlap over the semantically best action-specific article. | Adjust reranker for entity_row/procedural docs to preserve strong semantic rank and boost primary_name/action-term overlap. | High | Not Started |
 
 ---
 
