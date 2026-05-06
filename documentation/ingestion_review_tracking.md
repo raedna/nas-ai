@@ -54,7 +54,8 @@ Status values:
 |---|---|---|---|---|---|
 | TBL-001 | TABLES/table_detector.py | Detector hardcodes KB/Halo columns. | Replace with schema/template-driven detection. | Critical | Not Started |
 | TBL-002 | TABLES/table_parser.py | Header detection is heuristic only. | Add optional header_row override in template config. | Medium | Done |
-| TBL-002b | TABLES/table_serializer.py | Entity-row table payloads do not emit identifier_field, identifier_namespace, link_keys, related_link_keys, and file_path. | Apply the same normalized identity fields to _build_entity_row_doc(). | High | Not Started |
+| TBL-002b | TABLES/table_serializer.py | Entity-row table payloads do not emit identifier_field, identifier_namespace, link_keys, related_link_keys, and file_path. | Apply the same normalized identity fields to _build_entity_row_doc(). | High | Done |
+| TBL-002c | TABLES/table_serializer.py / retrieval | KB-style entity rows use source IDs that are not natural user query targets. | Ensure entity-row retrieval prioritizes primary_name, aliases, and description/text over identifier lookup. | High | Not Started |
 | TBL-003 | TABLES/schema_inference_table.py | Global roles may overfit one dataset. | Support collection/template role overrides later. | High | Not Started |
 | TBL-004 | TABLES/table_serializer.py | Table behavior depends on detector classification quality. | Improve detector before serializer changes. | High | Not Started |
 
@@ -136,6 +137,7 @@ Status values:
 | RET-004 | Structured answer formatting | Structured answers previously used collection-level schema labels, causing wrong labels like FIXMLFileName / CategoryID. | Prefer payload fields such as identifier_field, identifier, primary_name, description, and normalized enum_values. | High | Done |
 | RET-005 | Structured primary-name lookup | Asks like “what values can tag SecurityIDSource have?” do not resolve the structured payload by primary_name. | Detect structured value/name questions, search primary_name/aliases using n-gram spans from the question, and synthesize from the matched payload. | High | Done |
 | RET-006 | Fuzzy structured name lookup | Misspelled names like “seucityIdSource” do not resolve to SecurityIDSource. | Add conservative fuzzy matching over primary_name and aliases. | Medium | Not Started |
+| RET-007 | Procedural/entity-row action-title ranking | Questions like “how to pull recon files from sftp” retrieve an adjacent article with stronger body keyword overlap instead of the action-specific article title. | For entity_row/procedural docs, boost primary_name/title matches and action-term overlap before body semantic score. | High | Not Started |
 
 ---
 
