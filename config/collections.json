@@ -11,10 +11,13 @@
     }
   },
   "kb_docs": {
-    "path": "/Volumes/raedsync/Documents/OmniVista/Support Desk/KB Articles/KB_Articles RN_20260225.csv",
+    "path": "/Users/raednasr/RaedsMacM1/nas-ai/table_test_input/KB_Articles RN_20260225.csv",
     "allowed_filetypes": [
       "tables"
     ],
+    "allowed_extensions": [],
+    "exclude_dirs": [],
+    "exclude_extensions": [],
     "source_label": "Kb Docs",
     "notes": "KB as of  20260225",
     "filters": {
