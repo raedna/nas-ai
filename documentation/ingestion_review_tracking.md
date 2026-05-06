@@ -58,7 +58,9 @@ Status values:
 | TBL-002c | TABLES/table_serializer.py / retrieval | KB-style entity rows use source IDs that are not natural user query targets. | Ensure entity-row retrieval prioritizes primary_name, aliases, and description/text over identifier lookup. | High | Done |
 | TBL-002d | TABLES/table_serializer.py | Table payloads do not distinguish canonical/user-facing identifiers from source/system IDs or generated row IDs. | Add identifier_kind: structured=canonical, entity_row=source, procedural=generated. | High | Done |
 | TBL-003 | TABLES/schema_inference_table.py | Global roles may overfit one dataset. | Support collection/template role overrides later. | High | Not Started |
-| TBL-004 | TABLES/table_serializer.py | Table behavior depends on detector classification quality. | Improve detector before serializer changes. | High | Not Started |
+| TBL-004 | TABLES/table_serializer.py | Table behavior depends on detector classification quality. | Improve detector before serializer changes. | High | Superceded |
+| TBL-005 | TABLES/table_parser.py | Header-row detection is heuristic and may choose the wrong row for messy spreadsheets. | Add optional template override for header_row_index. | Medium | Not Started |
+| TBL-006 | TABLES/table_parser.py | CSV/XLS parsing handles basic files but not multi-sheet workbook selection. | Add optional sheet selection / all-sheets mode for Excel. | Medium | Not Started |
 
 ---
 
