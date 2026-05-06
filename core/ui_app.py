@@ -267,22 +267,40 @@ with tabs[0]:
         if selected_existing:
             existing_cfg = collections_cfg.get(selected_existing, {})
 
-            st.session_state["collection_name_input"] = selected_existing
-            st.session_state["collection_path_input"] = existing_cfg.get("path", "")
-            st.session_state["collection_source_label"] = existing_cfg.get("source_label", "")
-            st.session_state["collection_notes"] = existing_cfg.get("notes", "")
+            last_loaded = st.session_state.get("collection_loaded_existing")
 
-            existing_allowed = existing_cfg.get("allowed_filetypes", [])
-            st.session_state["collection_allowed_filetypes"] = existing_allowed
+            # Only load saved values when selection changes.
+            # Do not overwrite user edits on every Streamlit rerun.
+            if last_loaded != selected_existing:
+                st.session_state["collection_loaded_existing"] = selected_existing
 
-            existing_filters = existing_cfg.get("filters", {})
-            existing_field_filters = existing_filters.get("field_filters", [])
-            first_filter = existing_field_filters[0] if existing_field_filters else {}
+                st.session_state["collection_name_input"] = selected_existing
+                st.session_state["collection_path_input"] = existing_cfg.get("path", "")
+                st.session_state["collection_source_label"] = existing_cfg.get("source_label", "")
+                st.session_state["collection_notes"] = existing_cfg.get("notes", "")
 
-            st.session_state["collection_field_filters_enabled"] = len(existing_field_filters) > 0
-            st.session_state["collection_filter_field"] = first_filter.get("field", "")
-            st.session_state["collection_filter_mode"] = first_filter.get("mode", "exclude_equals")
-            st.session_state["collection_filter_values"] = ",".join(first_filter.get("values", []))
+                st.session_state["collection_allowed_filetypes"] = existing_cfg.get("allowed_filetypes", [])
+
+                st.session_state["collection_allowed_extensions"] = ",".join(
+                    existing_cfg.get("allowed_extensions", [])
+                )
+                st.session_state["collection_exclude_dirs"] = ",".join(
+                    existing_cfg.get("exclude_dirs", [])
+                )
+                st.session_state["collection_exclude_extensions"] = ",".join(
+                    existing_cfg.get("exclude_extensions", [])
+                )
+
+                existing_filters = existing_cfg.get("filters", {})
+                existing_field_filters = existing_filters.get("field_filters", [])
+                first_filter = existing_field_filters[0] if existing_field_filters else {}
+
+                st.session_state["collection_field_filters_enabled"] = len(existing_field_filters) > 0
+                st.session_state["collection_filter_field"] = first_filter.get("field", "")
+                st.session_state["collection_filter_mode"] = first_filter.get("mode", "exclude_equals")
+                st.session_state["collection_filter_values"] = ",".join(first_filter.get("values", []))
+        else:
+            st.session_state["collection_loaded_existing"] = ""
 
         cname = st.text_input(
             "Collection name",
@@ -308,19 +326,16 @@ with tabs[0]:
 
         allowed_extensions_raw = st.text_input(
             "Allowed extensions (comma-separated, include dots)",
-            value=",".join(existing_cfg.get("allowed_extensions", [])),
             key="collection_allowed_extensions"
         )
 
         exclude_dirs_raw = st.text_input(
             "Exclude folders (comma-separated)",
-            value=",".join(existing_cfg.get("exclude_dirs", [])),
             key="collection_exclude_dirs"
         )
 
         exclude_extensions_raw = st.text_input(
             "Exclude extensions (comma-separated, include dots)",
-            value=",".join(existing_cfg.get("exclude_extensions", [])),
             key="collection_exclude_extensions"
         )
 
