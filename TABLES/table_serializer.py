@@ -225,6 +225,7 @@ def table_serializer(parsed, file_path, template_config, file_tags, collection_n
         raise ValueError(f"Unknown table type: {table_type}")
 
     for d in docs:
+        d["file_path"] = source_path
         d.update(file_tags)
 
     return docs
