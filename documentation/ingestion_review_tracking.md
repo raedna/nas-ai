@@ -28,7 +28,7 @@ Status values:
 | CORE-010 | UI validation | Payload Inspector hides link_keys and related_link_keys in raw payload only. | Add link_keys and related_link_keys columns to the Payload Inspector table. | Low | Done |
 | CORE-011 | Query router modularization | query_router.py is too large and mixes routing, synthesis, scoring, discovery fallbacks, and legacy helpers. | Split into structured_lookup, relationship_lookup, synthesis, and scoring modules after XML regression is stable. | Medium | Not Started |
 | CORE-012 | Legacy test scripts | core/test_upload.py contains hardcoded local FIX paths and is not part of orchestrated ingestion. | Move to archive. | Low | Done |
-| CORE-013 | collection_merger structured overwrite | collection_merger.py re-merges structured docs and destroys normalized payload fields, producing old identifiers like identifier:RQ472. | Disable structured/entity/procedural re-merge; keep only image relationship post-processing until merger is redesigned. | Critical | In Progress |
+| CORE-013 | collection_merger structured overwrite | collection_merger.py re-merges structured docs and destroys normalized payload fields, producing old identifiers like identifier:RQ472. | Disable structured/entity/procedural re-merge; keep only image relationship post-processing until merger is redesigned. | Critical | Done |
 ---
 
 ## 2. XML ingestion
