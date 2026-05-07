@@ -61,6 +61,8 @@ Status values:
 | TBL-004 | TABLES/table_serializer.py | Table behavior depends on detector classification quality. | Improve detector before serializer changes. | High | Superceded |
 | TBL-005 | TABLES/table_parser.py | Header-row detection is heuristic and may choose the wrong row for messy spreadsheets. | Add optional template override for header_row_index. | Medium | Not Started |
 | TBL-006 | TABLES/table_parser.py | CSV/XLS parsing handles basic files but not multi-sheet workbook selection. | Add optional sheet selection / all-sheets mode for Excel. | Medium | Not Started |
+| TBL-007 | Entity-row relationship model | Entity-row records use source IDs, so identifier-based related_link_keys are not useful for user-facing relationships. | Define entity-row relationship logic based on primary_name, aliases, tags, explicit article references, and optional source-system related article fields. | Medium | Not Started |
+| TBL-008 | Entity-row related article extraction | KB-style rows may mention other articles or steps by title, but current table linking skips entity_row documents. | Build related_link_keys for entity_row only from safe signals such as explicit title references, shared workflow prefixes, or configured relationship columns. | Medium | Not Started |
 
 ---
 
