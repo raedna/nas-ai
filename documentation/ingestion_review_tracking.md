@@ -164,3 +164,13 @@ Status values:
 | ID | Area | Issue | Suggested Fix | Priority | Status |
 | UI-002 | Validation payload inspector | Inspector only searches by identifier, which is weak for entity_row/source-ID records. | Allow lookup by identifier, primary_name, and link_keys. | Medium | Not Started |
 
+---
+
+## 13. Ingestion
+
+| ID | Area | Issue | Suggested Fix | Priority | Status |
+| ING-001 | Force re-ingest cleanup | Force re-ingest can leave stale vectors when chunk IDs or payload shape change, causing duplicate old/new payloads for the same source record. | On force re-ingest, delete existing vectors for the source file or collection before inserting new chunks. | Critical | Not Started |
+
+
+
+
