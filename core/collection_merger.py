@@ -424,16 +424,18 @@ def _link_image_related_docs(docs):
 # =========================================================
 # MAIN ENTRYPOINT
 # =========================================================
-def merge_collection_docs(docs):
-    grouped = _group_docs_by_type(docs)
+ddef merge_collection_docs(docs):
+    """
+    Collection-level post-processing.
 
-    merged = []
-    merged.extend(merge_structured_docs(grouped["structured"]))
-    merged.extend(merge_entity_row_docs(grouped["entity_row"]))
-    merged.extend(merge_procedural_docs(grouped["procedural"]))
-    merged.extend(grouped["unknown"])
+    Structured/entity/procedural docs are already normalized by their serializers.
+    Do not re-merge them here, because that can destroy identifier_field,
+    identifier_namespace, identifier_kind, link_keys, source_file, and file_path.
 
-    # phase-1 post-processing links only
+    Keep only cross-modal/image relationship enrichment for now.
+    """
+    merged = [dict(doc) for doc in (docs or [])]
+
     merged = _link_image_related_docs(merged)
 
     return merged
