@@ -424,7 +424,7 @@ def _link_image_related_docs(docs):
 # =========================================================
 # MAIN ENTRYPOINT
 # =========================================================
-ddef merge_collection_docs(docs):
+def merge_collection_docs(docs):
     """
     Collection-level post-processing.
 
