@@ -36,6 +36,44 @@ def _namespace_from_field(field):
     field = str(field or "").strip().lower()
     return "".join(ch for ch in field if ch.isalnum() or ch == "_")
 
+def _apply_link_index_to_docs(docs, rows, schema, source_file):
+    from core.link_index import build_link_index
+
+    if not docs:
+        return docs
+
+    # Only canonical structured docs should get identifier-based related links.
+    # Source/generated identifiers are traceability IDs, not user-facing reference IDs.
+    canonical_docs = [
+        d for d in docs
+        if d.get("doc_type") == "structured"
+        and d.get("identifier_kind") == "canonical"
+        and d.get("link_keys")
+    ]
+
+    if not canonical_docs:
+        return docs
+
+    link_index = build_link_index(
+        {source_file: rows},
+        {source_file: schema}
+    )
+
+    entries = link_index.get("identifier", {})
+
+    for d in canonical_docs:
+        related = set(d.get("related_link_keys") or [])
+
+        for link_key in d.get("link_keys") or []:
+            entry = entries.get(link_key) or {}
+            for related_key in entry.get("related_link_keys") or []:
+                if related_key not in d.get("link_keys", []):
+                    related.add(related_key)
+
+        d["related_link_keys"] = sorted(related)
+
+    return docs
+
 
 # =========================================================
 # STRUCTURED TABLE DOC BUILDER
@@ -247,6 +285,8 @@ def table_serializer(parsed, file_path, template_config, file_tags, collection_n
         docs = process_procedural_table(rows, schema, source_file)
     else:
         raise ValueError(f"Unknown table type: {table_type}")
+
+    docs = _apply_link_index_to_docs(docs, rows, schema, source_file)
 
     for d in docs:
         d["file_path"] = source_path
