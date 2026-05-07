@@ -53,6 +53,7 @@ Status values:
 | ID | Area | Issue | Suggested Fix | Priority | Status |
 |---|---|---|---|---|---|
 | TBL-001 | TABLES/table_detector.py | Detector hardcodes KB/Halo columns. | Replace with schema/template-driven detection. | Critical | Done |
+| TBL-001b | TABLES/table_detector.py | Generic detector classifies BBG-style reference tables as entity_row because they have identifier/name/description but no enum/reference fields. | Add schema-driven text-density heuristic: long article-like descriptions imply entity_row; compact identifier/name/description records imply structured. | High | Not Started |
 | TBL-002 | TABLES/table_parser.py | Header detection is heuristic only. | Add optional header_row override in template config. | Medium | Done |
 | TBL-002b | TABLES/table_serializer.py | Entity-row table payloads do not emit identifier_field, identifier_namespace, link_keys, related_link_keys, and file_path. | Apply the same normalized identity fields to _build_entity_row_doc(). | High | Done |
 | TBL-002c | TABLES/table_serializer.py / retrieval | KB-style entity rows use source IDs that are not natural user query targets. | Ensure entity-row retrieval prioritizes primary_name, aliases, and description/text over identifier lookup. | High | Done |
