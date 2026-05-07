@@ -57,7 +57,7 @@ Status values:
 | TBL-002b | TABLES/table_serializer.py | Entity-row table payloads do not emit identifier_field, identifier_namespace, link_keys, related_link_keys, and file_path. | Apply the same normalized identity fields to _build_entity_row_doc(). | High | Done |
 | TBL-002c | TABLES/table_serializer.py / retrieval | KB-style entity rows use source IDs that are not natural user query targets. | Ensure entity-row retrieval prioritizes primary_name, aliases, and description/text over identifier lookup. | High | Done |
 | TBL-002d | TABLES/table_serializer.py | Table payloads do not distinguish canonical/user-facing identifiers from source/system IDs or generated row IDs. | Add identifier_kind: structured=canonical, entity_row=source, procedural=generated. | High | Done |
-| TBL-003 | TABLES/schema_inference_table.py | Global roles may overfit one dataset. | Support collection/template role overrides later. | High | Not Started |
+| TBL-003 | TABLES/table_serializer.py / link logic | Tables do not yet build same-file related_link_keys. | Reuse core.link_index for canonical structured table docs only; skip entity_row/source IDs and procedural/generated IDs. | High | In Progress |
 | TBL-004 | TABLES/table_serializer.py | Table behavior depends on detector classification quality. | Improve detector before serializer changes. | High | Superceded |
 | TBL-005 | TABLES/table_parser.py | Header-row detection is heuristic and may choose the wrong row for messy spreadsheets. | Add optional template override for header_row_index. | Medium | Not Started |
 | TBL-006 | TABLES/table_parser.py | CSV/XLS parsing handles basic files but not multi-sheet workbook selection. | Add optional sheet selection / all-sheets mode for Excel. | Medium | Not Started |
