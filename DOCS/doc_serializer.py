@@ -7,7 +7,18 @@ DEBUG = True
 # =========================================================
 # HELPERS
 # =========================================================
-def _make_chunk(blocks, chunk_id, doc_type, source_file, source_stem, is_markdown, file_tags, related_titles=None):
+def _make_chunk(
+    blocks,
+    chunk_id,
+    doc_type,
+    source_file,
+    source_stem,
+    is_markdown,
+    file_tags,
+    related_titles=None,
+    file_path=None,
+):
+
     if not blocks:
         return None
 
@@ -75,8 +86,22 @@ def _make_chunk(blocks, chunk_id, doc_type, source_file, source_stem, is_markdow
 
     related_titles = related_titles or []
 
+    identifier = f"chunk_{chunk_id}"
+    identifier_field = "chunk_id"
+    identifier_namespace = "chunk_id"
+    identifier_kind = "generated"
+    link_keys = [f"{identifier_namespace}:{identifier}"]
+
     payload = {
         "chunk_id": chunk_id,
+        "identifier": identifier,
+        "identifier_field": identifier_field,
+        "identifier_namespace": identifier_namespace,
+        "identifier_kind": identifier_kind,
+        "link_keys": link_keys,
+        "related_link_keys": [],
+        "file_path": str(file_path) if file_path else None,
+
         "primary_name": source_stem if is_markdown else heading,
         "section_heading": heading,
         "description": text,
