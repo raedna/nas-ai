@@ -72,9 +72,11 @@ Status values:
 
 | ID | Area | Issue | Suggested Fix | Priority | Status |
 |---|---|---|---|---|---|
-| DOC-001 | DOCS/doc_parser.py / doc_serializer.py | Docs default to narrative because doc_type is not clearly detected. | Add DOCS/doc_detector.py or equivalent doc_type classification. | High | Not Started |
+| DOC-001 | DOCS/doc_detector.py | Docs defaulted to narrative because doc_type was not clearly detected; detector now exists but still hardcodes procedural/reference keyword lists. | Move detector keyword lists to config/doc_query_hints.json or a dedicated doc_detection_hints.json, then validate doc_type classification. | High | Not Started |
 | DOC-002 | DOCS/doc_parser.py | Parser mixes text parsing, block detection, image resolution, and OCR enrichment. | Later split responsibilities if needed. | Medium | Not Started |
 | DOC-003 | DOCS/doc_parser.py | Asset search roots are passed by core special case. | Move to generic config merge. | High | Not Started |
+| DOC-004 | DOCS/doc_serializer.py | Doc chunks do not emit the shared normalized identity/source fields. | Add file_path, generated chunk identifier, identifier_field, identifier_namespace, identifier_kind=generated, link_keys, and related_link_keys. | High | Not Started |
+
 
 ---
 
@@ -146,6 +148,7 @@ Status values:
 | RET-006 | Fuzzy structured name lookup | Misspelled names like “seucityIdSource” do not resolve to SecurityIDSource. | Add conservative fuzzy matching over primary_name and aliases. | Medium | Not Started |
 | RET-007 | Entity/procedural reranking | Entity-row/procedural KB articles should be retrieved by topic/action/title, but final reranker can promote a neighboring article with stronger body keyword overlap over the semantically best action-specific article. | Adjust reranker for entity_row/procedural docs to preserve strong semantic rank and boost primary_name/action-term overlap. | High | Not Started |
 | RET-008 | Structured primary-name token matching | BBG-style structured rows are found by description terms like “ask price” but not by compact primary_name queries like “px ask” matching PX_ASK. | Normalize separators/underscores and boost token-overlap matches against primary_name/aliases for structured/canonical rows. | High | Not Started |
+| RET-009 | Query router/discovery cleanup | route_query, query_router, and discovery still contain mixed routing logic and remaining hardcoded assumptions. | Refactor retrieval after ingestion normalization: split routing, structured lookup, entity-row search, discovery, rerank, and synthesis. | Critical | Not Started |
 
 ---
 
