@@ -172,6 +172,7 @@ Status values:
 
 | ID | Area | Issue | Suggested Fix | Priority | Status |
 | ING-001 | Force re-ingest cleanup | Force re-ingest reprocesses files but can leave stale vectors when chunk IDs or payload shape changes. | When force_reingest=True, delete/recreate the target Qdrant collection before ingesting configured files. Normal ingestion should skip unchanged files and add/update only needed files. | Critical | In Progress |
+| ING-002 | Normal ingestion skip check | collection_state.py recorded file state but orchestrator did not use it, so normal ingestion reprocessed unchanged files. | Add should_skip_file() and skip unchanged files when force_reingest=False. | Critical | Done |
 
 
 
