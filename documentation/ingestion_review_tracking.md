@@ -171,7 +171,7 @@ Status values:
 ## 13. Ingestion
 
 | ID | Area | Issue | Suggested Fix | Priority | Status |
-| ING-001 | Force re-ingest cleanup | Force re-ingest reprocesses files but can leave stale vectors when chunk IDs or payload shape changes. | When force_reingest=True, delete/recreate the target Qdrant collection before ingesting configured files. Normal ingestion should skip unchanged files and add/update only needed files. | Critical | Not Started |
+| ING-001 | Force re-ingest cleanup | Force re-ingest reprocesses files but can leave stale vectors when chunk IDs or payload shape changes. | When force_reingest=True, delete/recreate the target Qdrant collection before ingesting configured files. Normal ingestion should skip unchanged files and add/update only needed files. | Critical | In Progress |
 
 
 
