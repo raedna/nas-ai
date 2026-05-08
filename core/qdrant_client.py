@@ -26,6 +26,19 @@ def ensure_collection_exists(collection_name):
             )
         )
 
+def recreate_collection(collection_name):
+    existing = [c.name for c in client.get_collections().collections]
+
+    if collection_name in existing:
+        client.delete_collection(collection_name=collection_name)
+
+    client.create_collection(
+        collection_name=collection_name,
+        vectors_config=VectorParams(
+            size=VECTOR_SIZE,
+            distance=Distance.COSINE
+        )
+    )
 
 # =========================================================
 # POINT UPSERT
