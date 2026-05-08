@@ -145,6 +145,7 @@ Status values:
 | RET-005 | Structured primary-name lookup | Asks like “what values can tag SecurityIDSource have?” do not resolve the structured payload by primary_name. | Detect structured value/name questions, search primary_name/aliases using n-gram spans from the question, and synthesize from the matched payload. | High | Done |
 | RET-006 | Fuzzy structured name lookup | Misspelled names like “seucityIdSource” do not resolve to SecurityIDSource. | Add conservative fuzzy matching over primary_name and aliases. | Medium | Not Started |
 | RET-007 | Entity/procedural reranking | Entity-row/procedural KB articles should be retrieved by topic/action/title, but final reranker can promote a neighboring article with stronger body keyword overlap over the semantically best action-specific article. | Adjust reranker for entity_row/procedural docs to preserve strong semantic rank and boost primary_name/action-term overlap. | High | Not Started |
+| RET-008 | Structured primary-name token matching | BBG-style structured rows are found by description terms like “ask price” but not by compact primary_name queries like “px ask” matching PX_ASK. | Normalize separators/underscores and boost token-overlap matches against primary_name/aliases for structured/canonical rows. | High | Not Started |
 
 ---
 
@@ -165,6 +166,7 @@ Status values:
 
 | ID | Area | Issue | Suggested Fix | Priority | Status |
 | UI-002 | Validation payload inspector | Inspector only searches by identifier, which is weak for entity_row/source-ID records. | Allow lookup by identifier, primary_name, and link_keys. | Medium | Not Started |
+| UI-003 | Related articles panel | Ask tab no longer shows related articles after disabling legacy collection_merger entity-row merge. | Rebuild related articles using normalized payload fields and a proper entity_row relationship model instead of old fuzzy merger. | Medium | Not Started |
 
 ---
 
