@@ -76,6 +76,8 @@ Status values:
 | DOC-002 | DOCS/doc_parser.py | Parser mixes text parsing, block detection, image resolution, and OCR enrichment. | Later split responsibilities if needed. | Medium | Not Started |
 | DOC-003 | DOCS/doc_parser.py | Asset search roots are passed by core special case. | Move to generic config merge. | High | Not Started |
 | DOC-004 | DOCS/doc_serializer.py | Doc chunks do not emit the shared normalized identity/source fields. | Add file_path, generated chunk identifier, identifier_field, identifier_namespace, identifier_kind=generated, link_keys, and related_link_keys. | High | Not Started |
+| DOC-005 | DOCS schema/model | Docs should not use table/XML-style role schema; they need a block/document metadata contract. | Define a DOCS payload contract covering document title, chunk identity, block types, embedded assets, Obsidian links, related_titles, source_file, and file_path. | High | Not Started |
+| DOC-006 | Obsidian image links | Markdown notes may reference PNG/JPG assets stored in different folders using ![[...]] syntax. | Ensure asset_search_roots are configurable per collection and embedded_image_paths / targets are preserved in normalized doc payloads. | High | Not Started |
 
 
 ---
