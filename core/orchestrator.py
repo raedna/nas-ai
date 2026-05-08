@@ -6,8 +6,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 from core.collection_merger import merge_collection_docs
-from core.collection_state import update_file_state
-
+from core.collection_state import update_file_state, should_skip_file
 
 
 DEBUG = True
@@ -165,6 +164,23 @@ class IngestionOrchestrator:
     ) -> FileResult:
         parser = self.registry.get_parser(task.parser_name)
         serializer = self.registry.get_serializer(task.serializer_name)
+
+
+        if not force_reingest:
+            skip, reason = should_skip_file(
+                collection_name=task.collection_name,
+                file_path=task.path
+            )
+
+            if skip:
+                return FileResult(
+                    path=task.path,
+                    filetype_name=task.filetype_name,
+                    success=True,
+                    skipped=True,
+                    chunks_created=0,
+                    metadata={"reason": reason},
+                )
 
         # parse
         parsed = parser(
