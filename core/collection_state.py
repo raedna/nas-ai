@@ -64,6 +64,32 @@ def update_file_state(
 
     save_collection_state(collection_name, state)
 
+def should_skip_file(collection_name, file_path):
+    state = load_collection_state(collection_name)
+
+    path_obj = Path(file_path)
+    file_key = str(path_obj.resolve())
+
+    entry = state.get("files", {}).get(file_key)
+
+    if not entry:
+        return False, "not_previously_ingested"
+
+    if entry.get("status") != "ingested":
+        return False, f"previous_status_{entry.get('status')}"
+
+    if not path_obj.exists():
+        return False, "file_missing"
+
+    stat = path_obj.stat()
+
+    previous_mtime = entry.get("mtime")
+    previous_size = entry.get("size")
+
+    if previous_mtime == stat.st_mtime and previous_size == stat.st_size:
+        return True, "unchanged"
+
+    return False, "modified"
 
 def remove_file_state(collection_name, file_path):
     state = load_collection_state(collection_name)
