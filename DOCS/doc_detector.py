@@ -25,6 +25,28 @@ def _contains_any(text, keywords):
     t = _norm(text)
     return any(k in t for k in keywords)
 
+import json
+from core.paths import CONFIG_DIR
+
+def load_doc_detection_hints():
+    path = CONFIG_DIR / "doc_detection_hints.json"
+
+    defaults = {
+        "procedural_keywords": [],
+        "reference_keywords": [],
+        "scoring": {}
+    }
+
+    if not path.exists():
+        return defaults
+
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        return {**defaults, **data}
+    except Exception:
+        return defaults
+
 
 # =========================================================
 # MAIN DETECTOR
@@ -42,39 +64,38 @@ def detect_doc_type(parsed):
     bullet_count = counts.get("bullet", 0)
     paragraph_count = counts.get("paragraph", 0)
 
-    procedural_keywords = [
-        "step", "steps", "procedure", "instructions", "checklist",
-        "how to", "runbook", "follow these steps", "initial status check"
-    ]
+    hints = load_doc_detection_hints()
 
-    reference_keywords = [
-        "overview", "summary", "introduction", "benefits",
-        "background", "reference", "white paper", "case study"
-    ]
+    procedural_keywords = hints.get("procedural_keywords", [])
+    reference_keywords = hints.get("reference_keywords", [])
+    scoring = hints.get("scoring", {})
 
     procedural_score = 0
     reference_score = 0
 
     # block-pattern signals
-    if bullet_count >= 3:
-        procedural_score += 3
+    if bullet_count >= scoring.get("bullet_count_procedural_min", 3):
+        procedural_score += scoring.get("bullet_count_procedural_score", 3)
 
-    if heading_count >= 2:
-        reference_score += 1
+    if heading_count >= scoring.get("heading_reference_min", 2):
+        reference_score += scoring.get("heading_reference_score", 1)
+    if (
+        heading_count >= scoring.get("heading_bullet_heading_min", 2)
+        and bullet_count >= scoring.get("heading_bullet_bullet_min", 2)
+    ):
 
-    if heading_count >= 2 and bullet_count >= 2:
-        procedural_score += 1
+        procedural_score += scoring.get("heading_bullet_procedural_score", 1)
 
     # text signals
     if _contains_any(full_text, procedural_keywords):
-        procedural_score += 3
+        procedural_score += scoring.get("procedural_keyword_score", 3)
 
     if _contains_any(full_text, reference_keywords):
-        reference_score += 2
+        reference_score += scoring.get("reference_keyword_score", 2)
 
     # numbered step signals
-    if re.search(r"\bstep\s+\d+\b", full_text):
-        procedural_score += 2
+    if re.search(scoring.get("numbered_step_pattern", r"\bstep\s+\d+\b"), full_text):
+        procedural_score += scoring.get("numbered_step_score", 2)
 
     # body-heavy narrative/reference
     if paragraph_count >= 4 and bullet_count <= 1:
