@@ -181,7 +181,16 @@ Status values:
 | ING-001 | Force re-ingest cleanup | Force re-ingest reprocesses files but can leave stale vectors when chunk IDs or payload shape changes. | When force_reingest=True, delete/recreate the target Qdrant collection before ingesting configured files. Normal ingestion should skip unchanged files and add/update only needed files. | Critical | In Progress |
 | ING-002 | Normal ingestion skip check | collection_state.py recorded file state but orchestrator did not use it, so normal ingestion reprocessed unchanged files. | Add should_skip_file() and skip unchanged files when force_reingest=False. | Critical | Done |
 
+---
 
+## 14. Halo Tickets
+
+| ID | Area | Issue | Suggested Fix | Priority | Status |
+| TKT-001 | Ticket ingestion contract | Ticket PDFs/exports contain metadata, client problem, investigation, fix, and outcome mixed together. | Define normalized ticket payload fields: ticket_id, customer, application, category, problem_text, cause_text, solution_text, outcome_text, status, priority, source fields. | Critical | Not Started |
+| TKT-002 | Ticket PDF parser/extractor | Halo ticket PDF reports are currently generic PDFs/docs, so support knowledge is not cleanly separated. | Add ticket-aware extraction for Halo report structure: metadata, first user email, work notes, support replies, child tickets, final resolution/outcome. | Critical | Not Started |
+| TKT-003 | Ticket embedding text generator | Raw ticket text is noisy and long, diluting the useful support problem/solution signal. | Generate ticket-specific NLP text emphasizing Problem, Symptoms, Cause, Resolution, Outcome, and related technical terms. | Critical | Not Started |
+| TKT-004 | Ticket visual/OCR handling | Ticket PDFs include screenshots of Charles River/GLMX/FIX grids that may contain important tags and values. | Preserve parsed page text plus image/OCR references; include extracted technical values where useful, but avoid over-weighting screenshots. | High | Not Started |
+| TKT-005 | Ticket retrieval evaluation set | Need to confirm client-style queries retrieve the right ticket or KB article. | Build sample queries mapped to expected tickets, e.g. “x-ccy repo settlement currency wrong”, “GLMX tag 120 PHP instead of USD”, “repo currency flips on close”. | High | Not Started |
 
 
 
