@@ -48,6 +48,9 @@
     "allowed_filetypes": [
       "docs"
     ],
+    "asset_search_roots": [
+      "/Volumes/raedsync/Notes/Obsidian"
+    ],
     "source_label": "Obsidian Notes",
     "notes": "Notes as of 04/16/2026",
     "filters": {
