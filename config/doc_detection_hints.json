@@ -35,6 +35,7 @@
     "mixed_reference_min": 3,
     "heading_bullet_heading_min": 2,
     "heading_bullet_bullet_min": 2,
-    "numbered_step_pattern": "\\bstep\\s+\\d+\\b"
+    "numbered_step_pattern": "\\bstep\\s+\\d+\\b",
+    "paragraph_reference_bullet_max": 1
   }
 }
