@@ -157,6 +157,7 @@ Status values:
 ## 11. Discovery harcoding fix
 
 | ID | Area | Issue | Suggested Fix | Priority | Status |
+|---|---|---|---|---|---|
 | DISC-001 | Discovery intent terms | detect_ask_intent() hardcodes count/list/comparison/distinct-value query terms. | Move terms to config/doc_query_hints.json and read them dynamically. | High | Done |
 | DISC-002 | Discovery role field resolution | discovery_engine.py hardcodes role_to_payload_fields for exposure/rotation/filter/object/date. | Add schema-driven resolve_payload_fields_for_role(collection, requested_role), then replace hardcoded dictionaries in match and distinct-value discovery. | Critical | Done |
 | DISC-002b | Role-specific query cleanup | parse_structured_filter_query() has special handling for requested_role == "exposure". | Move role-specific cleanup terms to config or remove once schema-driven role parsing is stable. | Medium | Not Started |
@@ -170,6 +171,7 @@ Status values:
 ## 12. UI
 
 | ID | Area | Issue | Suggested Fix | Priority | Status |
+|---|---|---|---|---|---|
 | UI-002 | Validation payload inspector | Inspector only searches by identifier, which is weak for entity_row/source-ID records. | Allow lookup by identifier, primary_name, and link_keys. | Medium | Not Started |
 | UI-003 | Related articles panel | Ask tab no longer shows related articles after disabling legacy collection_merger entity-row merge. | Rebuild related articles using normalized payload fields and a proper entity_row relationship model instead of old fuzzy merger. | Medium | Not Started |
 
@@ -178,6 +180,7 @@ Status values:
 ## 13. Ingestion
 
 | ID | Area | Issue | Suggested Fix | Priority | Status |
+|---|---|---|---|---|---|
 | ING-001 | Force re-ingest cleanup | Force re-ingest reprocesses files but can leave stale vectors when chunk IDs or payload shape changes. | When force_reingest=True, delete/recreate the target Qdrant collection before ingesting configured files. Normal ingestion should skip unchanged files and add/update only needed files. | Critical | In Progress |
 | ING-002 | Normal ingestion skip check | collection_state.py recorded file state but orchestrator did not use it, so normal ingestion reprocessed unchanged files. | Add should_skip_file() and skip unchanged files when force_reingest=False. | Critical | Done |
 
@@ -186,6 +189,7 @@ Status values:
 ## 14. Halo Tickets
 
 | ID | Area | Issue | Suggested Fix | Priority | Status |
+|---|---|---|---|---|---|
 | TKT-001 | Ticket ingestion contract | Ticket PDFs/exports contain metadata, client problem, investigation, fix, and outcome mixed together. | Define normalized ticket payload fields: ticket_id, customer, application, category, problem_text, cause_text, solution_text, outcome_text, status, priority, source fields. | Critical | Not Started |
 | TKT-002 | Ticket PDF parser/extractor | Halo ticket PDF reports are currently generic PDFs/docs, so support knowledge is not cleanly separated. | Add ticket-aware extraction for Halo report structure: metadata, first user email, work notes, support replies, child tickets, final resolution/outcome. | Critical | Not Started |
 | TKT-003 | Ticket embedding text generator | Raw ticket text is noisy and long, diluting the useful support problem/solution signal. | Generate ticket-specific NLP text emphasizing Problem, Symptoms, Cause, Resolution, Outcome, and related technical terms. | Critical | Not Started |
