@@ -32,6 +32,9 @@
     "paragraph_reference_min": 4,
     "paragraph_reference_score": 2,
     "mixed_procedural_min": 4,
-    "mixed_reference_min": 3
+    "mixed_reference_min": 3,
+    "heading_bullet_heading_min": 2,
+    "heading_bullet_bullet_min": 2,
+    "numbered_step_pattern": "\\bstep\\s+\\d+\\b"
   }
 }
