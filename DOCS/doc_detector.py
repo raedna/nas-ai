@@ -98,11 +98,17 @@ def detect_doc_type(parsed):
         procedural_score += scoring.get("numbered_step_score", 2)
 
     # body-heavy narrative/reference
-    if paragraph_count >= 4 and bullet_count <= 1:
-        reference_score += 2
+    if (
+        paragraph_count >= scoring.get("paragraph_reference_min", 4)
+        and bullet_count <= scoring.get("paragraph_reference_bullet_max", 1)
+    ):
+        reference_score += scoring.get("paragraph_reference_score", 2)
 
     # decision
-    if procedural_score >= 4 and reference_score >= 3:
+    if (
+        procedural_score >= scoring.get("mixed_procedural_min", 4)
+        and reference_score >= scoring.get("mixed_reference_min", 3)
+    ):
         doc_type = "mixed"
     elif procedural_score > reference_score:
         doc_type = "procedural"
