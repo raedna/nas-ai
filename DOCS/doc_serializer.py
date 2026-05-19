@@ -139,6 +139,7 @@ def doc_serializer(parsed, file_path, template_config, file_tags, collection_nam
     blocks = parsed.get("blocks", [])
     doc_type = parsed.get("doc_type") or "narrative"
     source_file = Path(file_path).name
+    source_path = str(file_path)
     source_stem = Path(file_path).stem
     source_suffix = Path(file_path).suffix.lower()
     is_markdown = source_suffix == ".md"
@@ -160,7 +161,18 @@ def doc_serializer(parsed, file_path, template_config, file_tags, collection_nam
         if not current_chunk:
             return
 
-        chunk = _make_chunk(current_chunk, chunk_id, doc_type, source_file, display_stem, is_markdown, file_tags, related_titles)
+        chunk = _make_chunk(
+            current_chunk,
+            chunk_id,
+            doc_type,
+            source_file,
+            display_stem,
+            is_markdown,
+            file_tags,
+            related_titles,
+            file_path=source_path,
+        )
+
         if chunk:
             # fallback title for procedural chunks with no heading
             if doc_type == "procedural" and not chunk.get("primary_name"):
@@ -198,7 +210,17 @@ def doc_serializer(parsed, file_path, template_config, file_tags, collection_nam
 
             # front matter becomes its own chunk
             if block_type == "front_matter":
-                chunk = _make_chunk(current_chunk, chunk_id, doc_type, source_file, display_stem, is_markdown, file_tags, related_titles)
+                chunk = _make_chunk(
+                    current_chunk,
+                    chunk_id,
+                    doc_type,
+                    source_file,
+                    display_stem,
+                    is_markdown,
+                    file_tags,
+                    related_titles,
+                    file_path=source_path,
+                )
                 if chunk:
                     items.append(chunk)
                     chunk_id += 1
