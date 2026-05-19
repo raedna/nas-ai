@@ -72,7 +72,7 @@ Status values:
 
 | ID | Area | Issue | Suggested Fix | Priority | Status |
 |---|---|---|---|---|---|
-| DOC-001 | DOCS/doc_detector.py | Docs defaulted to narrative because doc_type was not clearly detected; detector now exists but still hardcodes procedural/reference keyword lists. | Move detector keyword lists to config/doc_query_hints.json or a dedicated doc_detection_hints.json, then validate doc_type classification. | High | Not Started |
+| DOC-001 | DOCS/doc_detector.py | Docs defaulted to narrative because doc_type was not clearly detected; detector now exists but still hardcodes procedural/reference keyword lists. | Move detector keyword lists to config/doc_query_hints.json or a dedicated doc_detection_hints.json, then validate doc_type classification. | High | Done |
 | DOC-002 | DOCS/doc_parser.py | Parser mixes text parsing, block detection, image resolution, and OCR enrichment. | Later split responsibilities if needed. | Medium | Not Started |
 | DOC-003 | DOCS/doc_parser.py | Asset search roots are passed by core special case. | Move to generic config merge. | High | Not Started |
 | DOC-004 | DOCS/doc_serializer.py | Doc chunks do not emit the shared normalized identity/source fields. | Add file_path, generated chunk identifier, identifier_field, identifier_namespace, identifier_kind=generated, link_keys, and related_link_keys. | High | Done |
