@@ -1,0 +1,37 @@
+{
+  "procedural_keywords": [
+    "step",
+    "steps",
+    "procedure",
+    "instructions",
+    "checklist",
+    "how to",
+    "runbook",
+    "follow these steps",
+    "initial status check"
+  ],
+  "reference_keywords": [
+    "overview",
+    "summary",
+    "introduction",
+    "benefits",
+    "background",
+    "reference",
+    "white paper",
+    "case study"
+  ],
+  "scoring": {
+    "bullet_count_procedural_min": 3,
+    "bullet_count_procedural_score": 3,
+    "heading_reference_min": 2,
+    "heading_reference_score": 1,
+    "heading_bullet_procedural_score": 1,
+    "procedural_keyword_score": 3,
+    "reference_keyword_score": 2,
+    "numbered_step_score": 2,
+    "paragraph_reference_min": 4,
+    "paragraph_reference_score": 2,
+    "mixed_procedural_min": 4,
+    "mixed_reference_min": 3
+  }
+}
