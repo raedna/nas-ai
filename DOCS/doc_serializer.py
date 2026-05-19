@@ -86,9 +86,12 @@ def _make_chunk(
 
     related_titles = related_titles or []
 
-    identifier = f"chunk_{chunk_id}"
-    identifier_field = "chunk_id"
-    identifier_namespace = "chunk_id"
+    source_key = Path(str(file_path or source_file)).stem
+    source_key = re.sub(r"[^a-zA-Z0-9_]+", "_", source_key).strip("_").lower()
+
+    identifier = f"{source_key}_chunk_{chunk_id}"
+    identifier_field = "doc_chunk"
+    identifier_namespace = "doc_chunk"
     identifier_kind = "generated"
     link_keys = [f"{identifier_namespace}:{identifier}"]
 
