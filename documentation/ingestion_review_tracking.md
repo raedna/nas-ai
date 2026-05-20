@@ -174,6 +174,8 @@ Status values:
 |---|---|---|---|---|---|
 | UI-002 | Validation payload inspector | Inspector only searches by identifier, which is weak for entity_row/source-ID records. | Allow lookup by identifier, primary_name, and link_keys. | Medium | Not Started |
 | UI-003 | Related articles panel | Ask tab no longer shows related articles after disabling legacy collection_merger entity-row merge. | Rebuild related articles using normalized payload fields and a proper entity_row relationship model instead of old fuzzy merger. | Medium | Not Started |
+| UI-004 | Collection editor asset roots | Create/Edit Collection does not expose asset_search_roots, even though DOCS parser supports them for Obsidian image resolution. | Add an Asset search roots text field to collection config UI and save it to collections.json. | High | Not Started |
+
 
 ---
 
