@@ -299,6 +299,10 @@ with tabs[0]:
                 st.session_state["collection_filter_field"] = first_filter.get("field", "")
                 st.session_state["collection_filter_mode"] = first_filter.get("mode", "exclude_equals")
                 st.session_state["collection_filter_values"] = ",".join(first_filter.get("values", []))
+
+                st.session_state["collection_asset_search_roots"] = "\n".join(
+                    existing_cfg.get("asset_search_roots", [])
+                )
         else:
             st.session_state["collection_loaded_existing"] = ""
 
@@ -337,6 +341,12 @@ with tabs[0]:
         exclude_extensions_raw = st.text_input(
             "Exclude extensions (comma-separated, include dots)",
             key="collection_exclude_extensions"
+        )
+
+        asset_search_roots_raw = st.text_area(
+            "Asset search roots (one path per line)",
+            key="collection_asset_search_roots",
+            help="Optional. Used by DOCS/Obsidian notes to resolve embedded image links like ![[image.png]]."
         )
 
         st.markdown("### Field / Row Filters")
@@ -421,12 +431,19 @@ with tabs[0]:
             exclude_dirs = [x.strip() for x in exclude_dirs_raw.split(",") if x.strip()]
             exclude_extensions = [x.strip().lower() for x in exclude_extensions_raw.split(",") if x.strip()]
 
+            asset_search_roots = [
+                x.strip()
+                for x in asset_search_roots_raw.replace(",", "\n").splitlines()
+                if x.strip()
+            ]
+
             collections_cfg[cname_clean] = {
                 "path": path_value.strip(),
                 "allowed_filetypes": allowed_filetypes,
                 "allowed_extensions": allowed_extensions,
                 "exclude_dirs": exclude_dirs,
                 "exclude_extensions": exclude_extensions,
+                "asset_search_roots": asset_search_roots,
                 "source_label": source_label.strip(),
                 "notes": notes.strip(),
                 "filters": {
