@@ -97,6 +97,7 @@ Status values:
 |---|---|---|---|---|---|
 | PDF-001 | PDF/pdf_detector.py | Readable vs scanned threshold is hardcoded. | Keep for now; expose config later only if needed. | Low | Deferred |
 | PDF-002 | PDF/pdf_serializer.py | Chunking behavior is local to serializer. | Accept for now; align later with standard chunk config if needed. | Low | Deferred |
+| PDF-003 | PDF/pdf_serializer.py | PDF chunks do not emit shared normalized identity/source fields. | Add file_path, file-aware generated identifier, identifier_field=pdf_chunk, identifier_namespace=pdf_chunk, identifier_kind=generated, link_keys, related_link_keys, pdf_mode, and file_name. | High | Not Started |
 
 ---
 
