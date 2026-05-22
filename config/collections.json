@@ -48,6 +48,9 @@
     "allowed_filetypes": [
       "docs"
     ],
+    "allowed_extensions": [],
+    "exclude_dirs": [],
+    "exclude_extensions": [],
     "asset_search_roots": [
       "/Volumes/raedsync/Notes/Obsidian"
     ],
