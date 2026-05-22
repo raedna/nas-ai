@@ -75,8 +75,9 @@ def should_skip_file(collection_name, file_path):
     if not entry:
         return False, "not_previously_ingested"
 
-    if entry.get("status") != "ingested":
-        return False, f"previous_status_{entry.get('status')}"
+    previous_status = entry.get("status")
+    if previous_status not in ["ingested", "skipped"]:
+        return False, f"previous_status_{previous_status}"
 
     if not path_obj.exists():
         return False, "file_missing"
