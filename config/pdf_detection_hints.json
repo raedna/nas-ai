@@ -1,0 +1,38 @@
+{
+  "mode": {
+    "scanned_text_len_min": 80,
+    "scanned_avg_chars_per_page_min": 40
+  },
+  "doc_type": {
+    "procedural_keywords": [
+      "step",
+      "steps",
+      "procedure",
+      "instructions",
+      "checklist",
+      "runbook",
+      "follow these steps"
+    ],
+    "reference_keywords": [
+      "glossary",
+      "appendix",
+      "index",
+      "definition",
+      "definitions",
+      "overview",
+      "introduction",
+      "reference",
+      "manual"
+    ],
+    "thresholds": {
+      "readable_bullet_procedural_min": 3,
+      "readable_heading_reference_min": 2,
+      "readable_paragraph_reference_min": 3,
+      "scanned_bullet_procedural_min": 4,
+      "scanned_short_upper_reference_min": 2,
+      "scanned_dense_paragraph_reference_min": 3,
+      "reference_keyword_score": 3,
+      "procedural_keyword_score": 3
+    }
+  }
+}

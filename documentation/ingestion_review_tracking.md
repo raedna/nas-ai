@@ -95,7 +95,7 @@ Status values:
 
 | ID | Area | Issue | Suggested Fix | Priority | Status |
 |---|---|---|---|---|---|
-| PDF-001 | PDF/pdf_detector.py | Readable vs scanned threshold is hardcoded. | Keep for now; expose config later only if needed. | Low | Deferred |
+| PDF-001 | PDF/pdf_detector.py | PDF mode/doc_type detection uses hardcoded thresholds and scanned glossary/reference pages can be misclassified as procedural. | Move PDF detection thresholds and keywords to config/pdf_detection_hints.json; add reference keyword signals such as glossary, appendix, index, definition, introduction, overview. | High | Not Started |
 | PDF-002 | PDF/pdf_serializer.py | Chunking behavior is local to serializer. | Accept for now; align later with standard chunk config if needed. | Low | Deferred |
 | PDF-003 | PDF/pdf_serializer.py | PDF chunks do not emit shared normalized identity/source fields. | Add file_path, file-aware generated identifier, identifier_field=pdf_chunk, identifier_namespace=pdf_chunk, identifier_kind=generated, link_keys, related_link_keys, pdf_mode, and file_name. | High | Done |
 
