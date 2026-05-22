@@ -199,4 +199,11 @@ Status values:
 | TKT-005 | Ticket retrieval evaluation set | Need to confirm client-style queries retrieve the right ticket or KB article. | Build sample queries mapped to expected tickets, e.g. “x-ccy repo settlement currency wrong”, “GLMX tag 120 PHP instead of USD”, “repo currency flips on close”. | High | Not Started |
 
 
+---
+
+## 15. Enrichment
+
+| ID | Area | Issue | Suggested Fix | Priority | Status |
+|---|---|---|---|---|---|
+| ENRICH-001 | Generic enrichment layer | Ingestion currently relies on parser/serializer output and retrieval-time logic for aliases, query variants, answer hints, and relationship hints. | Add a lightweight role-driven enrichment stage after schema/role inference and before serialization. Start with structured items only, generating optional metadata such as identifier_aliases, name_aliases, query_variants, relationship_keys, and answer_kind. | High | Not Started |
 
