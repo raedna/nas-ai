@@ -1,4 +1,5 @@
 from pathlib import Path
+import re
 
 DEBUG = True
 
@@ -6,7 +7,17 @@ DEBUG = True
 # =========================================================
 # HELPERS
 # =========================================================
-def _make_chunk(blocks, chunk_id, doc_type, source_file, page_count, file_tags):
+def _make_chunk(
+    blocks,
+    chunk_id,
+    doc_type,
+    source_file,
+    page_count,
+    file_tags,
+    file_path=None,
+    pdf_mode=None,
+):
+
     if not blocks:
         return None
 
@@ -39,8 +50,18 @@ def _make_chunk(blocks, chunk_id, doc_type, source_file, page_count, file_tags):
     if not text:
         return None
 
+    identity = _pdf_chunk_identity(
+        file_path=file_path,
+        source_file=source_file,
+        chunk_id=chunk_id,
+    )
+
     payload = {
         "chunk_id": chunk_id,
+        **identity,
+        "file_path": str(file_path) if file_path else None,
+        "file_name": source_file,
+        "pdf_mode": pdf_mode,
         "primary_name": heading,
         "section_heading": heading,
         "description": text if heading else None,
@@ -65,6 +86,29 @@ def _chunk_has_meaningful_body(blocks):
     ]
     return len(non_heading_blocks) > 0
 
+def _pdf_chunk_identity(file_path, source_file, chunk_id, page_num=None):
+    source_key = Path(str(file_path or source_file)).stem
+    source_key = re.sub(r"[^a-zA-Z0-9_]+", "_", source_key).strip("_").lower()
+
+    if page_num:
+        identifier = f"{source_key}_page_{page_num}_chunk_{chunk_id}"
+    else:
+        identifier = f"{source_key}_chunk_{chunk_id}"
+
+    identifier_field = "pdf_chunk"
+    identifier_namespace = "pdf_chunk"
+    identifier_kind = "generated"
+    link_keys = [f"{identifier_namespace}:{identifier}"]
+
+    return {
+        "identifier": identifier,
+        "identifier_field": identifier_field,
+        "identifier_namespace": identifier_namespace,
+        "identifier_kind": identifier_kind,
+        "link_keys": link_keys,
+        "related_link_keys": [],
+    }
+
 
 # =========================================================
 # MAIN SERIALIZER
@@ -73,6 +117,7 @@ def pdf_serializer(parsed, file_path, template_config, file_tags, collection_nam
     blocks = parsed.get("blocks", [])
     doc_type = parsed.get("doc_type") or "reference"
     source_file = Path(file_path).name
+    source_path = str(file_path)
     source_stem = Path(file_path).stem
     page_count = parsed.get("page_count") or 0
     pdf_mode = parsed.get("pdf_mode") or "readable_pdf"
@@ -93,9 +138,20 @@ def pdf_serializer(parsed, file_path, template_config, file_tags, collection_nam
 
             text = f"[PDF OCR page {page_num}]\n{block_text}" if page_num else block_text
 
+            identity = _pdf_chunk_identity(
+                file_path=source_path,
+                source_file=source_file,
+                chunk_id=chunk_id,
+                page_num=page_num,
+            )
+
             items.append({
                 "text": text,
                 "chunk_id": chunk_id,
+                **identity,
+                "file_path": source_path,
+                "file_name": source_file,
+                "pdf_mode": pdf_mode,
                 "primary_name": f"Page {page_num}" if page_num else None,
                 "section_heading": f"Page {page_num}" if page_num else None,
                 "description": text,
@@ -138,7 +194,9 @@ def pdf_serializer(parsed, file_path, template_config, file_tags, collection_nam
             doc_type,
             source_file,
             page_count,
-            file_tags
+            file_tags,
+            file_path=source_path,
+            pdf_mode=pdf_mode,
         )
 
         if chunk:
