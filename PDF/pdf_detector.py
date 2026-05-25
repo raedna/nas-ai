@@ -1,8 +1,55 @@
 from collections import Counter
+import json
 import re
+
+from core.paths import CONFIG_DIR
 
 DEBUG = True
 
+def load_pdf_detection_hints():
+    path = CONFIG_DIR / "pdf_detection_hints.json"
+
+    defaults = {
+        "mode": {
+            "scanned_text_len_min": 80,
+            "scanned_avg_chars_per_page_min": 40
+        },
+        "doc_type": {
+            "procedural_keywords": [],
+            "reference_keywords": [],
+            "thresholds": {}
+        }
+    }
+
+    if not path.exists():
+        return defaults
+
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        mode = {
+            **defaults["mode"],
+            **data.get("mode", {})
+        }
+
+        doc_type = {
+            **defaults["doc_type"],
+            **data.get("doc_type", {})
+        }
+
+        doc_type["thresholds"] = {
+            **defaults["doc_type"].get("thresholds", {}),
+            **data.get("doc_type", {}).get("thresholds", {})
+        }
+
+        return {
+            "mode": mode,
+            "doc_type": doc_type
+        }
+
+    except Exception:
+        return defaults
 
 def _count_block_types(blocks):
     counts = Counter()
@@ -16,7 +63,13 @@ def detect_pdf_mode(text, page_count=0, template_config=None):
     text_len = len(text)
     avg_chars_per_page = text_len / max(page_count, 1)
 
-    if text_len < 80 or avg_chars_per_page < 40:
+    hints = load_pdf_detection_hints()
+    mode_cfg = hints.get("mode", {})
+
+    if (
+        text_len < mode_cfg.get("scanned_text_len_min", 80)
+        or avg_chars_per_page < mode_cfg.get("scanned_avg_chars_per_page_min", 40)
+    ):
         return "scanned_pdf"
 
     return "readable_pdf"
@@ -60,12 +113,30 @@ def _ocr_layout_signals(blocks):
         "dense_paragraph_count": dense_paragraph_count,
     }
 
+def _contains_any(text, keywords):
+    t = str(text or "").lower()
+    return any(str(k or "").lower() in t for k in keywords if str(k or "").strip())
 
 def detect_pdf_doc_type(text, blocks=None, pdf_mode="readable_pdf", template_config=None):
     blocks = blocks or []
     counts = _count_block_types(blocks)
 
-    # readable pdf path
+    hints = load_pdf_detection_hints()
+    doc_cfg = hints.get("doc_type", {})
+    thresholds = doc_cfg.get("thresholds", {})
+
+    procedural_keywords = doc_cfg.get("procedural_keywords", [])
+    reference_keywords = doc_cfg.get("reference_keywords", [])
+
+    procedural_score = 0
+    reference_score = 0
+
+    if _contains_any(text, procedural_keywords):
+        procedural_score += thresholds.get("procedural_keyword_score", 3)
+
+    if _contains_any(text, reference_keywords):
+        reference_score += thresholds.get("reference_keyword_score", 4)
+
     if pdf_mode == "readable_pdf":
         heading_count = counts.get("heading", 0)
         bullet_count = counts.get("bullet", 0)
@@ -74,29 +145,31 @@ def detect_pdf_doc_type(text, blocks=None, pdf_mode="readable_pdf", template_con
         if not heading_count and not bullet_count and not paragraph_count:
             return "narrative"
 
-        if bullet_count >= 3 and bullet_count >= paragraph_count:
-            return "procedural"
+        if bullet_count >= thresholds.get("readable_bullet_procedural_min", 3):
+            procedural_score += thresholds.get("bullet_procedural_score", 3)
 
-        if heading_count >= 2 and paragraph_count >= 2:
-            if bullet_count >= 2:
-                return "mixed"
-            return "reference"
+        if heading_count >= thresholds.get("readable_heading_reference_min", 2):
+            reference_score += thresholds.get("heading_reference_score", 2)
 
-        if paragraph_count >= 3:
-            return "reference"
+        if paragraph_count >= thresholds.get("readable_paragraph_reference_min", 3):
+            reference_score += thresholds.get("paragraph_reference_score", 2)
 
-        return "narrative"
+    else:
+        signals = _ocr_layout_signals(blocks)
 
-    # scanned pdf path
-    signals = _ocr_layout_signals(blocks)
+        if signals["bullet_like_count"] >= thresholds.get("scanned_bullet_procedural_min", 4):
+            procedural_score += thresholds.get("bullet_procedural_score", 3)
 
-    if signals["bullet_like_count"] >= 4:
+        if signals["short_upper_count"] >= thresholds.get("scanned_short_upper_reference_min", 2):
+            reference_score += thresholds.get("short_upper_reference_score", 2)
+
+        if signals["dense_paragraph_count"] >= thresholds.get("scanned_dense_paragraph_reference_min", 3):
+            reference_score += thresholds.get("dense_paragraph_reference_score", 2)
+
+    if reference_score > procedural_score:
+        return "reference"
+
+    if procedural_score > reference_score:
         return "procedural"
-
-    if signals["short_upper_count"] >= 2 and signals["dense_paragraph_count"] >= 2:
-        return "reference"
-
-    if signals["dense_paragraph_count"] >= 3:
-        return "reference"
 
     return "narrative"
