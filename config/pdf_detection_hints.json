@@ -11,7 +11,11 @@
       "instructions",
       "checklist",
       "runbook",
-      "follow these steps"
+      "follow these steps",
+      "click",
+      "select",
+      "open",
+      "enter"
     ],
     "reference_keywords": [
       "glossary",
@@ -22,7 +26,9 @@
       "overview",
       "introduction",
       "reference",
-      "manual"
+      "manual",
+      "term",
+      "terms"
     ],
     "thresholds": {
       "readable_bullet_procedural_min": 3,
@@ -31,8 +37,13 @@
       "scanned_bullet_procedural_min": 4,
       "scanned_short_upper_reference_min": 2,
       "scanned_dense_paragraph_reference_min": 3,
-      "reference_keyword_score": 3,
-      "procedural_keyword_score": 3
+      "procedural_keyword_score": 3,
+      "reference_keyword_score": 4,
+      "bullet_procedural_score": 3,
+      "heading_reference_score": 2,
+      "paragraph_reference_score": 2,
+      "short_upper_reference_score": 2,
+      "dense_paragraph_reference_score": 2
     }
   }
 }
