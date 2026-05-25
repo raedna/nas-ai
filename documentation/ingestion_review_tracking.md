@@ -88,6 +88,7 @@ Status values:
 |---|---|---|---|---|---|
 | IMG-001 | core/ingest_collection.py / IMAGES/image_parser.py | OCR is enabled through core special case. | Move enable_ocr to filetype config. | High | Not Started |
 | IMG-002 | IMAGES/image_detector.py | Detector uses fixed heuristic thresholds and keyword lists. | Keep for now; make configurable later only if needed. | Low | Deferred |
+| IMG-003 | IMAGES/image_serializer.py | Image payloads do not emit shared normalized identity fields. | Add file-aware generated identifier, identifier_field=image_file, identifier_namespace=image_file, identifier_kind=generated, primary_name, description, link_keys, and related_link_keys while preserving OCR/image metadata. | High | Not Started |
 
 ---
 
