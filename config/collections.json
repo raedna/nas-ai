@@ -132,5 +132,20 @@
     "filters": {
       "field_filters": []
     }
+  },
+  "image_test": {
+    "path": "/Users/raednasr/RaedsMacM1/nas-ai/images_tests",
+    "allowed_filetypes": [
+      "image"
+    ],
+    "allowed_extensions": [],
+    "exclude_dirs": [],
+    "exclude_extensions": [],
+    "asset_search_roots": [],
+    "source_label": "",
+    "notes": "",
+    "filters": {
+      "field_filters": []
+    }
   }
 }
