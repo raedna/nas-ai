@@ -48,7 +48,6 @@ def _load_astro_metadata_config() -> Dict[str, Any]:
 
 def _parse_astro_filename(path: Path) -> Dict[str, Any]:
     stem = path.stem
-    parts = stem.split("_")
 
     parsed: Dict[str, Any] = {
         "file_stem": stem,
@@ -65,59 +64,95 @@ def _parse_astro_filename(path: Path) -> Dict[str, Any]:
         "file_scope_model": None,
     }
 
-    if not parts:
-        return parsed
+    astro_cfg = _load_astro_metadata_config()
+    patterns = astro_cfg.get("filename_patterns", []) or []
 
-    first = parts[0].lower()
-    if first in {"light", "dark", "flat", "bias"}:
-        parsed["file_frame_type"] = parts[0]
-        if len(parts) > 1:
-            parsed["file_target"] = parts[1]
-    else:
-        parsed["file_target"] = parts[0]
+    for pattern in patterns:
+        if not pattern.get("enabled", True):
+            continue
 
-    for part in parts:
-        p = part.lower()
+        matched = _apply_filename_pattern(stem, pattern)
 
-        if p.endswith("s"):
+        if matched:
+            parsed.update(matched)
+            return parsed
+
+    return parsed
+
+def _coerce_filename_value(value, value_type):
+    if value in [None, ""]:
+        return None
+
+    try:
+        if value_type == "int":
+            return int(float(value))
+        if value_type == "float":
+            return float(value)
+    except Exception:
+        return None
+
+    return str(value)
+
+
+def _apply_filename_pattern(stem, pattern):
+    separator = pattern.get("separator", "_")
+    parts = stem.split(separator) if separator else [stem]
+
+    parsed = {}
+    fields = pattern.get("fields", []) or []
+
+    for field_cfg in fields:
+        field = field_cfg.get("field")
+        if not field:
+            continue
+
+        value = None
+
+        # position-based extraction
+        if "position" in field_cfg:
             try:
-                parsed["file_exposure_sec"] = float(p[:-1])
+                pos = int(field_cfg["position"])
+                if 0 <= pos < len(parts):
+                    value = parts[pos]
             except Exception:
-                pass
+                value = None
 
-        elif p.startswith("bin"):
-            try:
-                parsed["file_binning"] = int(p.replace("bin", ""))
-            except Exception:
-                pass
+        # regex-based extraction scans each filename part
+        regex = field_cfg.get("regex")
+        if regex:
+            for part in parts:
+                m = re.fullmatch(regex, part, flags=re.IGNORECASE)
+                if not m:
+                    continue
 
-        elif p.startswith("gain"):
-            try:
-                parsed["file_gain"] = int(p.replace("gain", ""))
-            except Exception:
-                pass
+                if "value" in m.groupdict():
+                    value = m.group("value")
+                else:
+                    value = m.group(0)
+                break
 
-        elif p.endswith("c"):
-            temp = p[:-1]
-            try:
-                parsed["file_sensor_temp_c"] = float(temp)
-            except Exception:
-                pass
+        # allowed values can be used by position or scanning
+        allowed_values = field_cfg.get("allowed_values") or []
+        if allowed_values:
+            allowed_norm = {str(x).lower(): x for x in allowed_values}
 
-        elif re.fullmatch(r"\d{8}-\d{6}", part):
-            parsed["file_capture_datetime"] = part
+            if value is not None:
+                if str(value).lower() not in allowed_norm:
+                    continue
+            else:
+                for part in parts:
+                    if str(part).lower() in allowed_norm:
+                        value = part
+                        break
 
-        elif re.fullmatch(r"\d{4,}", part):
-            parsed["file_sequence_no"] = part
+        if value in [None, ""]:
+            continue
 
-        elif re.fullmatch(r"[zZ]\d{2,3}", part):
-            parsed["file_scope_model"] = part
+        value_type = field_cfg.get("type", "str")
+        value = _coerce_filename_value(value, value_type)
 
-        elif "mc" in p or "asi" in p or "533" in p or "2600" in p:
-            parsed["file_camera"] = part
-
-        elif p in {"none", "ha", "oiii", "sii", "l", "r", "g", "b", "rgb"}:
-            parsed["file_filter"] = part
+        if value not in [None, ""]:
+            parsed[field] = value
 
     return parsed
 
