@@ -106,9 +106,9 @@ Status values:
 
 | ID | Area | Issue | Suggested Fix | Priority | Status |
 |---|---|---|---|---|---|
-| ASTRO-001 | ASTRO/astro_parser.py | Astro metadata keys and filename parsing are hardcoded. | Accept as specialized plugin for now; move mappings to config later. | Medium | Deferred |
-| ASTRO-002 | ASTRO/astro_serializer.py | Structured astro docs do not have stable identifiers. | Consider file path or metadata-based identifier later. | Medium | Not Started |
-
+| ASTRO-001 | ASTRO/astro_parser.py | Astro metadata keys and filename parsing are hardcoded; filenames may contain target, exposure, gain, temperature, filter, date, camera, and sequence info but naming is not always consistent. | Accept as specialized plugin for now; parse filename metadata as low-confidence fallback only when header metadata is missing; later move filename patterns/mappings to config. | Medium | Deferred |
+| ASTRO-002 | ASTRO/astro_serializer.py | Structured astro docs do not have stable identifiers or shared normalized payload fields. | Add file-aware generated identifier, identifier_field=astro_file, identifier_namespace=astro_file, identifier_kind=generated, link_keys, related_link_keys, file_path, and file_name while preserving astro metadata. | High | Not Started |
+| ASTRO-003 | ASTRO filename metadata config | Astro filenames may contain target, frame type, exposure, gain, temperature, filter, date, camera, and sequence info, but naming conventions may change. | Add configurable filename_patterns in config/astro_metadata.json so parser can extract metadata from filenames without hardcoded assumptions. | High | Done |
 ---
 
 ## 8. Regression checks needed
