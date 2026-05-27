@@ -1,7 +1,26 @@
 from pathlib import Path
+import re
 
 DEBUG = True
 
+def _astro_identity(file_path, source_file):
+    source_key = Path(str(file_path or source_file)).stem
+    source_key = re.sub(r"[^a-zA-Z0-9_]+", "_", source_key).strip("_").lower()
+
+    identifier = source_key
+    identifier_field = "astro_file"
+    identifier_namespace = "astro_file"
+    identifier_kind = "generated"
+    link_keys = [f"{identifier_namespace}:{identifier}"]
+
+    return {
+        "identifier": identifier,
+        "identifier_field": identifier_field,
+        "identifier_namespace": identifier_namespace,
+        "identifier_kind": identifier_kind,
+        "link_keys": link_keys,
+        "related_link_keys": [],
+    }
 
 def astro_serializer(parsed, file_path, template_config, file_tags, collection_name):
     metadata = parsed.get("metadata") or {}
@@ -11,6 +30,8 @@ def astro_serializer(parsed, file_path, template_config, file_tags, collection_n
         return []
 
     source_file = Path(file_path).name
+    source_path = str(file_path)
+    identity = _astro_identity(source_path, source_file)
 
     primary_name = (
         metadata.get("target")
@@ -38,12 +59,14 @@ def astro_serializer(parsed, file_path, template_config, file_tags, collection_n
 
     item = {
         "text": text,
-        "identifier": None,
+        **identity,
         "primary_name": primary_name,
         "description": description,
         "doc_type": parsed.get("doc_type") or "structured",
         "source_type": "astro",
         "source_file": source_file,
+        "file_name": source_file,
+        "file_path": source_path,
         "astro_format": parsed.get("astro_format"),
         **metadata
     }
