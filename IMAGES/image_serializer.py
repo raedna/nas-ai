@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import re
 from typing import Any, Dict, List, Optional
 
 
@@ -8,6 +9,25 @@ def _safe_str(value: Any) -> str:
     if value is None:
         return ""
     return str(value).strip()
+
+def _image_identity(file_path, source_file):
+    source_key = Path(str(file_path or source_file)).stem
+    source_key = re.sub(r"[^a-zA-Z0-9_]+", "_", source_key).strip("_").lower()
+
+    identifier = source_key
+    identifier_field = "image_file"
+    identifier_namespace = "image_file"
+    identifier_kind = "generated"
+    link_keys = [f"{identifier_namespace}:{identifier}"]
+
+    return {
+        "identifier": identifier,
+        "identifier_field": identifier_field,
+        "identifier_namespace": identifier_namespace,
+        "identifier_kind": identifier_kind,
+        "link_keys": link_keys,
+        "related_link_keys": [],
+    }
 
 
 def _build_combined_text(parsed: Dict[str, Any]) -> str:
@@ -72,13 +92,21 @@ def serialize_image(
 
     combined_text = _build_combined_text(parsed)
 
+    source_file = _safe_str(parsed.get("file_name") or file_path.name)
+    source_path = _safe_str(parsed.get("file_path") or str(file_path))
+    identity = _image_identity(source_path, source_file)
+    primary_name = Path(source_file).stem
+
     doc = {
         "text": combined_text,
+        **identity,
         "file_type": "image",
         "source_type": _safe_str(parsed.get("source_type") or "standalone_image"),
-        "source_file": _safe_str(parsed.get("file_name") or file_path.name),
-        "file_name": _safe_str(parsed.get("file_name") or file_path.name),
-        "file_path": _safe_str(parsed.get("file_path") or str(file_path)),
+        "primary_name": primary_name,
+        "description": combined_text,
+        "source_file": source_file,
+        "file_name": source_file,
+        "file_path": source_path,
         "doc_type": _safe_str(parsed.get("doc_type")),
         "image_mode": _safe_str(parsed.get("image_mode")),
         "format": _safe_str(meta.get("format")),
