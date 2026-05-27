@@ -42,5 +42,62 @@
     "1": "LE",
     "2": "LU",
     "3": "Lpro/IR"
-  }
+  },
+  "filename_patterns": [
+    {
+      "name": "underscore_astro_sequence",
+      "enabled": true,
+      "separator": "_",
+      "fields": [
+        {
+          "field": "file_frame_type",
+          "position": 0,
+          "allowed_values": ["light", "dark", "flat", "bias"]
+        },
+        {
+          "field": "file_target",
+          "position": 1
+        },
+        {
+          "field": "file_exposure_sec",
+          "regex": "(?P<value>\\d+(?:\\.\\d+)?)s",
+          "type": "float"
+        },
+        {
+          "field": "file_binning",
+          "regex": "bin(?P<value>\\d+)",
+          "type": "int"
+        },
+        {
+          "field": "file_gain",
+          "regex": "gain(?P<value>\\d+)",
+          "type": "int"
+        },
+        {
+          "field": "file_sensor_temp_c",
+          "regex": "(?P<value>-?\\d+(?:\\.\\d+)?)c",
+          "type": "float"
+        },
+        {
+          "field": "file_capture_datetime",
+          "regex": "(?P<value>\\d{8}-\\d{6}|\\d{14})",
+          "type": "str"
+        },
+        {
+          "field": "file_filter",
+          "allowed_values": ["none", "ha", "oiii", "sii", "l", "r", "g", "b", "rgb"]
+        },
+        {
+          "field": "file_scope_model",
+          "regex": "(?P<value>[zZ]\\d{2,3})",
+          "type": "str"
+        },
+        {
+          "field": "file_camera",
+          "regex": "(?P<value>.*(?:mc|asi|533|2600).*)",
+          "type": "str"
+        }
+      ]
+    }
+  ]
 }
