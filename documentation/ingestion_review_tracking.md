@@ -214,8 +214,8 @@ Status values:
 
 | ID | Area | Issue | Suggested Fix | Priority | Status |
 |---|---|---|---|---|---|
-| CHAT-001 | Global collection routing | Chat without a selected collection needs to decide which collections to query. | Add collection-selection layer using collection metadata, source_type/doc_type distribution, identifier_namespace, identifier_kind, and query intent before calling per-collection query_router. | Critical | Not Started |
-| CHAT-002 | Cross-collection result merge | Results from multiple collections need consistent ranking and answer synthesis. | Merge results using normalized fields such as identifier_kind, doc_type, source_type, primary_name, description, score, and collection priority. | High | Not Started |
-
+| CHAT-001 | Global collection routing | Chat frontend will not always have a selected collection. | Add a NAS-AI routing layer that selects candidate collections based on query intent, collection metadata, doc_type/source_type distribution, identifier_namespace, and identifier_kind. | Critical | Not Started |
+| CHAT-002 | Open WebUI integration | Open WebUI needs a backend endpoint to query NAS-AI. | Expose a chat/retrieval API endpoint compatible with Open WebUI or an OpenAI-style tool/function bridge. | High | Not Started |
+| CHAT-003 | Cross-collection answer synthesis | Results from multiple collections need to be merged and cited. | Merge per-collection results using normalized payload fields and produce a final answer with source collection/file/path metadata. | High | Not Started |
 
 
