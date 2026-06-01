@@ -54,12 +54,12 @@ Status values:
 | ID | Area | Issue | Suggested Fix | Priority | Status |
 |---|---|---|---|---|---|
 | TBL-001 | TABLES/table_detector.py | Detector hardcodes KB/Halo columns. | Replace with schema/template-driven detection. | Critical | Done |
-| TBL-001b | TABLES/table_detector.py | Generic detector classifies BBG-style reference tables as entity_row because they have identifier/name/description but no enum/reference fields. | Add schema-driven text-density heuristic: long article-like descriptions imply entity_row; compact identifier/name/description records imply structured. | High | Not Started |
+| TBL-001b | TABLES/table_detector.py | Generic detector classifies BBG-style reference tables as entity_row because they have identifier/name/description but no enum/reference fields. | Add schema-driven text-density heuristic: long article-like descriptions imply entity_row; compact identifier/name/description records imply structured. | High | Done |
 | TBL-002 | TABLES/table_parser.py | Header detection is heuristic only. | Add optional header_row override in template config. | Medium | Done |
 | TBL-002b | TABLES/table_serializer.py | Entity-row table payloads do not emit identifier_field, identifier_namespace, link_keys, related_link_keys, and file_path. | Apply the same normalized identity fields to _build_entity_row_doc(). | High | Done |
 | TBL-002c | TABLES/table_serializer.py / retrieval | KB-style entity rows use source IDs that are not natural user query targets. | Ensure entity-row retrieval prioritizes primary_name, aliases, and description/text over identifier lookup. | High | Done |
 | TBL-002d | TABLES/table_serializer.py | Table payloads do not distinguish canonical/user-facing identifiers from source/system IDs or generated row IDs. | Add identifier_kind: structured=canonical, entity_row=source, procedural=generated. | High | Done |
-| TBL-003 | TABLES/table_serializer.py / link logic | Tables do not yet build same-file related_link_keys. | Reuse core.link_index for canonical structured table docs only; skip entity_row/source IDs and procedural/generated IDs. | High | In Progress |
+| TBL-003 | TABLES/table_serializer.py / link logic | Tables do not yet build same-file related_link_keys. | Reuse core.link_index for canonical structured table docs only; skip entity_row/source IDs and procedural/generated IDs. | High | Done |
 | TBL-004 | TABLES/table_serializer.py | Table behavior depends on detector classification quality. | Improve detector before serializer changes. | High | Superceded |
 | TBL-005 | TABLES/table_parser.py | Header-row detection is heuristic and may choose the wrong row for messy spreadsheets. | Add optional template override for header_row_index. | Medium | Not Started |
 | TBL-006 | TABLES/table_parser.py | CSV/XLS parsing handles basic files but not multi-sheet workbook selection. | Add optional sheet selection / all-sheets mode for Excel. | Medium | Not Started |
@@ -107,7 +107,7 @@ Status values:
 | ID | Area | Issue | Suggested Fix | Priority | Status |
 |---|---|---|---|---|---|
 | ASTRO-001 | ASTRO/astro_parser.py | Astro metadata keys and filename parsing are hardcoded; filenames may contain target, exposure, gain, temperature, filter, date, camera, and sequence info but naming is not always consistent. | Accept as specialized plugin for now; parse filename metadata as low-confidence fallback only when header metadata is missing; later move filename patterns/mappings to config. | Medium | Deferred |
-| ASTRO-002 | ASTRO/astro_serializer.py | Structured astro docs do not have stable identifiers or shared normalized payload fields. | Add file-aware generated identifier, identifier_field=astro_file, identifier_namespace=astro_file, identifier_kind=generated, link_keys, related_link_keys, file_path, and file_name while preserving astro metadata. | High | Not Started |
+| ASTRO-002 | ASTRO/astro_serializer.py | Structured astro docs do not have stable identifiers or shared normalized payload fields. | Add file-aware generated identifier, identifier_field=astro_file, identifier_namespace=astro_file, identifier_kind=generated, link_keys, related_link_keys, file_path, and file_name while preserving astro metadata. | High | Done |
 | ASTRO-003 | ASTRO filename metadata config | Astro filenames may contain target, frame type, exposure, gain, temperature, filter, date, camera, and sequence info, but naming conventions may change. | Add configurable filename_patterns in config/astro_metadata.json so parser can extract metadata from filenames without hardcoded assumptions. | High | Done |
 ---
 
