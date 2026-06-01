@@ -209,3 +209,10 @@ Status values:
 |---|---|---|---|---|---|
 | ENRICH-001 | Generic enrichment layer | Ingestion currently relies on parser/serializer output and retrieval-time logic for aliases, query variants, answer hints, and relationship hints. | Add a lightweight role-driven enrichment stage after schema/role inference and before serialization. Start with structured items only, generating optional metadata such as identifier_aliases, name_aliases, query_variants, relationship_keys, and answer_kind. | High | Not Started |
 
+
+## 16. Chat:
+
+| ID | Area | Issue | Suggested Fix | Priority | Status |
+|---|---|---|---|---|---|
+| CHAT-001 | Global collection routing | Chat without a selected collection needs to decide which collections to query. | Add collection-selection layer using collection metadata, source_type/doc_type distribution, identifier_namespace, identifier_kind, and query intent before calling per-collection query_router. | Critical | Not Started |
+
