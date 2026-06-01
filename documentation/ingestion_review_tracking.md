@@ -215,4 +215,7 @@ Status values:
 | ID | Area | Issue | Suggested Fix | Priority | Status |
 |---|---|---|---|---|---|
 | CHAT-001 | Global collection routing | Chat without a selected collection needs to decide which collections to query. | Add collection-selection layer using collection metadata, source_type/doc_type distribution, identifier_namespace, identifier_kind, and query intent before calling per-collection query_router. | Critical | Not Started |
+| CHAT-002 | Cross-collection result merge | Results from multiple collections need consistent ranking and answer synthesis. | Merge results using normalized fields such as identifier_kind, doc_type, source_type, primary_name, description, score, and collection priority. | High | Not Started |
+
+
 
