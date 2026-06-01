@@ -172,33 +172,5 @@
     "field",
     "component",
     "componentid"
-  ],
-  "structured_mnemonic_query_terms": [
-  "mnemonic",
-  "field mnemonic",
-  "bloomberg mnemonic",
-  "field name",
-  "code for"
-  ],
-  "structured_mnemonic_subject_patterns": [
-    "\\bmnemonic for (.+)$",
-    "\\bfield mnemonic for (.+)$",
-    "\\bbloomberg mnemonic for (.+)$",
-    "\\bfield name for (.+)$",
-    "\\bcode for (.+)$"
-  ],
-  "structured_mnemonic_noise_words": [
-    "what",
-    "is",
-    "the",
-    "a",
-    "an",
-    "for",
-    "of",
-    "mnemonic",
-    "field",
-    "name",
-    "code",
-    "bloomberg"
   ]
 }
