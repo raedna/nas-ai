@@ -80,6 +80,140 @@ def extract_reverse_lookup_candidate(question, field_maps):
     words = [w for w in cleaned.split() if w and w not in noise]
     return " ".join(words).strip()
 
+def normalize_structured_token(text):
+    text = str(text or "").lower()
+    text = text.replace("_", " ")
+    text = re.sub(r"[^a-z0-9]+", " ", text)
+    text = re.sub(r"\s+", " ", text).strip()
+    return text
+
+
+def _get_doc_hint_list(key, default=None):
+    hints = load_doc_query_hints() or {}
+    value = hints.get(key, default or [])
+    return value if isinstance(value, list) else (default or [])
+
+
+def looks_like_mnemonic_query(question):
+    q = normalize_structured_token(question)
+
+    terms = _get_doc_hint_list("structured_mnemonic_query_terms", [])
+
+    for term in terms:
+        term_norm = normalize_structured_token(term)
+        if term_norm and term_norm in q:
+            return True
+
+    return False
+
+
+def extract_mnemonic_subject(question):
+    q = normalize_structured_token(question)
+
+    patterns = _get_doc_hint_list("structured_mnemonic_subject_patterns", [])
+
+    for pattern in patterns:
+        m = re.search(pattern, q)
+        if m:
+            return m.group(1).strip()
+
+    noise = set(_get_doc_hint_list("structured_mnemonic_noise_words", []))
+
+    words = [w for w in q.split() if w not in noise]
+    return " ".join(words).strip()
+
+def fetch_structured_by_name_or_description(collection, subject, limit=10):
+    subject_norm = normalize_structured_token(subject)
+
+    if not subject_norm:
+        return []
+
+    subject_terms = [w for w in subject_norm.split() if w]
+
+    points, _ = client.scroll(
+        collection_name=collection,
+        limit=5000,
+        with_payload=True,
+        with_vectors=False
+    )
+
+    scored = []
+
+    for p in points:
+        payload = p.payload or {}
+
+        if infer_doc_type(payload) != "structured":
+            continue
+
+        identifier_kind = str(payload.get("identifier_kind") or "").lower()
+        if identifier_kind and identifier_kind not in {"canonical", "generated"}:
+            continue
+
+        primary_name = str(payload.get("primary_name") or "")
+        description = str(payload.get("description") or "")
+        aliases = payload.get("aliases") or []
+
+        name_norm = normalize_structured_token(primary_name)
+        desc_norm = normalize_structured_token(description)
+        alias_norms = [normalize_structured_token(a) for a in aliases if a]
+
+        combined = " ".join([name_norm, desc_norm] + alias_norms).strip()
+
+        score = 0.0
+
+        if subject_norm == name_norm:
+            score += 100.0
+        elif subject_norm in alias_norms:
+            score += 90.0
+        elif subject_norm == desc_norm:
+            score += 80.0
+        elif subject_norm in name_norm:
+            score += 60.0
+        elif subject_norm in desc_norm:
+            score += 50.0
+        elif subject_norm in combined:
+            score += 40.0
+
+        name_hits = sum(1 for w in subject_terms if w in name_norm)
+        desc_hits = sum(1 for w in subject_terms if w in desc_norm)
+        alias_hits = sum(1 for w in subject_terms if any(w in a for a in alias_norms))
+
+        score += name_hits * 8.0
+        score += alias_hits * 6.0
+        score += desc_hits * 4.0
+
+        if subject_terms and all(w in name_norm for w in subject_terms):
+            score += 25.0
+        elif subject_terms and all(w in desc_norm for w in subject_terms):
+            score += 20.0
+        elif subject_terms and all(w in combined for w in subject_terms):
+            score += 10.0
+
+        if score > 0:
+            scored.append((score, p))
+
+    scored.sort(key=lambda x: x[0], reverse=True)
+    return [p for _, p in scored[:limit]]
+
+def synthesize_structured_mnemonic_answer(payload):
+    primary_name = payload.get("primary_name")
+    description = payload.get("description")
+    identifier = payload.get("identifier")
+    identifier_field = payload.get("identifier_field") or "identifier"
+
+    if not primary_name:
+        return "No mnemonic found."
+
+    lines = [f"Mnemonic: {primary_name}"]
+
+    if description:
+        lines.append(f"Description: {description}")
+
+    if identifier:
+        lines.append(f"{identifier_field}: {identifier}")
+
+    return "\n".join(lines)
+
 def extract_explicit_identifier(question: str):
     q = question.lower()
 
@@ -460,7 +594,51 @@ def run_query_with_method(collection, question, mode="best", limit=25):
                 "result": synthesize_answer(payload, [], collection)
             }
 
-    # 3. Value / enum-style lookups
+    # 3. Structured mnemonic / primary-name lookup
+    if looks_like_mnemonic_query(question):
+        subject = extract_mnemonic_subject(question)
+
+        points = fetch_structured_by_name_or_description(
+            collection,
+            subject,
+            limit=5
+        )
+
+        if points:
+            payload = points[0].payload or {}
+            return {
+                "method": "structured_mnemonic_lookup",
+                "reason": f"matched structured row by mnemonic subject: {subject}",
+                "result": synthesize_structured_mnemonic_answer(payload)
+            }
+
+    # 3b. Direct structured primary_name lookup for compact asks like PX_ASK / px ask
+    direct_subject = extract_mnemonic_subject(question)
+
+    direct_points = fetch_structured_by_name_or_description(
+        collection,
+        direct_subject,
+        limit=5
+    )
+
+    if direct_points:
+        payload = direct_points[0].payload or {}
+
+        subject_norm = normalize_structured_token(direct_subject)
+        primary_norm = normalize_structured_token(payload.get("primary_name"))
+
+        if subject_norm and primary_norm and (
+            subject_norm == primary_norm
+            or subject_norm in primary_norm
+            or primary_norm in subject_norm
+        ):
+            return {
+                "method": "structured_direct_lookup",
+                "reason": f"matched structured primary_name using normalized token lookup: {direct_subject}",
+                "result": synthesize_answer(payload, [], collection)
+            }
+
+    # 4. Value / enum-style lookups
     if looks_like_reverse_enum_query(question):
         name_points = fetch_structured_points_by_name_in_question(
             collection,
