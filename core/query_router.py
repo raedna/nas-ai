@@ -4,6 +4,8 @@ from core.query_helpers import (
     normalize_simple_text,
     expand_terms_with_synonyms,
 )
+from core.structured_query_planner import plan_structured_query
+from core.structured_plan_executor import execute_structured_plan
 from core.paths import CONFIG_DIR, SCHEMAS_DIR
 from core.embedder import embed_texts
 from qdrant_client import QdrantClient
@@ -492,6 +494,20 @@ def run_query_with_method(collection, question, mode="best", limit=25):
                     "reason": f"matched normalized enum value/name/description: {candidate}",
                     "result": synthesize_reverse_enum_answer(enum_matches, collection)
                 }
+
+    # 4. NLP/planner-style structured lookup
+    structured_plan = plan_structured_query(question)
+
+    if structured_plan.get("enabled") and structured_plan.get("confidence", 0) >= 0.7:
+        structured_result = execute_structured_plan(collection, structured_plan)
+
+        if structured_result.get("matched"):
+            return {
+                "method": "structured_query_plan",
+                "reason": structured_plan.get("reason"),
+                "plan": structured_plan,
+                "result": structured_result.get("answer"),
+            }
 
     if intent["mode"] in ["discovery_count", "discovery_list"]:
         return run_discovery_with_method(collection, question, limit=limit)
