@@ -85,5 +85,10 @@ def plan_structured_query(
     if not q:
         return empty_plan(question, "empty question")
 
+    return empty_plan(
+        question,
+        "generic structured planner disabled pending role-based refactor"
+    )
+
 def explain_plan(plan: Dict[str, Any]) -> str:
     return json.dumps(plan, indent=2, ensure_ascii=False)
