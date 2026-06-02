@@ -506,6 +506,7 @@ def run_query_with_method(collection, question, mode="best", limit=25):
                 "method": "structured_query_plan",
                 "reason": structured_plan.get("reason"),
                 "plan": structured_plan,
+                "executor_debug_items": structured_result.get("executor_debug_items", []),
                 "result": structured_result.get("answer"),
             }
 
