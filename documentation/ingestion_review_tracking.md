@@ -158,6 +158,12 @@ Status values:
 		Expected: semantic/structured search should rank ExecBroker correctly.
 		Actual: structured_query_plan intercepts and returns worse result.
 		Issue: compact structured lookup is too broad for plain “what is X” questions.
+| RET-010a | Role-based structured query planner | Initial planner used phrase-specific rules and hijacked plain questions like “what is exec broker”. | Rebuild planner around generic roles: search_concept, search_roles, return_fields, preferred_identifier_namespace, direct_identifier, and limit. | Critical | Not Started |
+	Test case:
+		Question: what tag is exec broker
+		Current method: semantic
+		Desired future method: role_based_structured_plan
+		Expected: find ExecBroker-like field and return tag/identifier plus name/description.
 
 | RET-011 | Explicit namespace answer refinement | Queries like “what is tag 22” and “what values can tag 22 have” currently return broad/full structured info. This is correct but can be noisy when the user expects a focused description or only enum values. | Refine namespace+identifier routing so description-style and enum/value-style questions produce focused answers while preserving full structured fallback. | Medium | Not Started |
 
