@@ -1232,20 +1232,6 @@ with tabs[3]:
                         if related_desc:
                             st.markdown(related_desc)
 
-            if show_debug:
-
-                with st.expander("Routing Decision", expanded=True):
-                    try:
-                        st.json(explain_query_routing(selected_collection, question))
-                    except Exception as e:
-                        st.warning(f"Could not build routing debug: {e}")
-
-                    if "query_run" in locals():
-                        st.write({
-                            "selected_method": query_run.get("method"),
-                            "selected_reason": query_run.get("reason"),
-                        })  
-
             if show_debug and debug_data:
                 def points_to_rows(points):
                     rows = []
