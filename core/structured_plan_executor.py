@@ -49,32 +49,53 @@ def _score_payload_against_condition(
     if not value:
         return 0.0
 
-    role_text = _normalized_role_text(payload, roles)
-
-    if not role_text:
-        return 0.0
-
     value_terms = [w for w in value.split() if w]
+    best_score = 0.0
 
-    score = 0.0
+    role_weights = {
+        "description": 1.3,
+        "primary_name": 1.0,
+        "aliases": 1.0,
+        "identifier": 0.8,
+    }
 
-    if operator in ["contains", "semantic_or_contains"]:
-        if value == role_text:
-            score += 100.0
-        elif value in role_text:
-            score += 60.0
+    for role in roles:
+        role_values = _payload_role_values(payload, role)
 
-        term_hits = sum(1 for w in value_terms if w in role_text)
-        score += term_hits * 8.0
+        for raw_role_value in role_values:
+            role_text = normalize_match_value(raw_role_value)
 
-        if value_terms and all(w in role_text for w in value_terms):
-            score += 20.0
+            if not role_text:
+                continue
 
-    elif operator == "equals":
-        if value == role_text:
-            score += 100.0
+            score = 0.0
 
-    return score
+            if operator in ["contains", "semantic_or_contains"]:
+                if value == role_text:
+                    score += 150.0
+                elif role_text.startswith(value + " "):
+                    score += 90.0
+                elif role_text.endswith(" " + value):
+                    score += 80.0
+                elif value in role_text:
+                    score += 45.0
+
+                term_hits = sum(1 for w in value_terms if w in role_text)
+                score += term_hits * 6.0
+
+                if value_terms and all(w in role_text for w in value_terms):
+                    score += 12.0
+
+            elif operator == "equals":
+                if value == role_text:
+                    score += 150.0
+
+            score *= role_weights.get(role, 1.0)
+
+            if score > best_score:
+                best_score = score
+
+    return best_score
 
 
 def _is_structured_payload(payload: Dict[str, Any]) -> bool:
@@ -136,17 +157,33 @@ def execute_structured_plan(
     selected = scored[:limit]
     items = []
 
+    executor_debug_items = []
+
     for score, p in selected:
         payload = p.payload or {}
-        items.append(
+
+        item = {
+            "score": score,
+            "identifier": payload.get("identifier"),
+            "identifier_field": payload.get("identifier_field"),
+            "primary_name": payload.get("primary_name"),
+            "description": payload.get("description"),
+            "source_file": payload.get("source_file"),
+            "payload": payload,
+        }
+
+        items.append(item)
+
+        executor_debug_items.append(
             {
-                "score": score,
+                "executor_score": score,
                 "identifier": payload.get("identifier"),
                 "identifier_field": payload.get("identifier_field"),
                 "primary_name": payload.get("primary_name"),
                 "description": payload.get("description"),
                 "source_file": payload.get("source_file"),
-                "payload": payload,
+                "doc_type": payload.get("doc_type"),
+                "identifier_kind": payload.get("identifier_kind"),
             }
         )
 
@@ -157,6 +194,7 @@ def execute_structured_plan(
         "reason": "executed structured retrieval plan",
         "plan": plan,
         "items": items,
+        "executor_debug_items": executor_debug_items,
         "answer": answer,
     }
 

@@ -167,7 +167,7 @@ def plan_structured_query(
                         "value": value,
                     },
                     "filters": [],
-                    "limit": 5,
+                    "limit": 1,
                 }
 
     # -------------------------------------------------
