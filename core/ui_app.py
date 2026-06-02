@@ -1276,6 +1276,10 @@ with tabs[3]:
                 st.markdown("---")
                 st.markdown("### Debug Details")
 
+                selected_method = None
+                if "query_run" in locals():
+                    selected_method = query_run.get("method")
+
                 with st.expander("Routing Decision", expanded=True):
                     try:
                         st.json(explain_query_routing(selected_collection, question))
@@ -1288,49 +1292,68 @@ with tabs[3]:
                             "selected_reason": query_run.get("reason"),
                         })
 
-                with st.expander("Semantic Candidates", expanded=True):
-                    st.dataframe(points_to_rows(debug_data.get("semantic_points")), width="stretch")
+                if selected_method == "structured_query_plan":
+                    with st.expander("Structured Query Plan", expanded=True):
+                        st.json(query_run.get("plan") or {})
 
-                with st.expander("Lexical Chunk Candidates", expanded=False):
-                    st.dataframe(points_to_rows(debug_data.get("lexical_chunk_points")), width="stretch")
+                    with st.expander("Structured Plan Executor Candidates", expanded=True):
+                        executor_items = query_run.get("executor_debug_items") or []
 
-                with st.expander("Lexical Structured Candidates", expanded=False):
-                    st.dataframe(points_to_rows(debug_data.get("lexical_structured_points")), width="stretch")
+                        if executor_items:
+                            st.dataframe(executor_items, width="stretch")
+                        else:
+                            st.info("No structured executor candidates were returned.")
 
-                with st.expander("Lexical Entity Row Candidates (disabled)", expanded=False):
-                    st.dataframe(points_to_rows(debug_data.get("lexical_entity_points")), width="stretch")
+                    st.info(
+                        "Final answer was produced by structured_plan_executor. "
+                        "Semantic/rerank debug panels were not used for this answer."
+                    )
 
-                with st.expander("Merged Candidates Before Rerank", expanded=False):
-                    st.dataframe(points_to_rows(debug_data.get("merged_points")), width="stretch")
+                else:
 
-                with st.expander("Final Reranked Candidates", expanded=True):
-                    ranked_rows = []
-                    for i, p in enumerate(debug_data.get("ranked_points") or [], start=1):
-                        payload = p.payload or {}
-                        preview_text = (
-                            payload.get("text")
-                            or payload.get("description")
-                            or ""
-                        )
-                        preview_text = str(preview_text).strip().replace("\n", " ")
-                        preview_text = preview_text[:300]
+                    with st.expander("Semantic Candidates", expanded=True):
+                        st.dataframe(points_to_rows(debug_data.get("semantic_points")), width="stretch")
 
-                        ranked_rows.append({
-                            "rank": i,
-                            "semantic_score": getattr(p, "score", None),
-                            "identifier": payload.get("identifier"),
-                            "primary_name": payload.get("primary_name"),
-                            "doc_type": payload.get("doc_type"),
-                            "source_type": payload.get("source_type"),
-                            "source_file": payload.get("source_file"),
-                            "page_num": payload.get("page_num"),
-                            "preview": preview_text
-                        })
+                    with st.expander("Lexical Chunk Candidates", expanded=False):
+                        st.dataframe(points_to_rows(debug_data.get("lexical_chunk_points")), width="stretch")
 
-                    st.dataframe(ranked_rows, width="stretch")
+                    with st.expander("Lexical Structured Candidates", expanded=False):
+                        st.dataframe(points_to_rows(debug_data.get("lexical_structured_points")), width="stretch")
 
-                with st.expander("Returned Answer Payload", expanded=False):
-                    st.write(debug_data.get("final_result"))
+                    with st.expander("Lexical Entity Row Candidates (disabled)", expanded=False):
+                        st.dataframe(points_to_rows(debug_data.get("lexical_entity_points")), width="stretch")
+
+                    with st.expander("Merged Candidates Before Rerank", expanded=False):
+                        st.dataframe(points_to_rows(debug_data.get("merged_points")), width="stretch")
+
+                    with st.expander("Final Reranked Candidates", expanded=True):
+                        ranked_rows = []
+                        for i, p in enumerate(debug_data.get("ranked_points") or [], start=1):
+                            payload = p.payload or {}
+                            preview_text = (
+                                payload.get("text")
+                                or payload.get("description")
+                                or ""
+                            )
+                            preview_text = str(preview_text).strip().replace("\n", " ")
+                            preview_text = preview_text[:300]
+
+                            ranked_rows.append({
+                                "rank": i,
+                                "semantic_score": getattr(p, "score", None),
+                                "identifier": payload.get("identifier"),
+                                "primary_name": payload.get("primary_name"),
+                                "doc_type": payload.get("doc_type"),
+                                "source_type": payload.get("source_type"),
+                                "source_file": payload.get("source_file"),
+                                "page_num": payload.get("page_num"),
+                                "preview": preview_text
+                            })
+
+                        st.dataframe(ranked_rows, width="stretch")
+
+                    with st.expander("Returned Answer Payload", expanded=False):
+                        st.write(debug_data.get("final_result"))
 
 with tabs[4]:
     st.subheader("Preview / Inspector")
