@@ -199,7 +199,23 @@ JSON:
 }
 """
 
-    user_prompt = f"Question: {question}"
+    user_prompt = f"""
+    Convert this question into a retrieval plan JSON.
+
+    Important:
+    - If the question asks "what tag is X", then:
+      - search_concept = X
+      - preferred_identifier_namespace = "tag"
+      - return_fields must include "identifier"
+    - If the question asks "what field is X", then preferred_identifier_namespace = "field".
+    - If the question asks "what is tag 22", then:
+      - intent = "direct_lookup"
+      - preferred_identifier_namespace = "tag"
+      - direct_identifier = "22"
+      - search_concept = ""
+
+    Question: {question}
+"""
 
     try:
         plan = call_local_llm_json(system_prompt, user_prompt, temperature=0.0)
@@ -210,6 +226,15 @@ JSON:
         return empty_plan(question, "local LLM planner returned non-dict response")
 
     plan["enabled"] = bool(plan.get("enabled", True))
+
+    try:
+        plan["confidence"] = float(plan.get("confidence", 0.8))
+    except Exception:
+        plan["confidence"] = 0.8
+
+    if plan["confidence"] <= 0:
+        plan["confidence"] = 0.8
+    
     plan["question"] = question
     plan["target_type"] = plan.get("target_type") or "structured"
     plan["search_roles"] = plan.get("search_roles") or ["primary_name", "description", "aliases"]
