@@ -234,7 +234,7 @@ JSON:
 
     if plan["confidence"] <= 0:
         plan["confidence"] = 0.8
-    
+
     plan["question"] = question
     plan["target_type"] = plan.get("target_type") or "structured"
     plan["search_roles"] = plan.get("search_roles") or ["primary_name", "description", "aliases"]
