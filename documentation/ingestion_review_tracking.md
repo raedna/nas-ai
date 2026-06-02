@@ -154,6 +154,11 @@ Status values:
 | RET-008 | Structured primary-name token matching | BBG-style structured rows are found by description terms like “ask price” but not by compact primary_name queries like “px ask” matching PX_ASK. | Superseded by RET-010 NLP structured query planner; avoid adding more hardcoded phrase-specific routing. | High | Superseded |
 | RET-009 | Query router/discovery cleanup | route_query, query_router, and discovery still contain mixed routing logic and remaining hardcoded assumptions. | Refactor retrieval after ingestion normalization: split routing, structured lookup, entity-row search, discovery, rerank, and synthesis. | Critical | Not Started |
 | RET-010 | NLP structured query planner | Retrieval uses hardcoded query patterns for structured asks such as mnemonic lookup, contains/list queries, and primary_name matching. | Add a lightweight query planner that converts user questions into normalized retrieval-plan JSON: intent, target_type, return_fields, filters, match fields, operators, and candidate roles. Execute the plan generically against normalized payload fields. | Critical | In Progress |
+		Question: what is exec broker
+		Expected: semantic/structured search should rank ExecBroker correctly.
+		Actual: structured_query_plan intercepts and returns worse result.
+		Issue: compact structured lookup is too broad for plain “what is X” questions.
+
 | RET-011 | Explicit namespace answer refinement | Queries like “what is tag 22” and “what values can tag 22 have” currently return broad/full structured info. This is correct but can be noisy when the user expects a focused description or only enum values. | Refine namespace+identifier routing so description-style and enum/value-style questions produce focused answers while preserving full structured fallback. | Medium | Not Started |
 
 ---
