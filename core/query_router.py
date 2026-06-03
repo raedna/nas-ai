@@ -465,6 +465,17 @@ def run_query_with_method(collection, question, mode="best", limit=25):
             return {
                 "method": "structured_namespace_lookup",
                 "reason": f"explicit namespace+identifier detected: {namespace}:{identifier}",
+                "namespace_debug": {
+                    "namespace": namespace,
+                    "identifier": identifier,
+                    "matched_identifier": payload.get("identifier"),
+                    "matched_identifier_field": payload.get("identifier_field"),
+                    "matched_identifier_namespace": payload.get("identifier_namespace"),
+                    "primary_name": payload.get("primary_name"),
+                    "description": payload.get("description"),
+                    "source_file": payload.get("source_file"),
+                    "enum_values_count": len(payload.get("enum_values") or []),
+                },
                 "result": synthesize_answer(payload, [], collection)
             }
 
