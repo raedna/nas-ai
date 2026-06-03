@@ -305,6 +305,9 @@ def synthesize_structured_plan_answer(
         "identifier",
     ]
 
+    if "enum_values" in return_fields and items:
+        return _format_enum_values_answer(items[0])
+
     if intent == "lookup" and len(items) == 1:
         return _format_single_item(items[0], return_fields)
 
@@ -378,3 +381,44 @@ def _format_inline_item(
         text += f" ({identifier_field}: {identifier})"
 
     return text
+
+def _format_enum_values_answer(item: Dict[str, Any]) -> str:
+    payload = item.get("payload") or {}
+
+    identifier = payload.get("identifier")
+    identifier_field = payload.get("identifier_field") or "identifier"
+    primary_name = payload.get("primary_name")
+    enum_values = payload.get("enum_values") or []
+
+    if identifier and primary_name:
+        header = f"Allowed values for {identifier_field} {identifier} ({primary_name}):"
+    elif primary_name:
+        header = f"Allowed values for {primary_name}:"
+    elif identifier:
+        header = f"Allowed values for {identifier_field} {identifier}:"
+    else:
+        header = "Allowed values:"
+
+    if not enum_values:
+        return header + "\nNo enumerated values found."
+
+    lines = [header]
+
+    for e in enum_values:
+        if isinstance(e, dict):
+            val = e.get("enum_value") or e.get("Value") or e.get("value")
+            name = e.get("enum_name") or e.get("SymbolicName") or e.get("name")
+            desc = e.get("description")
+
+            if val and name and desc and desc != name:
+                lines.append(f"- {val}: {name} — {desc}")
+            elif val and name:
+                lines.append(f"- {val}: {name}")
+            elif val:
+                lines.append(f"- {val}")
+            elif name:
+                lines.append(f"- {name}")
+        else:
+            lines.append(f"- {e}")
+
+    return "\n".join(lines)
