@@ -1278,6 +1278,10 @@ with tabs[3]:
                             "selected_reason": query_run.get("reason"),
                         })
 
+                if "query_run" in locals() and query_run.get("namespace_debug"):
+                    with st.expander("Structured Namespace Lookup Debug", expanded=True):
+                        st.json(query_run.get("namespace_debug") or {})
+
                 if "query_run" in locals() and query_run.get("structured_plan_dry_run"):
                     with st.expander("Structured Planner Dry Run", expanded=True):
                         st.json(query_run.get("structured_plan_dry_run") or {})
