@@ -16,6 +16,9 @@ def normalize_match_value(value: Any) -> str:
     value = normalize_simple_text(value)
     return value
 
+def compact_match_value(value: Any) -> str:
+    text = normalize_match_value(value)
+    return "".join(ch for ch in text if ch.isalnum())
 
 def _payload_role_values(payload: Dict[str, Any], role: str) -> List[str]:
     value = payload.get(role)
@@ -104,6 +107,7 @@ def _score_payload_against_search_concept(
     preferred_identifier_namespace: str = None,
 ) -> float:
     concept = normalize_match_value(search_concept)
+    concept_compact = compact_match_value(search_concept)
 
     if not concept:
         return 0.0
@@ -123,11 +127,17 @@ def _score_payload_against_search_concept(
 
         for raw_role_value in role_values:
             role_text = normalize_match_value(raw_role_value)
+            role_compact = compact_match_value(raw_role_value)
 
             if not role_text:
                 continue
 
             score = 0.0
+
+            if concept_compact and concept_compact == role_compact:
+                score += 220.0
+            elif concept_compact and concept_compact in role_compact:
+                score += 120.0
 
             if concept == role_text:
                 score += 150.0
