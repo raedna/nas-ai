@@ -32,6 +32,12 @@ DEBUG = True
 
 # --- INIT CLIENT ---
 
+from core.local_llm_client import load_nlp_config
+
+
+def get_structured_planner_config():
+    cfg = load_nlp_config()
+    return cfg.get("structured_planner", {})
 
 def load_query_terms():
     path = CONFIG_DIR / "query_terms.json"
@@ -496,19 +502,34 @@ def run_query_with_method(collection, question, mode="best", limit=25):
                 }
 
     # 4. NLP/planner-style structured lookup
-    structured_plan = plan_structured_query(question)
+    planner_cfg = get_structured_planner_config()
+    planner_enabled = bool(planner_cfg.get("enabled", True))
+    planner_execute = bool(planner_cfg.get("execute", False))
+    planner_dry_run = bool(planner_cfg.get("dry_run", True))
+    planner_min_confidence = float(planner_cfg.get("min_confidence", 0.7))
 
-    if structured_plan.get("enabled") and structured_plan.get("confidence", 0) >= 0.7:
-        structured_result = execute_structured_plan(collection, structured_plan)
+    if planner_enabled:
+        structured_plan = plan_structured_query(
+            question,
+            dry_run=planner_dry_run,
+        )
 
-        if structured_result.get("matched"):
-            return {
-                "method": "structured_query_plan",
-                "reason": structured_plan.get("reason"),
-                "plan": structured_plan,
-                "executor_debug_items": structured_result.get("executor_debug_items", []),
-                "result": structured_result.get("answer"),
-            }
+        if (
+            structured_plan.get("enabled")
+            and planner_execute
+            and not structured_plan.get("dry_run", True)
+            and structured_plan.get("confidence", 0) >= planner_min_confidence
+        ):
+            structured_result = execute_structured_plan(collection, structured_plan)
+
+            if structured_result.get("matched"):
+                return {
+                    "method": "structured_query_plan",
+                    "reason": structured_plan.get("reason"),
+                    "plan": structured_plan,
+                    "executor_debug_items": structured_result.get("executor_debug_items", []),
+                    "result": structured_result.get("answer"),
+                }
 
     if intent["mode"] in ["discovery_count", "discovery_list"]:
         return run_discovery_with_method(collection, question, limit=limit)
