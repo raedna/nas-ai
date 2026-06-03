@@ -1,5 +1,5 @@
 from __future__ import annotations
-
+import json
 from pathlib import Path
 import sys
 
@@ -188,6 +188,23 @@ def delete_qdrant_collection(qdrant_url: str, collection_name: str):
     r = requests.delete(f"{qdrant_url}/collections/{collection_name}", timeout=10)
     r.raise_for_status()
 
+
+NLP_CONFIG_PATH = Path("config/nlp_config.json")
+
+
+def load_nlp_ui_config():
+    if not NLP_CONFIG_PATH.exists():
+        return {}
+
+    with open(NLP_CONFIG_PATH, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+def save_nlp_ui_config(cfg):
+    NLP_CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
+
+    with open(NLP_CONFIG_PATH, "w", encoding="utf-8") as f:
+        json.dump(cfg, f, indent=2)
 
 # =========================================================
 # APP START
@@ -1479,8 +1496,59 @@ with tabs[5]:
 
 with tabs[6]:
     st.subheader("System Config")
-    st.info("System Config tab scaffold ready.")
 
+    st.markdown("### Structured Planner")
+
+    nlp_cfg = load_nlp_ui_config()
+    planner_cfg = nlp_cfg.get("structured_planner", {})
+
+    planner_enabled = st.checkbox(
+        "Enable structured planner",
+        value=bool(planner_cfg.get("enabled", True)),
+        help="Allow the LLM planner to generate structured retrieval plans."
+    )
+
+    planner_dry_run = st.checkbox(
+        "Dry run only",
+        value=bool(planner_cfg.get("dry_run", True)),
+        help="Generate and show the plan, but do not let it produce the final answer."
+    )
+
+    planner_execute = st.checkbox(
+        "Allow planner execution",
+        value=bool(planner_cfg.get("execute", False)),
+        help="Allow the structured planner + executor to produce the final answer."
+    )
+
+    planner_min_confidence = st.number_input(
+        "Minimum planner confidence",
+        min_value=0.0,
+        max_value=1.0,
+        value=float(planner_cfg.get("min_confidence", 0.7)),
+        step=0.05,
+    )
+
+    planner_debug_raw = st.checkbox(
+        "Debug raw LLM plan",
+        value=bool(planner_cfg.get("debug_raw_plan", False)),
+        help="Print/show raw LLM planner output for troubleshooting."
+    )
+
+    if st.button("Save structured planner settings"):
+        nlp_cfg.setdefault("structured_planner", {})
+
+        nlp_cfg["structured_planner"].update({
+            "enabled": planner_enabled,
+            "dry_run": planner_dry_run,
+            "execute": planner_execute,
+            "min_confidence": planner_min_confidence,
+            "debug_raw_plan": planner_debug_raw,
+        })
+
+        save_nlp_ui_config(nlp_cfg)
+        st.success("Structured planner settings saved. Restart Streamlit if changes do not apply immediately.")
+
+        
 with tabs[7]:
     st.subheader("Chat")
     st.info("Chat tab scaffold ready.")
