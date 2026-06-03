@@ -175,6 +175,48 @@ def _is_structured_payload(payload: Dict[str, Any]) -> bool:
 
     return False
 
+def expand_search_concept_variants(concept: str) -> List[str]:
+    concept_norm = normalize_match_value(concept)
+    if not concept_norm:
+        return []
+
+    words = [w for w in concept_norm.split() if w]
+    variants = [concept_norm]
+
+    # Build one-word-at-a-time phrase variants from synonyms.json
+    for idx, word in enumerate(words):
+        for syn in expand_terms_with_synonyms([word]) or []:
+            syn_norm = normalize_match_value(syn)
+            if not syn_norm:
+                continue
+
+            new_words = list(words)
+            new_words[idx] = syn_norm
+            variants.append(" ".join(new_words))
+
+    # Add compact variant:
+    # "exec broker" -> "execbroker"
+    if len(words) >= 2:
+        variants.append("".join(words))
+
+    # Add compact variants for all generated phrases
+    extra_compact = []
+    for v in variants:
+        v_words = [w for w in normalize_match_value(v).split() if w]
+        if len(v_words) >= 2:
+            extra_compact.append("".join(v_words))
+
+    variants.extend(extra_compact)
+
+    seen = set()
+    clean = []
+    for v in variants:
+        v_norm = normalize_match_value(v)
+        if v_norm and v_norm not in seen:
+            seen.add(v_norm)
+            clean.append(v_norm)
+
+    return clean
 
 def execute_structured_plan(
     collection: str,
@@ -216,17 +258,16 @@ def execute_structured_plan(
     expanded_concepts = []
 
     for concept in search_concepts:
-        expanded_concepts.append(concept)
-        expanded_concepts.extend(expand_terms_with_synonyms(concept))
+        expanded_concepts.extend(expand_search_concept_variants(concept))
 
-    # preserve order, remove duplicates
     seen = set()
     search_concepts = []
+
     for concept in expanded_concepts:
         concept_norm = normalize_match_value(concept)
         if concept_norm and concept_norm not in seen:
             seen.add(concept_norm)
-            search_concepts.append(concept)
+            search_concepts.append(concept_norm)
 
     for p in points:
         payload = p.payload or {}
