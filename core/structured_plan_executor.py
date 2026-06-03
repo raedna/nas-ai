@@ -97,6 +97,63 @@ def _score_payload_against_condition(
 
     return best_score
 
+def _score_payload_against_search_concept(
+    payload: Dict[str, Any],
+    search_concept: str,
+    search_roles: List[str],
+    preferred_identifier_namespace: str = None,
+) -> float:
+    concept = normalize_match_value(search_concept)
+
+    if not concept:
+        return 0.0
+
+    concept_terms = [w for w in concept.split() if w]
+    best_score = 0.0
+
+    role_weights = {
+        "primary_name": 1.3,
+        "aliases": 1.2,
+        "description": 1.0,
+        "identifier": 0.7,
+    }
+
+    for role in search_roles or []:
+        role_values = _payload_role_values(payload, role)
+
+        for raw_role_value in role_values:
+            role_text = normalize_match_value(raw_role_value)
+
+            if not role_text:
+                continue
+
+            score = 0.0
+
+            if concept == role_text:
+                score += 150.0
+            elif concept in role_text:
+                score += 70.0
+
+            term_hits = sum(1 for w in concept_terms if w in role_text)
+            score += term_hits * 10.0
+
+            if concept_terms and all(w in role_text for w in concept_terms):
+                score += 30.0
+
+            score *= role_weights.get(role, 1.0)
+
+            if score > best_score:
+                best_score = score
+
+    if preferred_identifier_namespace:
+        payload_namespace = normalize_match_value(payload.get("identifier_namespace"))
+        requested_namespace = normalize_match_value(preferred_identifier_namespace)
+
+        if payload_namespace == requested_namespace:
+            best_score += 25.0
+
+    return best_score
+
 
 def _is_structured_payload(payload: Dict[str, Any]) -> bool:
     if infer_doc_type(payload) == "structured":
@@ -135,6 +192,11 @@ def execute_structured_plan(
     filters = plan.get("filters") or []
     limit = int(plan.get("limit") or 10)
 
+    search_concept = plan.get("search_concept") or ""
+    search_roles = plan.get("search_roles") or ["primary_name", "description", "aliases"]
+    preferred_identifier_namespace = plan.get("preferred_identifier_namespace")
+    direct_identifier = plan.get("direct_identifier")
+
     for p in points:
         payload = p.payload or {}
 
@@ -142,6 +204,30 @@ def execute_structured_plan(
             continue
 
         score = 0.0
+
+        if direct_identifier:
+            payload_identifier = normalize_match_value(payload.get("identifier"))
+            requested_identifier = normalize_match_value(direct_identifier)
+
+            if payload_identifier == requested_identifier:
+                score += 200.0
+            else:
+                continue
+
+            if preferred_identifier_namespace:
+                payload_namespace = normalize_match_value(payload.get("identifier_namespace"))
+                requested_namespace = normalize_match_value(preferred_identifier_namespace)
+
+                if payload_namespace == requested_namespace:
+                    score += 50.0
+
+        elif search_concept:
+            score += _score_payload_against_search_concept(
+                payload,
+                search_concept,
+                search_roles,
+                preferred_identifier_namespace=preferred_identifier_namespace,
+            )
 
         if match:
             score += _score_payload_against_condition(payload, match)
