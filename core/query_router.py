@@ -536,11 +536,16 @@ def run_query_with_method(collection, question, mode="best", limit=25):
 
     method_info = detect_query_mode(question)
 
-    return {
+    response = {
         "method": method_info["mode"],
         "reason": method_info["reason"],
         "result": route_query(collection, question, mode=mode, limit=limit)
     }
+
+    if "structured_plan" in locals() and structured_plan:
+        response["structured_plan_dry_run"] = structured_plan
+
+    return response
 
 # OLD QUERY replaced with above
 #def run_query_with_method(collection, question, mode="best", limit=25):
