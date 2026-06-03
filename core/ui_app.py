@@ -1534,6 +1534,12 @@ with tabs[6]:
         help="Print/show raw LLM planner output for troubleshooting."
     )
 
+    if planner_execute and planner_dry_run:
+        st.warning("Planner execution is enabled, but dry-run is also enabled. Dry-run prevents final-answer execution.")
+
+    if planner_execute and not planner_dry_run:
+        st.warning("Planner execution is active. Structured planner results may become final answers.")
+
     if st.button("Save structured planner settings"):
         nlp_cfg.setdefault("structured_planner", {})
 
@@ -1548,7 +1554,7 @@ with tabs[6]:
         save_nlp_ui_config(nlp_cfg)
         st.success("Structured planner settings saved. Restart Streamlit if changes do not apply immediately.")
 
-        
+
 with tabs[7]:
     st.subheader("Chat")
     st.info("Chat tab scaffold ready.")
