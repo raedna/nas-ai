@@ -4,6 +4,7 @@ from qdrant_client import QdrantClient
 
 from core.query_helpers import infer_doc_type, normalize_simple_text
 from core.system_config import load_system_config
+from core.query_helpers import expand_terms_with_synonyms
 
 
 cfg = load_system_config()
@@ -206,6 +207,26 @@ def execute_structured_plan(
     search_roles = plan.get("search_roles") or ["primary_name", "description", "aliases"]
     preferred_identifier_namespace = plan.get("preferred_identifier_namespace")
     direct_identifier = plan.get("direct_identifier")
+
+    search_concepts = plan.get("search_concepts") or []
+
+    if search_concept:
+        search_concepts.append(search_concept)
+
+    expanded_concepts = []
+
+    for concept in search_concepts:
+        expanded_concepts.append(concept)
+        expanded_concepts.extend(expand_terms_with_synonyms(concept))
+
+    # preserve order, remove duplicates
+    seen = set()
+    search_concepts = []
+    for concept in expanded_concepts:
+        concept_norm = normalize_match_value(concept)
+        if concept_norm and concept_norm not in seen:
+            seen.add(concept_norm)
+            search_concepts.append(concept)
 
     for p in points:
         payload = p.payload or {}
