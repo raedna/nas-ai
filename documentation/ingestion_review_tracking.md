@@ -154,17 +154,11 @@ Status values:
 | RET-008 | Structured primary-name token matching | BBG-style structured rows are found by description terms like “ask price” but not by compact primary_name queries like “px ask” matching PX_ASK. | Superseded by RET-010 NLP structured query planner; avoid adding more hardcoded phrase-specific routing. | High | Superseded |
 | RET-009 | Query router/discovery cleanup | route_query, query_router, and discovery still contain mixed routing logic and remaining hardcoded assumptions. | Refactor retrieval after ingestion normalization: split routing, structured lookup, entity-row search, discovery, rerank, and synthesis. | Critical | Not Started |
 | RET-010 | NLP structured query planner | Retrieval uses hardcoded query patterns for structured asks such as mnemonic lookup, contains/list queries, and primary_name matching. | Add a lightweight query planner that converts user questions into normalized retrieval-plan JSON: intent, target_type, return_fields, filters, match fields, operators, and candidate roles. Execute the plan generically against normalized payload fields. | Critical | In Progress |
-		Question: what is exec broker
-		Expected: semantic/structured search should rank ExecBroker correctly.
-		Actual: structured_query_plan intercepts and returns worse result.
-		Issue: compact structured lookup is too broad for plain “what is X” questions.
-| RET-010a | Role-based structured query planner | Initial planner used phrase-specific rules and hijacked plain questions like “what is exec broker”. | Rebuild planner around generic roles: search_concept, search_roles, return_fields, preferred_identifier_namespace, direct_identifier, and limit. | Critical | Not Started |
-	Test case:
-		Question: what tag is exec broker
-		Current method: semantic
-		Desired future method: role_based_structured_plan
-		Expected: find ExecBroker-like field and return tag/identifier plus name/description.
-
+| RET-010a | Role-based structured planner/executor | LLM planner and structured executor support role-based lookup for structured payloads. | Use planner JSON + deterministic executor for structured/canonical records, controlled by nlp_config flags. | Critical | Done |
+| RET-010b | Structured token normalization | Compact/spaced/underscored forms like PX ASK and PX_ASK needed consistent matching. | Added compact token matching in structured executor. | High | Done |
+| RET-010c | Synonym-based structured concept expansion | Concepts like execution broker need phrase-preserving expansion using synonyms.json. | Added phrase-preserving synonym expansion; avoid loose character expansion. | High | Done |
+| RET-010d | Structured ranking balance | Queries where exact phrases appear in long descriptions, e.g. executing broker, can still rank generic records above canonical fields. | Consider primary_name/canonical boosting later after broader regression testing. | Medium | Deferred |
+| RET-010e | Reverse enum/value lookup in structured planner | Questions like “what tag can have value ISIN” should search enum_values, not normal descriptions. | Added reverse_enum_lookup intent and enum-value executor matching. | High | Done |
 | RET-011 | Explicit namespace answer refinement | Queries like “what is tag 22” and “what values can tag 22 have” currently return broad/full structured info. This is correct but can be noisy when the user expects a focused description or only enum values. | Refine namespace+identifier routing so description-style and enum/value-style questions produce focused answers while preserving full structured fallback. | Medium | Not Started |
 
 ---
