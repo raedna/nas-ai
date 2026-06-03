@@ -513,6 +513,8 @@ def run_query_with_method(collection, question, mode="best", limit=25):
                 }
 
     # 4. NLP/planner-style structured lookup
+    structured_plan = None
+
     planner_cfg = get_structured_planner_config()
     planner_enabled = bool(planner_cfg.get("enabled", True))
     planner_execute = bool(planner_cfg.get("execute", False))
@@ -542,9 +544,13 @@ def run_query_with_method(collection, question, mode="best", limit=25):
                     "result": structured_result.get("answer"),
                 }
 
+
+    # 5. Discovery fallback
     if intent["mode"] in ["discovery_count", "discovery_list"]:
         return run_discovery_with_method(collection, question, limit=limit)
 
+
+    # 6. Normal semantic/lexical fallback
     method_info = detect_query_mode(question)
 
     response = {
@@ -553,7 +559,7 @@ def run_query_with_method(collection, question, mode="best", limit=25):
         "result": route_query(collection, question, mode=mode, limit=limit)
     }
 
-    if "structured_plan" in locals() and structured_plan:
+    if structured_plan:
         response["structured_plan_dry_run"] = structured_plan
 
     return response
