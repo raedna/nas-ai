@@ -6,9 +6,9 @@
   },
   "structured_planner": {
     "enabled": true,
-    "dry_run": true,
-    "execute": false,
+    "dry_run": false,
+    "execute": true,
     "min_confidence": 0.7,
-    "debug_raw_plan": false
+    "debug_raw_plan": true
   }
 }
