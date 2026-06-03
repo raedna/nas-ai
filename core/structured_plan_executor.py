@@ -41,6 +41,57 @@ def _normalized_role_text(payload: Dict[str, Any], roles: List[str]) -> str:
 
     return normalize_match_value(" ".join(values))
 
+def _score_payload_enum_values(
+    payload: Dict[str, Any],
+    search_concept: str,
+) -> Tuple[float, Dict[str, Any]]:
+    concept = normalize_match_value(search_concept)
+    concept_compact = compact_match_value(search_concept)
+
+    if not concept:
+        return 0.0, {}
+
+    best_score = 0.0
+    best_enum = {}
+
+    enum_values = payload.get("enum_values") or []
+
+    for enum_item in enum_values:
+        if not isinstance(enum_item, dict):
+            enum_text = str(enum_item)
+            enum_payload = {"value": enum_text}
+        else:
+            enum_payload = enum_item
+            enum_text = " ".join(
+                str(enum_item.get(k) or "")
+                for k in ["enum_value", "enum_name", "description", "value", "name"]
+            )
+
+        enum_norm = normalize_match_value(enum_text)
+        enum_compact = compact_match_value(enum_text)
+
+        score = 0.0
+
+        if concept and concept == enum_norm:
+            score += 200.0
+        elif concept and concept in enum_norm:
+            score += 120.0
+
+        if concept_compact and concept_compact == enum_compact:
+            score += 200.0
+        elif concept_compact and concept_compact in enum_compact:
+            score += 120.0
+
+        terms = [w for w in concept.split() if w]
+        if terms:
+            term_hits = sum(1 for w in terms if w in enum_norm)
+            score += term_hits * 20.0
+
+        if score > best_score:
+            best_score = score
+            best_enum = enum_payload
+
+    return best_score, best_enum
 
 def _score_payload_against_condition(
     payload: Dict[str, Any],
@@ -277,7 +328,32 @@ def execute_structured_plan(
 
         score = 0.0
 
-        if direct_identifier:
+        matched_enum = None
+
+        if intent == "reverse_enum_lookup":
+            enum_score, matched_enum = _score_payload_enum_values(
+                payload,
+                search_concept,
+            )
+
+            if enum_score <= 0:
+                continue
+
+            score += enum_score
+
+            if preferred_identifier_namespace:
+                requested_namespace = normalize_match_value(preferred_identifier_namespace)
+                payload_namespace = normalize_match_value(
+                    payload.get("identifier_namespace")
+                    or payload.get("identifier_field")
+                )
+
+                if payload_namespace != requested_namespace:
+                    continue
+
+                score += 50.0
+
+        elif direct_identifier:
             payload_identifier = normalize_match_value(payload.get("identifier"))
             requested_identifier = normalize_match_value(direct_identifier)
 
@@ -321,29 +397,28 @@ def execute_structured_plan(
             score += _score_payload_against_condition(payload, condition)
 
         if score > 0:
-            scored.append((score, p))
+            scored.append((score, p, matched_enum))
 
     scored.sort(key=lambda x: x[0], reverse=True)
 
     selected = scored[:limit]
+
     items = []
 
-    executor_debug_items = []
-
-    for score, p in selected:
+    for score, p, matched_enum in selected:
         payload = p.payload or {}
-
-        item = {
-            "score": score,
-            "identifier": payload.get("identifier"),
-            "identifier_field": payload.get("identifier_field"),
-            "primary_name": payload.get("primary_name"),
-            "description": payload.get("description"),
-            "source_file": payload.get("source_file"),
-            "payload": payload,
-        }
-
-        items.append(item)
+        items.append(
+            {
+                "score": score,
+                "identifier": payload.get("identifier"),
+                "identifier_field": payload.get("identifier_field"),
+                "primary_name": payload.get("primary_name"),
+                "description": payload.get("description"),
+                "source_file": payload.get("source_file"),
+                "payload": payload,
+                "matched_enum": matched_enum,
+            }
+        )
 
         executor_debug_items.append(
             {
@@ -355,6 +430,7 @@ def execute_structured_plan(
                 "source_file": payload.get("source_file"),
                 "doc_type": payload.get("doc_type"),
                 "identifier_kind": payload.get("identifier_kind"),
+                "matched_enum": matched_enum,
             }
         )
 
