@@ -1232,7 +1232,7 @@ with tabs[3]:
                         if related_desc:
                             st.markdown(related_desc)
 
-            if show_debug and debug_data:
+            if show_debug #and debug_data:
                 def points_to_rows(points):
                     rows = []
                     for i, p in enumerate(points or [], start=1):
