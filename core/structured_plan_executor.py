@@ -259,12 +259,19 @@ def execute_structured_plan(
                 score += 50.0
 
         elif search_concept:
-            score += _score_payload_against_search_concept(
-                payload,
-                search_concept,
-                search_roles,
-                preferred_identifier_namespace=preferred_identifier_namespace,
-            )
+            concept_scores = []
+
+            for concept in search_concepts or [search_concept]:
+                concept_scores.append(
+                    _score_payload_against_search_concept(
+                        payload,
+                        concept,
+                        search_roles,
+                        preferred_identifier_namespace=preferred_identifier_namespace,
+                    )
+                )
+
+            score += max(concept_scores) if concept_scores else 0.0
 
         if match:
             score += _score_payload_against_condition(payload, match)
