@@ -1,18 +1,28 @@
 import json
+from pathlib import Path
+
 import requests
 
-from core.system_config import load_system_config
+
+def load_nlp_config():
+    path = Path("config/nlp_config.json")
+
+    if not path.exists():
+        return {}
+
+    with open(path, "r", encoding="utf-8") as f:
+        return json.load(f)
 
 
 def get_local_llm_config():
-    cfg = load_system_config()
+    cfg = load_nlp_config()
+    llm_cfg = cfg.get("local_llm", {})
 
     return {
-        "base_url": cfg.get("local_llm_base_url", "http://127.0.0.1:1234"),
-        "model": cfg.get("local_llm_model", "meta-llama-3.1-8b-instruct"),
-        "timeout": int(cfg.get("local_llm_timeout", 60)),
+        "base_url": llm_cfg.get("base_url", "http://localhost:1234"),
+        "model": llm_cfg.get("model", "meta-llama-3.1-8b-instruct"),
+        "timeout": int(llm_cfg.get("timeout", 60)),
     }
-
 
 def call_local_llm_json(system_prompt, user_prompt, temperature=0.0):
     llm_cfg = get_local_llm_config()
