@@ -404,6 +404,7 @@ def execute_structured_plan(
     selected = scored[:limit]
 
     items = []
+    executor_debug_items = []
 
     for score, p, matched_enum in selected:
         payload = p.payload or {}
