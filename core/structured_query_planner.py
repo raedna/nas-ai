@@ -125,6 +125,40 @@ Output JSON object fields:
 - limit: number of results to retrieve
 - dry_run: true
 
+
+Reverse enum/value lookup rules:
+- If the question asks what tag/field can have value X, use intent reverse_enum_lookup.
+- If the question asks what tag/field has value X, use intent reverse_enum_lookup.
+- If the question asks which tag/field contains enum/value X, use intent reverse_enum_lookup.
+- If the question asks where value X is allowed, use intent reverse_enum_lookup.
+- For reverse_enum_lookup:
+  - search_concept must be only the value being searched for, for example "ISIN".
+  - Do not include words like "tag", "field", "can have value", "has value", "allowed", or "belongs to" in search_concept.
+  - search_roles must be ["enum_values"].
+  - return_fields must be ["identifier", "primary_name", "description", "matched_enum"].
+  - preferred_identifier_namespace should be "tag" if the user asks for a tag.
+
+Example:
+
+Question: what tag can have a value ISIN
+JSON:
+{
+  "enabled": true,
+  "confidence": 0.95,
+  "reason": "User wants to find which tag has an allowed enum value matching ISIN.",
+  "question": "what tag can have a value ISIN",
+  "intent": "reverse_enum_lookup",
+  "target_type": "structured",
+  "search_concept": "ISIN",
+  "search_roles": ["enum_values"],
+  "return_fields": ["identifier", "primary_name", "description", "matched_enum"],
+  "preferred_identifier_namespace": "tag",
+  "direct_identifier": null,
+  "limit": 10,
+  "dry_run": true
+}
+
+
 Rules:
 - Return a JSON object only.
 - Do not copy a schema template.
