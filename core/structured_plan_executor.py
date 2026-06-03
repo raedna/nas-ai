@@ -215,11 +215,17 @@ def execute_structured_plan(
                 continue
 
             if preferred_identifier_namespace:
-                payload_namespace = normalize_match_value(payload.get("identifier_namespace"))
                 requested_namespace = normalize_match_value(preferred_identifier_namespace)
 
-                if payload_namespace == requested_namespace:
-                    score += 50.0
+                payload_namespace = normalize_match_value(
+                    payload.get("identifier_namespace")
+                    or payload.get("identifier_field")
+                )
+
+                if payload_namespace != requested_namespace:
+                    continue
+
+                score += 50.0
 
         elif search_concept:
             score += _score_payload_against_search_concept(
