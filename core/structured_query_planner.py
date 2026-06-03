@@ -242,7 +242,7 @@ JSON:
     plan["limit"] = int(plan.get("limit") or 5)
     plan["dry_run"] = dry_run
 
-    if plan.get("intent") not in ["lookup", "list", "direct_lookup"]:
+    if plan.get("intent") not in ["lookup", "list", "direct_lookup", "reverse_enum_lookup"]:
         return empty_plan(question, "local LLM planner returned invalid intent")
 
     if not plan.get("search_concept") and not plan.get("direct_identifier"):
