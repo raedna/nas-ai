@@ -1303,7 +1303,7 @@ with tabs[3]:
                         "Semantic/rerank debug panels were not used for this answer."
                     )
 
-                else:
+                elif debug_data:
 
                     with st.expander("Semantic Candidates", expanded=True):
                         st.dataframe(points_to_rows(debug_data.get("semantic_points")), width="stretch")
