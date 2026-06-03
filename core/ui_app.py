@@ -1278,6 +1278,10 @@ with tabs[3]:
                             "selected_reason": query_run.get("reason"),
                         })
 
+                if "query_run" in locals() and query_run.get("structured_plan_dry_run"):
+                    with st.expander("Structured Planner Dry Run", expanded=True):
+                        st.json(query_run.get("structured_plan_dry_run") or {})
+
                 if selected_method == "structured_query_plan":
                     with st.expander("Structured Query Plan", expanded=True):
                         st.json(query_run.get("plan") or {})
