@@ -1955,7 +1955,12 @@ def route_query(collection, question, mode="best", limit=25):
     )
 
     if is_chunked_doc_like:
-        best_point = pick_best_chunked_candidate(points, question)
+        ranked = rerank_points(points, question)
+
+        if not ranked:
+            return "No answer found after applying filters."
+
+        best_point = ranked[0]
         fuller_payload = build_fuller_doc_payload(collection, best_point.payload)
         return synthesize_answer(fuller_payload, roles, collection)
 
