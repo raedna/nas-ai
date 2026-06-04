@@ -80,7 +80,8 @@ Status values:
 | DOC-006 | Obsidian image links | Markdown notes may reference PNG/JPG assets stored in different folders using ![[...]] syntax. | Ensure asset_search_roots are configurable per collection and embedded_image_paths / targets are preserved in normalized doc payloads. | High | Done |
 | DOC-007 | Markdown/Obsidian retrieval validation | Docs ingestion now has detector, identity fields, and Obsidian image-link support, but retrieval quality still needs end-to-end validation. | Test headings, bullets, numbered steps, Obsidian links, embedded images, source titles, and procedural answer formatting using real Markdown/Obsidian questions. | High | Not Started |
 | DOC-008 | Procedural answer synthesis cleanup | Obsidian/doc retrieval finds the right procedural note, but embedded image OCR can dominate the answer and make it noisy. | In final answer synthesis, prefer human-authored text first, summarize or collapse embedded image OCR, and show image names as references instead of dumping full OCR inline. | High | Not Started |
-
+| DOC-009 | Image OCR answer handling | Embedded image OCR is useful for retrieval but can dominate final answers and make procedural docs noisy. | Separate OCR retrieval text from answer display text. Prefer human-authored text in answers, show image references, and only include OCR text when the user explicitly asks about image contents. | High | Not Started |
+| DOC-010 | Image OCR quality improvement | OCR extracted from screenshots can be noisy, especially for UI screenshots with small text, tables, and icons. | Review OCR preprocessing and extraction: resize images, improve contrast, optionally use image-type-specific OCR settings, and store OCR confidence/summary separately from full OCR text. | Medium | Not Started |
 ---
 
 ## 5. Image ingestion
