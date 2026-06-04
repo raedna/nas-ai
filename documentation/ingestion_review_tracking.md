@@ -226,4 +226,8 @@ Status values:
 | CHAT-002 | Open WebUI integration | Open WebUI needs a backend endpoint to query NAS-AI. | Expose a chat/retrieval API endpoint compatible with Open WebUI or an OpenAI-style tool/function bridge. | High | Not Started |
 | CHAT-003 | Cross-collection answer synthesis | Results from multiple collections need to be merged and cited. | Merge per-collection results using normalized payload fields and produce a final answer with source collection/file/path metadata. | High | Not Started |
 
+## 17. Halo Sync
 
+HALO-001 — Halo KB sync to SQLite
+HALO-002 — Export Halo KB articles to markdown
+HALO-003 — Ingest exported Halo KB folder as NAS-AI collection
