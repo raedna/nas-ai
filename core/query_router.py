@@ -1615,35 +1615,47 @@ def build_fuller_doc_payload(collection, best_payload):
 
     best_heading = str(best_payload.get("section_heading") or "").strip()
 
+    doc_type = str(best_payload.get("doc_type") or "").lower()
+    source_file_lower = str(source_file or "").lower()
+
+    is_markdown_note = source_file_lower.endswith(".md")
+    is_procedural_doc = doc_type == "procedural"
+
+    include_full_note = is_markdown_note or is_procedural_doc
+
     selected = []
-    for p in ordered:
-        payload = p.payload or {}
-        cid = payload.get("chunk_id")
-        try:
-            cid = int(cid)
-        except Exception:
-            cid = None
 
-        heading = str(payload.get("section_heading") or "").strip()
+    if include_full_note:
+        selected = [p.payload or {} for p in ordered]
+    else:
+        for p in ordered:
+            payload = p.payload or {}
+            cid = payload.get("chunk_id")
+            try:
+                cid = int(cid)
+            except Exception:
+                cid = None
 
-        if best_chunk_id is None:
-            if best_heading:
-                if heading == best_heading or not heading:
+            heading = str(payload.get("section_heading") or "").strip()
+
+            if best_chunk_id is None:
+                if best_heading:
+                    if heading == best_heading or not heading:
+                        selected.append(payload)
+                else:
                     selected.append(payload)
             else:
-                selected.append(payload)
-        else:
-            if cid is None:
-                continue
+                if cid is None:
+                    continue
 
-            if best_heading:
-                if heading == best_heading:
-                    selected.append(payload)
-                elif abs(cid - best_chunk_id) <= 1 and not heading:
-                    selected.append(payload)
-            else:
-                if abs(cid - best_chunk_id) <= 1:
-                    selected.append(payload)
+                if best_heading:
+                    if heading == best_heading:
+                        selected.append(payload)
+                    elif abs(cid - best_chunk_id) <= 1 and not heading:
+                        selected.append(payload)
+                else:
+                    if abs(cid - best_chunk_id) <= 1:
+                        selected.append(payload)
 
     if not selected:
         selected = [best_payload]
