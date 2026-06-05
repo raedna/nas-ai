@@ -2094,6 +2094,25 @@ def route_query(collection, question, mode="best", limit=25):
 
     return synthesize_answer(ranked[0].payload, roles, collection)
 
+def dedupe_repeated_paragraphs(text):
+    paragraphs = [p.strip() for p in str(text or "").split("\n\n")]
+    cleaned = []
+    seen = set()
+
+    for p in paragraphs:
+        if not p:
+            continue
+
+        key = normalize_simple_text(p)
+
+        if key and key in seen:
+            continue
+
+        seen.add(key)
+        cleaned.append(p)
+
+    return "\n\n".join(cleaned).strip()
+
 def synthesize_answer(payload, roles, collection_name):
     if DEBUG:
         print("🔥 SYNTHESIZER V2 ACTIVE")
@@ -2232,6 +2251,7 @@ def synthesize_answer(payload, roles, collection_name):
             parts.append(name)
 
         desc_text = str(description or payload.get("text") or "").strip()
+        desc_text = dedupe_repeated_paragraphs(desc_text)
 
         if desc_text:
             lines = [ln.rstrip() for ln in desc_text.splitlines()]
