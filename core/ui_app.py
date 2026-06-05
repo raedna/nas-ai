@@ -236,6 +236,59 @@ def render_answer_images_from_payload(payload):
             with st.expander(f"OCR / extracted text: {caption}", expanded=False):
                 st.text(ocr_text)
 
+def resolve_image_payloads_from_related_titles(collection_name, qdrant_url, related_titles, limit=5000):
+    if not collection_name or not qdrant_url or not related_titles:
+        return []
+
+    wanted = {Path(str(t)).name.strip().lower() for t in related_titles if str(t).strip()}
+    if not wanted:
+        return []
+
+    try:
+        r = requests.post(
+            f"{qdrant_url}/collections/{collection_name}/points/scroll",
+            json={
+                "limit": int(limit),
+                "with_payload": True,
+                "with_vectors": False
+            },
+            timeout=30
+        )
+        r.raise_for_status()
+
+        points = r.json().get("result", {}).get("points", [])
+    except Exception:
+        return []
+
+    matches = []
+
+    for p in points:
+        payload = p.get("payload", {}) or {}
+
+        candidates = [
+            payload.get("file_name"),
+            payload.get("source_file"),
+            payload.get("primary_name"),
+            payload.get("file_path"),
+            payload.get("local_path"),
+            payload.get("image_path"),
+        ]
+
+        candidate_names = {
+            Path(str(x)).name.strip().lower()
+            for x in candidates
+            if str(x or "").strip()
+        }
+
+        if wanted & candidate_names:
+            source_type = str(payload.get("source_type") or "").lower()
+            file_type = str(payload.get("file_type") or "").lower()
+
+            if source_type in ["image", "standalone_image"] or file_type == "image":
+                matches.append(payload)
+
+    return matches
+
 # =========================================================
 # LOGGING
 # =========================================================
@@ -1318,6 +1371,18 @@ with tabs[3]:
                         answer_payload = ranked_points[0].payload or {}
 
                 render_answer_images_from_payload(answer_payload)
+
+                # If the answer payload only has related image names, resolve them to image payloads.
+                if answer_payload:
+                    related_titles_for_images = answer_payload.get("related_titles") or []
+                    image_payloads = resolve_image_payloads_from_related_titles(
+                        selected_collection,
+                        qdrant_url,
+                        related_titles_for_images,
+                    )
+
+                    for image_payload in image_payloads:
+                        render_answer_images_from_payload(image_payload)
 
                 if answer_payload:
                     with st.expander("Answer payload image debug", expanded=False):
