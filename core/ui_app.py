@@ -237,6 +237,102 @@ def render_answer_images_from_payload(payload):
             with st.expander(f"OCR / extracted text: {caption}", expanded=False):
                 st.text(ocr_text)
 
+def render_answer_with_inline_images(
+    answer_text,
+    image_items=None,
+    show_images=True,
+    show_inline_ocr=False,
+    show_ocr_expanders=True,
+):
+    text = str(answer_text or "")
+    image_items = image_items or []
+
+    image_map = {}
+    for item in image_items:
+        path = str(item.get("path") or "").strip()
+        caption = str(item.get("caption") or Path(path).name).strip()
+        ocr = str(item.get("ocr") or "").strip()
+
+        if not path:
+            continue
+
+        image_map[Path(caption).name.lower()] = {
+            "path": path,
+            "caption": caption,
+            "ocr": ocr,
+        }
+
+    pattern = r"\[Embedded image OCR from:\s*([^\]]+)\]"
+
+    pos = 0
+    found_marker = False
+
+    for match in re.finditer(pattern, text):
+        found_marker = True
+
+        before = text[pos:match.start()].strip()
+        image_name = match.group(1).strip()
+        image_key = Path(image_name).name.lower()
+        image_item = image_map.get(image_key)
+
+        if before:
+            st.markdown(before)
+
+        if image_item and show_images:
+            image_path = image_item["path"]
+            caption = image_item["caption"]
+
+            try:
+                if Path(image_path).exists():
+                    st.image(image_path, caption=caption)
+                else:
+                    st.caption(f"Image path not found: {image_path}")
+            except Exception as e:
+                st.caption(f"Could not render image: {image_path} — {e}")
+
+            ocr_text = image_item.get("ocr") or ""
+
+            if show_inline_ocr and ocr_text:
+                st.markdown(ocr_text)
+            elif show_ocr_expanders and ocr_text:
+                with st.expander(f"OCR / extracted text: {caption}", expanded=False):
+                    st.text(ocr_text)
+        else:
+            # If image cannot be resolved, keep marker visible only when images are enabled.
+            if show_images:
+                st.caption(f"Image not resolved: {image_name}")
+
+        pos = match.end()
+
+        # Skip OCR text immediately following the marker unless inline OCR is enabled.
+        # OCR may continue until the next blank paragraph, the next image marker, or end of answer.
+        if not show_inline_ocr:
+            j = pos
+
+            # skip whitespace after marker
+            while j < len(text) and text[j] in [" ", "\t", "\r", "\n"]:
+                j += 1
+
+            next_marker = re.search(pattern, text[j:])
+            next_marker_pos = j + next_marker.start() if next_marker else None
+
+            next_blank = text.find("\n\n", j)
+
+            if next_blank != -1 and (next_marker_pos is None or next_blank < next_marker_pos):
+                pos = next_blank + 2
+            elif next_marker_pos is not None:
+                pos = next_marker_pos
+            else:
+                # OCR was the last thing in the answer
+                pos = len(text)
+
+    tail = text[pos:].strip()
+    if tail:
+        st.markdown(tail)
+
+    if not found_marker:
+        st.markdown(text)
+
 def resolve_image_payloads_from_related_titles(collection_name, qdrant_url, related_titles, limit=5000):
     if not collection_name or not qdrant_url or not related_titles:
         return []
@@ -359,64 +455,6 @@ def fetch_image_paths_for_source_file(collection_name, qdrant_url, source_file, 
 
     return image_items
 
-def render_answer_with_inline_images(answer_text, image_items):
-    if not answer_text:
-        return
-
-    image_map = {}
-
-    for item in image_items or []:
-        path = str(item.get("path") or "").strip()
-        caption = str(item.get("caption") or Path(path).name).strip()
-
-        if not path:
-            continue
-
-        image_map[Path(caption).name.lower()] = item
-        image_map[caption.lower()] = item
-
-    pattern = r"(\[Embedded image OCR from:\s*([^\]]+)\])"
-    parts = re.split(pattern, str(answer_text))
-
-    i = 0
-    buffer = []
-
-    while i < len(parts):
-        part = parts[i]
-
-        if i + 2 < len(parts) and parts[i].startswith("[Embedded image OCR from:"):
-            marker = parts[i]
-            image_name = parts[i + 1].strip()
-            image_item = image_map.get(Path(image_name).name.lower()) or image_map.get(image_name.lower())
-
-            if buffer:
-                st.markdown("".join(buffer).strip())
-                buffer = []
-
-            if image_item:
-                image_path = str(image_item.get("path") or "")
-                caption = image_item.get("caption") or image_name
-
-                if Path(image_path).exists():
-                    st.image(image_path, caption=caption)
-                else:
-                    st.caption(f"Image path not found: {image_path}")
-
-                ocr_text = str(image_item.get("ocr") or "").strip()
-                if ocr_text:
-                    with st.expander(f"OCR / extracted text: {caption}", expanded=False):
-                        st.text(ocr_text)
-            else:
-                st.caption(marker)
-
-            i += 3
-            continue
-
-        buffer.append(part)
-        i += 1
-
-    if buffer:
-        st.markdown("".join(buffer).strip())
 
 # =========================================================
 # LOGGING
@@ -1270,6 +1308,24 @@ with tabs[3]:
             key="ask_debug_top_k"
         )
 
+        show_answer_images = st.checkbox(
+            "Show related images",
+            value=True,
+            key="ask_show_answer_images"
+        )
+
+        show_inline_ocr = st.checkbox(
+            "Show OCR inline",
+            value=False,
+            key="ask_show_inline_ocr"
+        )
+
+        show_ocr_expanders = st.checkbox(
+            "Show OCR in expanders",
+            value=True,
+            key="ask_show_ocr_expanders"
+        )
+
         if st.button("Ask", key="ask_run_button"):
             if not question.strip():
                 st.warning("Enter a question.")
@@ -1490,9 +1546,32 @@ with tabs[3]:
             else:
                 answer_text = str(result)
                 main_answer = strip_related_articles_from_answer(answer_text)
-                st.markdown(main_answer)
 
                 answer_payload = None
+
+                if isinstance(debug_data, dict):
+                    ranked_points = debug_data.get("ranked_points") or []
+                    if ranked_points:
+                        answer_payload = ranked_points[0].payload or {}
+
+                source_image_items = []
+
+                if answer_payload:
+                    source_file = answer_payload.get("source_file")
+                    source_image_items = fetch_image_paths_for_source_file(
+                        selected_collection,
+                        qdrant_url,
+                        source_file,
+                        related_titles=answer_payload.get("related_titles") or [],
+                    )
+
+                render_answer_with_inline_images(
+                    main_answer,
+                    image_items=source_image_items,
+                    show_images=show_answer_images,
+                    show_inline_ocr=show_inline_ocr,
+                    show_ocr_expanders=show_ocr_expanders,
+                )
 
                 if isinstance(debug_data, dict):
                     ranked_points = debug_data.get("ranked_points") or []
@@ -1510,7 +1589,7 @@ with tabs[3]:
                         related_titles=answer_payload.get("related_titles") or [],
                     )
 
-                    if source_image_items:
+                    if show_answer_images and source_image_items and not inline_images_rendered:
                         st.markdown("### Related Images")
 
                         for item in source_image_items[:10]:
