@@ -85,11 +85,11 @@ Status values:
 | DOC-011 | Multi-chunk procedural answer completeness | Correct Obsidian/procedural note is retrieved, but final answer can be truncated when the procedure spans more chunks than the current fuller-doc selection window. | Improve build_fuller_doc_payload() for procedural docs so it includes the full relevant section or full note when the selected source file is clearly the right note, with a safe max character cap. | High | Done |
 | DOC-012 | Obsidian multi-term query drift | Obsidian retrieval can drift when a broad extra term such as “dates” competes with the main anchor term, e.g. “repo issue with the dates”. | Later review doc reranking/lexical anchoring so strong literal terms like repo remain dominant while secondary terms refine rather than redirect results. | Medium | Deferred |
 | DOC-013 | Markdown table block preservation | Markdown/Obsidian tables are currently treated as normal text, so answers cannot reliably return them as tables. | Detect Markdown table blocks during doc parsing, store table_headers and table_rows in payload, include table text for retrieval, and render selected table_block payloads as Markdown tables in final answers. | Medium | Not Started |
-| DOC-014 | Render related images and OCR in answers | Images now render, but linked procedural notes can share related image names, causing overlapping images across closely related sections. | Prefer directly embedded images from the selected note/section; treat related note images as optional/fallback, not automatic. Show OCR in collapsed expanders. | High | In Progress |
+| DOC-014 | Render related images and OCR in answers | Images can now render, but they appear below the answer and OCR handling is not controlled cleanly. | Add Ask-tab toggles for related images, inline OCR, and OCR expanders. Render images inline where embedded image markers appear when possible; otherwise show related images below the answer. | High | In Progress |
 	DOC-014a: Confirm final answer text still contains image markers internally.
 	DOC-014b: Build render_answer_with_inline_images().
 	DOC-014c: Replace st.markdown(main_answer) with inline renderer for doc answers only.
-	
+
 ---
 
 ## 5. Image ingestion
@@ -172,7 +172,7 @@ Status values:
 | RET-011 | Explicit namespace answer refinement | Exact namespace queries like “what is tag 22” and “what values can tag 22 have” can still route through structured_namespace_lookup and return broad/full structured info instead of focused description/enum answers. | Refine namespace+identifier routing so description-style and enum/value-style questions produce focused answers, or delegate enum-style questions to structured planner/executor when appropriate. | Medium | In Progress |
 | RET-012 | Procedural answer formatting | KB/procedural answers retrieve correctly, but step-by-step content can be returned as dense paragraphs with missing line breaks. | Preserve or reconstruct procedural formatting using sentence/step splitting, bullets, and source section headings during answer synthesis. | Medium | Not Started |
 | RET-013 | Final answer/debug path mismatch | Final rerank could show the correct note as top candidate, but the final answer came from a different payload because chunked doc answer selection used a separate picker before rerank. | Updated chunked doc answer path to use the reranked top candidate before building the fuller doc payload. Monitor remaining doc completeness cases separately. | Critical | Done |
-| RET-014 | Discovery intent too sensitive to “find” | Typo/awkward questions like “what to find hprof files” can route to discovery_list because “find” is treated as a list/discovery cue, even when the user likely wants a procedural answer. | Refine discovery intent so “find/list/show records containing X” triggers discovery, but “where/how/what to find X” stays semantic/procedural. | Medium | Deferred |
+| RET-014 | Discovery intent too sensitive to “find” | Questions using “find” can route to discovery_list even when the user is asking a procedural/how-to question, e.g. “how to find recon PB files on server.” | Refine detect_ask_intent() so discovery only triggers for explicit list/count/explore patterns, while how/where/what/find procedural questions stay in answer/semantic mode. | High | Not Started |
 
 ---
 
