@@ -1660,6 +1660,9 @@ def build_fuller_doc_payload(collection, best_payload):
     if not selected:
         selected = [best_payload]
 
+    max_chars = 12000
+    current_chars = 0
+
     combined_parts = []
     seen_headings = set()
     seen_related = set()
@@ -1716,7 +1719,17 @@ def build_fuller_doc_payload(collection, best_payload):
                     text = "\n".join(text_lines[1:]).strip()
 
             if text:
+                remaining = max_chars - current_chars
+                if remaining <= 0:
+                    break
+
+                if len(text) > remaining:
+                    combined_parts.append(text[:remaining].rstrip() + "\n\n[Answer truncated due to length.]")
+                    current_chars = max_chars
+                    break
+
                 combined_parts.append(text)
+                current_chars += len(text)
 
     merged_payload = dict(best_payload)
     merged_payload["description"] = "\n\n".join(part for part in combined_parts if part).strip()
