@@ -1319,6 +1319,21 @@ with tabs[3]:
 
                 render_answer_images_from_payload(answer_payload)
 
+                if answer_payload:
+                    with st.expander("Answer payload image debug", expanded=False):
+                        st.write({
+                            "embedded_image_paths": answer_payload.get("embedded_image_paths"),
+                            "embedded_images": answer_payload.get("embedded_images"),
+                            "image_paths": answer_payload.get("image_paths"),
+                            "related_image_paths": answer_payload.get("related_image_paths"),
+                            "related_titles": answer_payload.get("related_titles"),
+                            "source_file": answer_payload.get("source_file"),
+                        })
+                else:
+                    st.caption("No answer payload available for image rendering.")
+
+                related_titles = st.session_state.ask_related_titles
+
                 related_titles = st.session_state.ask_related_titles
                 if related_titles:
                     st.markdown("### Related Articles")
