@@ -2035,6 +2035,10 @@ def route_query(collection, question, mode="best", limit=25):
 
     return synthesize_answer(ranked[0].payload, roles, collection)
 
+def is_embedded_image_ocr_line(line: str) -> bool:
+    text = str(line or "").strip()
+    return text.startswith("[Embedded image OCR from:")
+
 def synthesize_answer(payload, roles, collection_name):
     if DEBUG:
         print("🔥 SYNTHESIZER V2 ACTIVE")
@@ -2176,6 +2180,7 @@ def synthesize_answer(payload, roles, collection_name):
 
         if desc_text:
             lines = [ln.rstrip() for ln in desc_text.splitlines()]
+            image_ocr_lines = []
 
             cleaned = []
             title_norm = normalize_simple_text(name)
@@ -2184,6 +2189,9 @@ def synthesize_answer(payload, roles, collection_name):
 
             for ln in lines:
                 stripped = ln.strip()
+                if is_embedded_image_ocr_line(stripped):
+                    image_ocr_lines.append(stripped)
+                    continue
                 if not stripped:
                     cleaned.append("")
                     continue
@@ -2217,6 +2225,23 @@ def synthesize_answer(payload, roles, collection_name):
 
             if desc_text:
                 parts.append(desc_text)
+
+            if image_ocr_lines:
+                image_refs = []
+
+                for line in image_ocr_lines:
+                    # Extract filename from: [Embedded image OCR from: filename.png] ...
+                    marker = "[Embedded image OCR from:"
+                    if marker in line:
+                        filename = line.split(marker, 1)[1].split("]", 1)[0].strip()
+                        if filename and filename not in image_refs:
+                            image_refs.append(filename)
+
+                if image_refs:
+                    parts.append(
+                        "Related images:\n" +
+                        "\n".join(f"- {name}" for name in image_refs[:10])
+                    )
 
         related_titles = payload.get("related_titles") or []
         if related_titles:
