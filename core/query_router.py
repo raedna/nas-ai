@@ -1653,11 +1653,30 @@ def build_fuller_doc_payload(collection, best_payload):
     seen_related = set()
     merged_related_titles = []
 
+    seen_image_paths = set()
+    merged_image_paths = []
+
+    seen_image_targets = set()
+    merged_image_targets = []
+
+    merged_image_ocr_items = []
+
     note_title = str(best_payload.get("primary_name") or "").strip()
 
     for payload in selected:
         heading = str(payload.get("section_heading") or "").strip()
         text = str(payload.get("text") or payload.get("description") or "").strip()
+        for image_path in payload.get("embedded_image_paths") or []:
+            image_path = str(image_path).strip()
+            if image_path and image_path not in seen_image_paths:
+                seen_image_paths.add(image_path)
+                merged_image_paths.append(image_path)
+
+        for image_target in payload.get("embedded_image_targets") or []:
+            image_target = str(image_target).strip()
+            if image_target and image_target not in seen_image_targets:
+                seen_image_targets.add(image_target)
+                merged_image_targets.append(image_target)
 
         for title in payload.get("related_titles") or []:
             title = str(title).strip()
@@ -1690,6 +1709,12 @@ def build_fuller_doc_payload(collection, best_payload):
     merged_payload = dict(best_payload)
     merged_payload["description"] = "\n\n".join(part for part in combined_parts if part).strip()
     merged_payload["related_titles"] = merged_related_titles
+
+    if merged_image_paths:
+        merged_payload["embedded_image_paths"] = merged_image_paths
+
+    if merged_image_targets:
+        merged_payload["embedded_image_targets"] = merged_image_targets
 
     return merged_payload
 
