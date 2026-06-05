@@ -2,6 +2,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 import sys
+import re
 
 CURRENT_DIR = Path(__file__).resolve().parent
 LOCAL_PROJECT_ROOT = CURRENT_DIR.parent
@@ -288,6 +289,134 @@ def resolve_image_payloads_from_related_titles(collection_name, qdrant_url, rela
                 matches.append(payload)
 
     return matches
+
+def fetch_image_paths_for_source_file(collection_name, qdrant_url, source_file, related_titles=None, limit=5000):
+    if not collection_name or not qdrant_url or not source_file:
+        return []
+
+    wanted_names = {
+        Path(str(t)).name.strip().lower()
+        for t in (related_titles or [])
+        if str(t).strip().lower().endswith((".png", ".jpg", ".jpeg", ".webp"))
+    }
+
+    # Important: do not render arbitrary images from the note
+    if not wanted_names:
+        return []
+
+    try:
+        r = requests.post(
+            f"{qdrant_url}/collections/{collection_name}/points/scroll",
+            json={
+                "limit": int(limit),
+                "with_payload": True,
+                "with_vectors": False
+            },
+            timeout=30
+        )
+        r.raise_for_status()
+        points = r.json().get("result", {}).get("points", [])
+    except Exception:
+        return []
+
+    image_items = []
+    seen = set()
+
+    for p in points:
+        payload = p.get("payload", {}) or {}
+
+        if payload.get("source_file") != source_file:
+            continue
+
+        paths = payload.get("embedded_image_paths") or []
+        targets = payload.get("embedded_image_targets") or []
+
+        for idx, image_path in enumerate(paths):
+            image_path = str(image_path or "").strip()
+            if not image_path:
+                continue
+
+            caption = None
+            if idx < len(targets):
+                caption = str(targets[idx] or "").strip()
+
+            caption_name = Path(str(caption or image_path)).name.strip().lower()
+
+            # Strict filter: only show images explicitly listed in related_titles
+            if caption_name not in wanted_names:
+                continue
+
+            if image_path in seen:
+                continue
+
+            seen.add(image_path)
+
+            image_items.append({
+                "path": image_path,
+                "caption": caption or Path(image_path).name,
+                "ocr": "",
+            })
+
+    return image_items
+
+def render_answer_with_inline_images(answer_text, image_items):
+    if not answer_text:
+        return
+
+    image_map = {}
+
+    for item in image_items or []:
+        path = str(item.get("path") or "").strip()
+        caption = str(item.get("caption") or Path(path).name).strip()
+
+        if not path:
+            continue
+
+        image_map[Path(caption).name.lower()] = item
+        image_map[caption.lower()] = item
+
+    pattern = r"(\[Embedded image OCR from:\s*([^\]]+)\])"
+    parts = re.split(pattern, str(answer_text))
+
+    i = 0
+    buffer = []
+
+    while i < len(parts):
+        part = parts[i]
+
+        if i + 2 < len(parts) and parts[i].startswith("[Embedded image OCR from:"):
+            marker = parts[i]
+            image_name = parts[i + 1].strip()
+            image_item = image_map.get(Path(image_name).name.lower()) or image_map.get(image_name.lower())
+
+            if buffer:
+                st.markdown("".join(buffer).strip())
+                buffer = []
+
+            if image_item:
+                image_path = str(image_item.get("path") or "")
+                caption = image_item.get("caption") or image_name
+
+                if Path(image_path).exists():
+                    st.image(image_path, caption=caption)
+                else:
+                    st.caption(f"Image path not found: {image_path}")
+
+                ocr_text = str(image_item.get("ocr") or "").strip()
+                if ocr_text:
+                    with st.expander(f"OCR / extracted text: {caption}", expanded=False):
+                        st.text(ocr_text)
+            else:
+                st.caption(marker)
+
+            i += 3
+            continue
+
+        buffer.append(part)
+        i += 1
+
+    if buffer:
+        st.markdown("".join(buffer).strip())
 
 # =========================================================
 # LOGGING
@@ -1371,6 +1500,30 @@ with tabs[3]:
                         answer_payload = ranked_points[0].payload or {}
 
                 render_answer_images_from_payload(answer_payload)
+
+                if answer_payload:
+                    source_file = answer_payload.get("source_file")
+                    source_image_items = fetch_image_paths_for_source_file(
+                        selected_collection,
+                        qdrant_url,
+                        source_file,
+                        related_titles=answer_payload.get("related_titles") or [],
+                    )
+
+                    if source_image_items:
+                        st.markdown("### Related Images")
+
+                        for item in source_image_items[:10]:
+                            image_path = str(item.get("path") or "")
+                            caption = item.get("caption") or Path(image_path).name
+
+                            try:
+                                if Path(image_path).exists():
+                                    st.image(image_path, caption=caption)
+                                else:
+                                    st.caption(f"Image path not found: {image_path}")
+                            except Exception as e:
+                                st.caption(f"Could not render image: {image_path} — {e}")
 
                 # If the answer payload only has related image names, resolve them to image payloads.
                 if answer_payload:
