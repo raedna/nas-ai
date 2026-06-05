@@ -1665,6 +1665,7 @@ def build_fuller_doc_payload(collection, best_payload):
 
     combined_parts = []
     seen_headings = set()
+    seen_text_parts = set()
     seen_related = set()
     merged_related_titles = []
 
@@ -1719,6 +1720,14 @@ def build_fuller_doc_payload(collection, best_payload):
                     text = "\n".join(text_lines[1:]).strip()
 
             if text:
+                text_key = normalize_simple_text(text)
+
+                if text_key and text_key in seen_text_parts:
+                    continue
+
+                if text_key:
+                    seen_text_parts.add(text_key)
+
                 remaining = max_chars - current_chars
                 if remaining <= 0:
                     break
