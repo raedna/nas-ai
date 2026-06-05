@@ -140,6 +140,102 @@ def strip_related_articles_from_answer(answer_text: str):
         return text
     return text.split(marker, 1)[0].rstrip()
 
+def render_answer_images_from_payload(payload):
+    if not payload:
+        return
+
+    image_items = []
+
+    # Embedded doc / Obsidian images
+    for key in [
+        "embedded_image_paths",
+        "embedded_images",
+        "image_paths",
+        "related_image_paths",
+    ]:
+        val = payload.get(key)
+
+        if isinstance(val, list):
+            for item in val:
+                if isinstance(item, str):
+                    image_items.append({
+                        "path": item,
+                        "caption": Path(item).name,
+                        "ocr": "",
+                    })
+
+                elif isinstance(item, dict):
+                    image_path = (
+                        item.get("local_path")
+                        or item.get("path")
+                        or item.get("file_path")
+                        or item.get("image_path")
+                    )
+
+                    if image_path:
+                        image_items.append({
+                            "path": image_path,
+                            "caption": (
+                                item.get("file_name")
+                                or item.get("caption")
+                                or Path(str(image_path)).name
+                            ),
+                            "ocr": item.get("ocr_text") or item.get("text") or "",
+                        })
+
+    # Standalone image payload
+    source_type = str(payload.get("source_type") or "").lower()
+    file_type = str(payload.get("file_type") or "").lower()
+
+    if source_type in ["image", "standalone_image"] or file_type == "image":
+        image_path = (
+            payload.get("local_path")
+            or payload.get("file_path")
+            or payload.get("image_path")
+            or payload.get("source_file")
+        )
+
+        if image_path:
+            image_items.append({
+                "path": image_path,
+                "caption": payload.get("file_name") or Path(str(image_path)).name,
+                "ocr": payload.get("ocr_text") or payload.get("text") or "",
+            })
+
+    # Deduplicate
+    seen = set()
+    clean_items = []
+
+    for item in image_items:
+        image_path = str(item.get("path") or "").strip()
+        if not image_path or image_path in seen:
+            continue
+
+        seen.add(image_path)
+        clean_items.append(item)
+
+    if not clean_items:
+        return
+
+    st.markdown("### Related Images")
+
+    for item in clean_items[:10]:
+        image_path = str(item["path"])
+        caption = item.get("caption") or Path(image_path).name
+
+        try:
+            if Path(image_path).exists():
+                st.image(image_path, caption=caption)
+            else:
+                st.caption(f"Image path not found: {image_path}")
+        except Exception as e:
+            st.caption(f"Could not render image: {image_path} — {e}")
+
+        ocr_text = str(item.get("ocr") or "").strip()
+        if ocr_text:
+            with st.expander(f"OCR / extracted text: {caption}", expanded=False):
+                st.text(ocr_text)
+
 # =========================================================
 # LOGGING
 # =========================================================
@@ -1213,6 +1309,15 @@ with tabs[3]:
                 answer_text = str(result)
                 main_answer = strip_related_articles_from_answer(answer_text)
                 st.markdown(main_answer)
+
+                answer_payload = None
+
+                if isinstance(debug_data, dict):
+                    ranked_points = debug_data.get("ranked_points") or []
+                    if ranked_points:
+                        answer_payload = ranked_points[0].payload or {}
+
+                render_answer_images_from_payload(answer_payload)
 
                 related_titles = st.session_state.ask_related_titles
                 if related_titles:
