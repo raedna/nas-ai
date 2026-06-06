@@ -253,7 +253,7 @@ HALO-005: Ingest exported markdown folder into NAS-AI
 ## Open
 
 - [ Done ] RDR-001: Final rerank debug table shows actual final score, not only semantic score
-- [ ] RDR-002: Add rerank score components/reason to debug output
+- [ Done ] RDR-002: Add rerank score components/reason to debug output
 - [ ] RDR-003: Fix Moore Login query where final reranker promotes Moore To-Do List
 - [ ] RDR-004: Fix lexical-short debug mismatch for "moore login"
 - [ ] RDR-005: Fix duplicate answer output for Moore Login note
