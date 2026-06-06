@@ -258,6 +258,6 @@ HALO-005: Ingest exported markdown folder into NAS-AI
 - [ ] RDR-005: Fix duplicate answer output for Moore Login note
 - [ ] RDR-006: Add doc_type and inferred_doc_type to debug tables
 - [ Done ] RDR-007: Fix Payload Inspector to support sample payloads and non-identifier searches
-- [ ] RDR-008: Fix inline_images_rendered undefined error
-- [ ] RDR-009: Prevent inline images from repeating in Related Images
+- [ Done ] RDR-008: Fix inline_images_rendered undefined error
+- [ Done ] RDR-009: Prevent inline images from repeating in Related Images
 
