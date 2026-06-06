@@ -2095,6 +2095,25 @@ def dedupe_repeated_paragraphs(text):
 
     return "\n\n".join(cleaned).strip()
 
+def dedupe_repeated_source_blocks(text):
+    text = str(text or "").strip()
+    if not text:
+        return ""
+
+    marker = "Source: Obsidian Notes"
+
+    if marker not in text:
+        return text
+
+    first = text.find(marker)
+    second = text.find(marker, first + len(marker))
+
+    if second == -1:
+        return text
+
+    # Keep only the first rendered source block.
+    return text[:second].rstrip()
+
 def synthesize_answer(payload, roles, collection_name):
     if DEBUG:
         print("🔥 SYNTHESIZER V2 ACTIVE")
