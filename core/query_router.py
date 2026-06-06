@@ -2156,7 +2156,10 @@ def synthesize_answer(payload, roles, collection_name):
                 else:
                     lines.append(f"- {e}")
 
-        return "\n".join(lines).strip()
+        answer = "\n\n".join(parts)
+        answer = dedupe_repeated_paragraphs(answer)
+        answer = dedupe_repeated_source_blocks(answer)
+        return answer
 
     labels = get_display_labels(collection_name)
     identifier_label = labels["identifier"]
