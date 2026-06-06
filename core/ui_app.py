@@ -330,13 +330,13 @@ def render_answer_with_inline_images(
                 # OCR was the last thing in the answer
                 pos = len(text)
 
-    tail = text[pos:].strip()
-    if tail:
-        st.markdown(tail)
-
     if not found_marker:
         st.markdown(text)
         return False
+
+    tail = text[pos:].strip()
+    if tail:
+        st.markdown(tail)
 
     return rendered_any_image
 
