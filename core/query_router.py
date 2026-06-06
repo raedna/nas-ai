@@ -27,6 +27,12 @@ from core.crosslink_engine import (
 )
 from core.discovery_engine import run_discovery_with_method, detect_ask_intent
 
+from core.retrieval_debug import (
+    extract_negative_terms,
+    remove_negative_terms_from_question,
+    contains_negative_term,
+)
+
 DEBUG = True
 
 
@@ -210,44 +216,6 @@ def synthesize_relationship_answer(base_payload, related_points, collection_name
 
     return "\n".join(lines)
 
-def extract_negative_terms(question: str):
-    q = normalize_simple_text(question)
-
-    patterns = [
-        r"\bnot\s+([a-z0-9_]+(?:\s+[a-z0-9_]+){0,2})",
-        r"\bexcluding\s+([a-z0-9_]+(?:\s+[a-z0-9_]+){0,2})",
-        r"\bexclude\s+([a-z0-9_]+(?:\s+[a-z0-9_]+){0,2})",
-        r"\bwithout\s+([a-z0-9_]+(?:\s+[a-z0-9_]+){0,2})"
-    ]
-
-    negatives = []
-    for pattern in patterns:
-        negatives.extend(re.findall(pattern, q))
-
-    cleaned = []
-    seen = set()
-
-    for term in negatives:
-        term = normalize_simple_text(term).strip()
-        if not term:
-            continue
-        if term not in seen:
-            seen.add(term)
-            cleaned.append(term)
-
-    return cleaned
-
-def remove_negative_terms_from_question(question: str):
-    q = normalize_simple_text(question)
-
-    q = re.sub(r"\bnot\s+[a-z0-9_]+(?:\s+[a-z0-9_]+){0,2}", " ", q)
-    q = re.sub(r"\bexcluding\s+[a-z0-9_]+(?:\s+[a-z0-9_]+){0,2}", " ", q)
-    q = re.sub(r"\bexclude\s+[a-z0-9_]+(?:\s+[a-z0-9_]+){0,2}", " ", q)
-    q = re.sub(r"\bwithout\s+[a-z0-9_]+(?:\s+[a-z0-9_]+){0,2}", " ", q)
-
-    q = re.sub(r"\s+", " ", q).strip()
-    return q
-
 def fetch_entity_row_exact_title_match(collection, question, limit=10):
     q_norm = normalize_simple_text(question)
 
@@ -271,17 +239,6 @@ def fetch_entity_row_exact_title_match(collection, question, limit=10):
             matches.append(payload)
 
     return matches[:limit]
-
-def contains_negative_term(text: str, negative_terms):
-    text_norm = normalize_simple_text(text)
-
-    for term in negative_terms:
-        if term == text_norm:
-            return True
-        if term in text_norm:
-            return True
-
-    return False
 
 def detect_query_mode(question: str):
     q_norm = normalize_simple_text(question)
