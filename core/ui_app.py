@@ -27,6 +27,7 @@ from core.query_router import route_query, semantic_search, debug_route_query, f
 from core.discovery_engine import detect_ask_intent, run_discovery_with_method
 from core.crosslink_engine import run_comparison_query
 from core.query_helpers import infer_doc_type
+from core.retrieval_debug import score_point_shared_debug
 
 # =========================================================
 # PATHS / CONFIG
