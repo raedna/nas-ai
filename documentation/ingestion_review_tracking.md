@@ -251,12 +251,12 @@ HALO-005: Ingest exported markdown folder into NAS-AI
 
 ## Open
 
-- [ ] RDR-001: Final rerank debug table shows actual final score, not only semantic score
+- [ Done ] RDR-001: Final rerank debug table shows actual final score, not only semantic score
 - [ ] RDR-002: Add rerank score components/reason to debug output
 - [ ] RDR-003: Fix Moore Login query where final reranker promotes Moore To-Do List
 - [ ] RDR-004: Fix lexical-short debug mismatch for "moore login"
 - [ ] RDR-005: Fix duplicate answer output for Moore Login note
-- [ ] RDR-006: Add doc_type and inferred_doc_type to debug tables
+- [ Done ] RDR-006: Add doc_type and inferred_doc_type to debug tables
 - [ Done ] RDR-007: Fix Payload Inspector to support sample payloads and non-identifier searches
 - [ Done ] RDR-008: Fix inline_images_rendered undefined error
 - [ Done ] RDR-009: Prevent inline images from repeating in Related Images
