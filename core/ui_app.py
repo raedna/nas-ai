@@ -1196,10 +1196,39 @@ with tabs[2]:
                 key="validation_payload_collection"
             )
 
-            identifier_to_inspect = st.text_input(
-                "Identifier to inspect",
-                value="22",
-                key="validation_payload_identifier"
+            inspect_mode = st.selectbox(
+                "Inspector mode",
+                [
+                    "Sample payloads",
+                    "Identifier exact match",
+                    "Contains text / name / source",
+                ],
+                key="validation_payload_inspect_mode"
+            )
+
+            inspect_query = ""
+
+            if inspect_mode == "Identifier exact match":
+                inspect_query = st.text_input(
+                    "Identifier to inspect",
+                    value="",
+                    key="validation_payload_identifier"
+                )
+
+            elif inspect_mode == "Contains text / name / source":
+                inspect_query = st.text_input(
+                    "Search text",
+                    value="",
+                    key="validation_payload_search_text"
+                )
+
+            inspect_limit = st.number_input(
+                "Max payloads to inspect",
+                min_value=1,
+                max_value=500,
+                value=25,
+                step=1,
+                key="validation_payload_inspect_limit"
             )
 
             if st.button("Inspect payloads", key="validation_inspect_payloads"):
@@ -1209,27 +1238,81 @@ with tabs[2]:
 
                     qclient = QdrantClient(url=qdrant_url)
 
-                    points, _ = qclient.scroll(
-                        collection_name=validation_collection,
-                        scroll_filter=Filter(
-                            must=[
-                                FieldCondition(
-                                    key="identifier",
-                                    match=MatchValue(value=str(identifier_to_inspect).strip())
-                                )
-                            ]
-                        ),
-                        limit=100,
-                        with_payload=True,
-                        with_vectors=False
-                    )
+                    points = []
+
+                    if inspect_mode == "Identifier exact match":
+                        identifier_value = str(inspect_query or "").strip()
+
+                        if not identifier_value:
+                            st.warning("Enter an identifier, or choose Sample payloads.")
+                        else:
+                            points, _ = qclient.scroll(
+                                collection_name=validation_collection,
+                                scroll_filter=Filter(
+                                    must=[
+                                        FieldCondition(
+                                            key="identifier",
+                                            match=MatchValue(value=identifier_value)
+                                        )
+                                    ]
+                                ),
+                                limit=int(inspect_limit),
+                                with_payload=True,
+                                with_vectors=False
+                            )
+
+                    elif inspect_mode == "Sample payloads":
+                        points, _ = qclient.scroll(
+                            collection_name=validation_collection,
+                            limit=int(inspect_limit),
+                            with_payload=True,
+                            with_vectors=False
+                        )
+
+                    else:
+                        query = str(inspect_query or "").strip().lower()
+
+                        if not query:
+                            st.warning("Enter search text, or choose Sample payloads.")
+                        else:
+                            scanned_points, _ = qclient.scroll(
+                                collection_name=validation_collection,
+                                limit=5000,
+                                with_payload=True,
+                                with_vectors=False
+                            )
+
+                            for p in scanned_points:
+                                payload = p.payload or {}
+
+                                searchable = " ".join(
+                                    str(payload.get(k) or "")
+                                    for k in [
+                                        "identifier",
+                                        "identifier_field",
+                                        "identifier_namespace",
+                                        "primary_name",
+                                        "description",
+                                        "text",
+                                        "source_file",
+                                        "file_name",
+                                        "file_path",
+                                        "doc_type",
+                                        "source_type",
+                                    ]
+                                ).lower()
+
+                                if query in searchable:
+                                    points.append(p)
+
+                                if len(points) >= int(inspect_limit):
+                                    break
 
                     rows = []
 
                     for p in points:
                         payload = p.payload or {}
                         enum_values = payload.get("enum_values") or []
-
                         link_keys = payload.get("link_keys") or []
                         related_link_keys = payload.get("related_link_keys") or []
 
@@ -1237,14 +1320,15 @@ with tabs[2]:
                             "identifier": payload.get("identifier"),
                             "identifier_field": payload.get("identifier_field"),
                             "identifier_namespace": payload.get("identifier_namespace"),
-                            "structured_subtype": payload.get("structured_subtype"),
                             "primary_name": payload.get("primary_name"),
                             "doc_type": payload.get("doc_type"),
+                            "source_type": payload.get("source_type"),
+                            "source_file": payload.get("source_file"),
+                            "file_path": payload.get("file_path"),
                             "enum_count": len(enum_values) if isinstance(enum_values, list) else 0,
                             "link_keys": ", ".join(link_keys) if isinstance(link_keys, list) else str(link_keys),
                             "related_link_keys": ", ".join(related_link_keys) if isinstance(related_link_keys, list) else str(related_link_keys),
-                            "source_file": payload.get("source_file"),
-                            "ingest_source": payload.get("ingest_source"),
+                            "preview": str(payload.get("description") or payload.get("text") or "")[:300],
                         })
 
                     if rows:
@@ -1256,7 +1340,7 @@ with tabs[2]:
                                 st.markdown(f"#### Payload {i}")
                                 st.json(p.payload or {})
                     else:
-                        st.warning("No payloads found for that identifier.")
+                        st.warning("No payloads found.")
 
                 except Exception as e:
                     st.exception(e)
