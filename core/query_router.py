@@ -2181,6 +2181,32 @@ def dedupe_repeated_answer_body(text):
 
     return text
 
+def dedupe_repeated_text_halves(text):
+    text = str(text or "").strip()
+    if not text:
+        return ""
+
+    paragraphs = [p.strip() for p in text.split("\n\n") if p.strip()]
+
+    if len(paragraphs) < 4:
+        return text
+
+    n = len(paragraphs)
+
+    # Look for repeated first block later in the answer.
+    for split_at in range(1, n):
+        first_block = "\n\n".join(paragraphs[:split_at])
+        remaining = "\n\n".join(paragraphs[split_at:])
+
+        first_norm = normalize_simple_text(first_block)
+        remaining_norm = normalize_simple_text(remaining)
+
+        # If the answer body starts again later, keep only the first copy.
+        if first_norm and len(first_norm) > 80 and remaining_norm.startswith(first_norm[:300]):
+            return first_block.strip()
+
+    return text
+
 def synthesize_answer(payload, roles, collection_name):
     if DEBUG:
         print("🔥 SYNTHESIZER V2 ACTIVE")
@@ -2324,6 +2350,7 @@ def synthesize_answer(payload, roles, collection_name):
 
         desc_text = str(description or payload.get("text") or "").strip()
         desc_text = dedupe_repeated_paragraphs(desc_text)
+        desc_text = dedupe_repeated_text_halves(desc_text)
 
         if desc_text:
             lines = [ln.rstrip() for ln in desc_text.splitlines()]
