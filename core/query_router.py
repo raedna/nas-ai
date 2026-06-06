@@ -1348,10 +1348,35 @@ def rerank_points(points, question):
     return sorted(points, key=lambda p: score_point_shared(p, question), reverse=True)
 
 def debug_route_query(collection, question, limit=25):
+    method_info = detect_query_mode(question)
+
+    if method_info.get("mode") == "lexical_short":
+        lexical_short_items = lexical_short_query_search(
+            collection,
+            question,
+            limit=limit
+        )
+
+        return {
+            "debug_method": "lexical_short",
+            "debug_reason": method_info.get("reason"),
+            "lexical_short_items": lexical_short_items,
+
+            # Keep generic keys present so UI does not break.
+            "semantic_points": [],
+            "lexical_chunk_points": [],
+            "lexical_structured_points": [],
+            "merged_points": [],
+            "ranked_points": [],
+            "final_result": None,
+        }
+
     candidate_sets = build_candidate_points(collection, question, limit=limit)
     ranked_points = rerank_points(candidate_sets["merged_points"], question)
 
     return {
+        "debug_method": method_info.get("mode"),
+        "debug_reason": method_info.get("reason"),
         "semantic_points": candidate_sets["semantic_points"],
         "lexical_chunk_points": candidate_sets["lexical_chunk_points"],
         "lexical_structured_points": candidate_sets["lexical_structured_points"],
