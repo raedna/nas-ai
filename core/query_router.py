@@ -1639,6 +1639,27 @@ def build_fuller_doc_payload(collection, best_payload):
                     if abs(cid - best_chunk_id) <= 1:
                         selected.append(payload)
 
+    deduped_selected = []
+    seen_chunk_keys = set()
+
+    for payload in selected:
+        text = str(payload.get("text") or payload.get("description") or "").strip()
+        text_key = normalize_simple_text(text)
+
+        chunk_key = (
+            payload.get("source_file"),
+            payload.get("chunk_id"),
+            text_key[:500],
+        )
+
+        if chunk_key in seen_chunk_keys:
+            continue
+
+        seen_chunk_keys.add(chunk_key)
+        deduped_selected.append(payload)
+
+    selected = deduped_selected
+
     if not selected:
         selected = [best_payload]
 
@@ -2100,19 +2121,40 @@ def dedupe_repeated_source_blocks(text):
     if not text:
         return ""
 
-    marker = "Source: Obsidian Notes"
+    markers = [
+        "Source: Obsidian Notes",
+        "Source: Obsidian",
+        "Source:",
+    ]
 
-    if marker not in text:
+    first_marker = None
+    first_pos = -1
+
+    for marker in markers:
+        pos = text.find(marker)
+        if pos != -1 and (first_pos == -1 or pos < first_pos):
+            first_pos = pos
+            first_marker = marker
+
+    if first_pos == -1:
         return text
 
-    first = text.find(marker)
-    second = text.find(marker, first + len(marker))
+    # Find the next Source marker after the first one.
+    search_start = first_pos + len(first_marker)
 
-    if second == -1:
+    next_positions = []
+    for marker in markers:
+        pos = text.find(marker, search_start)
+        if pos != -1:
+            next_positions.append(pos)
+
+    if not next_positions:
         return text
 
-    # Keep only the first rendered source block.
-    return text[:second].rstrip()
+    second_pos = min(next_positions)
+
+    # Keep only content before the repeated source block.
+    return text[:second_pos].rstrip()
 
 def synthesize_answer(payload, roles, collection_name):
     if DEBUG:
