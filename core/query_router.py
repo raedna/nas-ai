@@ -1601,9 +1601,8 @@ def build_fuller_doc_payload(collection, best_payload):
     source_file_lower = str(source_file or "").lower()
 
     is_markdown_note = source_file_lower.endswith(".md")
-    is_procedural_doc = doc_type == "procedural"
-
-    include_full_note = is_markdown_note or is_procedural_doc
+    is_full_note_doc = doc_type in {"procedural", "reference", "mixed"}
+    include_full_note = is_markdown_note or is_full_note_doc
 
     selected = []
 
