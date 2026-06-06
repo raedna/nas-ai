@@ -1833,6 +1833,45 @@ with tabs[3]:
                         "Semantic/rerank debug panels were not used for this answer."
                     )
 
+                elif selected_method == "lexical_short" and debug_data:
+                    st.info(
+                        "Final answer was produced by lexical_short. "
+                        "The semantic/rerank debug panels are not used for this answer path."
+                    )
+
+                    with st.expander("Lexical Short Candidates", expanded=True):
+                        lexical_items = debug_data.get("lexical_short_items") or []
+
+                        if lexical_items:
+                            rows = []
+
+                            for i, item in enumerate(lexical_items, start=1):
+                                payload = item.get("payload") or {}
+
+                                preview_text = (
+                                    payload.get("text")
+                                    or payload.get("description")
+                                    or ""
+                                )
+                                preview_text = str(preview_text).strip().replace("\n", " ")
+                                preview_text = preview_text[:300]
+
+                                rows.append({
+                                    "rank": i,
+                                    "lexical_short_score": item.get("score"),
+                                    "identifier": item.get("identifier") or payload.get("identifier"),
+                                    "primary_name": item.get("primary_name") or payload.get("primary_name"),
+                                    "doc_type": payload.get("doc_type"),
+                                    "inferred_doc_type": infer_doc_type(payload),
+                                    "source_type": payload.get("source_type"),
+                                    "source_file": payload.get("source_file"),
+                                    "preview": preview_text,
+                                })
+
+                            st.dataframe(rows, width="stretch")
+                        else:
+                            st.info("No lexical_short candidates were returned.")
+
                 elif debug_data:
 
                     with st.expander("Semantic Candidates", expanded=True):
