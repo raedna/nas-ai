@@ -2116,97 +2116,6 @@ def dedupe_repeated_paragraphs(text):
 
     return "\n\n".join(cleaned).strip()
 
-def dedupe_repeated_source_blocks(text):
-    text = str(text or "").strip()
-    if not text:
-        return ""
-
-    markers = [
-        "Source: Obsidian Notes",
-        "Source: Obsidian",
-        "Source:",
-    ]
-
-    first_marker = None
-    first_pos = -1
-
-    for marker in markers:
-        pos = text.find(marker)
-        if pos != -1 and (first_pos == -1 or pos < first_pos):
-            first_pos = pos
-            first_marker = marker
-
-    if first_pos == -1:
-        return text
-
-    # Find the next Source marker after the first one.
-    search_start = first_pos + len(first_marker)
-
-    next_positions = []
-    for marker in markers:
-        pos = text.find(marker, search_start)
-        if pos != -1:
-            next_positions.append(pos)
-
-    if not next_positions:
-        return text
-
-    second_pos = min(next_positions)
-
-    # Keep only content before the repeated source block.
-    return text[:second_pos].rstrip()
-
-def dedupe_repeated_answer_body(text):
-    text = str(text or "").strip()
-    if not text:
-        return ""
-
-    marker = "Source:"
-
-    # Case seen in Moore Login:
-    # body
-    # Source: ...
-    # same body again
-    if marker in text:
-        before_source, after_source = text.split(marker, 1)
-
-        before_norm = normalize_simple_text(before_source)
-        after_norm = normalize_simple_text(after_source)
-
-        # If the first body appears again after Source, keep first body + Source line only.
-        # This avoids repeating the full note.
-        if before_norm and before_norm[:300] in after_norm:
-            source_line = marker + after_source.splitlines()[0]
-            return before_source.rstrip() + "\n\n" + source_line.strip()
-
-    return text
-
-def dedupe_repeated_text_halves(text):
-    text = str(text or "").strip()
-    if not text:
-        return ""
-
-    paragraphs = [p.strip() for p in text.split("\n\n") if p.strip()]
-
-    if len(paragraphs) < 4:
-        return text
-
-    n = len(paragraphs)
-
-    # Look for repeated first block later in the answer.
-    for split_at in range(1, n):
-        first_block = "\n\n".join(paragraphs[:split_at])
-        remaining = "\n\n".join(paragraphs[split_at:])
-
-        first_norm = normalize_simple_text(first_block)
-        remaining_norm = normalize_simple_text(remaining)
-
-        # If the answer body starts again later, keep only the first copy.
-        if first_norm and len(first_norm) > 80 and remaining_norm.startswith(first_norm[:300]):
-            return first_block.strip()
-
-    return text
-
 def synthesize_answer(payload, roles, collection_name):
     if DEBUG:
         print("🔥 SYNTHESIZER V2 ACTIVE")
@@ -2251,8 +2160,6 @@ def synthesize_answer(payload, roles, collection_name):
 
         answer = "\n\n".join(lines)
         answer = dedupe_repeated_paragraphs(answer)
-        answer = dedupe_repeated_answer_body(answer)
-        answer = dedupe_repeated_source_blocks(answer)
         return answer
 
     labels = get_display_labels(collection_name)
@@ -2350,12 +2257,6 @@ def synthesize_answer(payload, roles, collection_name):
 
         desc_text = str(description or payload.get("text") or "").strip()
         desc_text = dedupe_repeated_paragraphs(desc_text)
-        desc_text = dedupe_repeated_text_halves(desc_text)
-
-        if "Moore Login" in desc_text:
-            print("DESC_TEXT_START")
-            print(desc_text[:3000])
-            print("DESC_TEXT_END")
 
         if desc_text:
             lines = [ln.rstrip() for ln in desc_text.splitlines()]
@@ -2408,8 +2309,6 @@ def synthesize_answer(payload, roles, collection_name):
 
         answer = "\n\n".join(parts) if parts else "No answer found."
         answer = dedupe_repeated_paragraphs(answer)
-        answer = dedupe_repeated_answer_body(answer)
-        answer = dedupe_repeated_source_blocks(answer)
         return answer
 
     # =========================
