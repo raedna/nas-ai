@@ -1643,7 +1643,7 @@ def build_fuller_doc_payload(collection, best_payload):
     seen_chunk_keys = set()
 
     for payload in selected:
-        text = str(payload.get("text") or payload.get("description") or "").strip()
+        text = str(payload.get("description") or payload.get("text") or "").strip()
         text_key = normalize_simple_text(text)
 
         chunk_key = (
@@ -1684,7 +1684,7 @@ def build_fuller_doc_payload(collection, best_payload):
 
     for payload in selected:
         heading = str(payload.get("section_heading") or "").strip()
-        text = str(payload.get("text") or payload.get("description") or "").strip()
+        text = str(payload.get("description") or payload.get("text") or "").strip()
         for image_path in payload.get("embedded_image_paths") or []:
             image_path = str(image_path).strip()
             if image_path and image_path not in seen_image_paths:
