@@ -16,8 +16,24 @@ def infer_doc_type(payload):
     primary_name = payload.get("primary_name")
     enum_values = payload.get("enum_values")
 
-    # infer structured rows like FIX/XML/BBG entries
-    if identifier not in [None, ""] and primary_name not in [None, ""]:
+    # infer structured rows only when there is a clear structured parser/source signal
+    source_type = str(payload.get("source_type") or "").strip().lower()
+    parser_type = str(payload.get("parser_type") or "").strip().lower()
+    collection_type = str(payload.get("collection_type") or "").strip().lower()
+    content_type = str(payload.get("content_type") or "").strip().lower()
+
+    structured_signal = " ".join([
+        source_type,
+        parser_type,
+        collection_type,
+        content_type,
+    ])
+
+    if (
+        identifier not in [None, ""]
+        and primary_name not in [None, ""]
+        and any(x in structured_signal for x in ["fix", "xml", "csv", "structured", "schema", "bbg"])
+    ):
         return "structured"
 
     if enum_values:
