@@ -2223,7 +2223,7 @@ def synthesize_answer(payload, roles, collection_name):
                 else:
                     lines.append(f"- {e}")
 
-        answer = "\n\n".join(parts)
+        answer = "\n\n".join(lines)
         answer = dedupe_repeated_paragraphs(answer)
         answer = dedupe_repeated_answer_body(answer)
         answer = dedupe_repeated_source_blocks(answer)
@@ -2374,7 +2374,11 @@ def synthesize_answer(payload, roles, collection_name):
             related_preview = "\n".join(f"- {t}" for t in related_titles[:5])
             parts.append(f"Related notes:\n{related_preview}")
 
-        return "\n\n".join(parts) if parts else "No answer found."
+        answer = "\n\n".join(parts) if parts else "No answer found."
+        answer = dedupe_repeated_paragraphs(answer)
+        answer = dedupe_repeated_answer_body(answer)
+        answer = dedupe_repeated_source_blocks(answer)
+        return answer
 
     # =========================
     # 5. IMAGE STYLE
