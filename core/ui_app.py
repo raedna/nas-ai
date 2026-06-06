@@ -266,6 +266,7 @@ def render_answer_with_inline_images(
 
     pos = 0
     found_marker = False
+    rendered_any_image = False
 
     for match in re.finditer(pattern, text):
         found_marker = True
@@ -285,6 +286,7 @@ def render_answer_with_inline_images(
             try:
                 if Path(image_path).exists():
                     st.image(image_path, caption=caption)
+                    rendered_any_image = True
                 else:
                     st.caption(f"Image path not found: {image_path}")
             except Exception as e:
@@ -332,6 +334,9 @@ def render_answer_with_inline_images(
 
     if not found_marker:
         st.markdown(text)
+        return False
+
+    return rendered_any_image
 
 def resolve_image_payloads_from_related_titles(collection_name, qdrant_url, related_titles, limit=5000):
     if not collection_name or not qdrant_url or not related_titles:
@@ -1649,7 +1654,9 @@ with tabs[3]:
                         related_titles=answer_payload.get("related_titles") or [],
                     )
 
-                render_answer_with_inline_images(
+                inline_images_rendered = False
+
+                inline_images_rendered = render_answer_with_inline_images(
                     main_answer,
                     image_items=source_image_items,
                     show_images=show_answer_images,
