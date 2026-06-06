@@ -12,6 +12,7 @@
   "doc_type": {
     "structured": "Structured source",
     "entity_row": "Entity record",
-    "procedural": "Procedure"
+    "procedural": "Procedure",
+    "reference": "Reference"
   }
 }
