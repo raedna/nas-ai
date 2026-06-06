@@ -23,7 +23,7 @@ from datetime import datetime
 import requests
 import streamlit as st
 from core.ingest_collection import ingest_collection
-from core.query_router import route_query, semantic_search, debug_route_query, fetch_entity_row_by_title, run_query_with_method, get_display_labels, explain_query_routing
+from core.query_router import route_query, semantic_search, debug_route_query, fetch_entity_row_by_title, run_query_with_method, get_display_labels, explain_query_routing, score_point_shared
 from core.discovery_engine import detect_ask_intent, run_discovery_with_method
 from core.crosslink_engine import run_comparison_query
 
@@ -1773,10 +1773,13 @@ with tabs[3]:
 
                         rows.append({
                             "rank": i,
+                            "semantic_score": getattr(p, "score", None),
+                            "final_rerank_score": score_point_shared(p, question),
                             "score": getattr(p, "score", None),
                             "identifier": payload.get("identifier"),
                             "primary_name": payload.get("primary_name"),
                             "doc_type": payload.get("doc_type"),
+                            "inferred_doc_type": infer_doc_type(payload),
                             "source_type": payload.get("source_type"),
                             "source_file": payload.get("source_file"),
                             "page_num": payload.get("page_num"),
@@ -1860,9 +1863,11 @@ with tabs[3]:
                             ranked_rows.append({
                                 "rank": i,
                                 "semantic_score": getattr(p, "score", None),
+                                "final_rerank_score": score_point_shared(p, question),
                                 "identifier": payload.get("identifier"),
                                 "primary_name": payload.get("primary_name"),
                                 "doc_type": payload.get("doc_type"),
+                                "inferred_doc_type": infer_doc_type(payload),
                                 "source_type": payload.get("source_type"),
                                 "source_file": payload.get("source_file"),
                                 "page_num": payload.get("page_num"),
