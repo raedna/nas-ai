@@ -1684,7 +1684,7 @@ def build_fuller_doc_payload(collection, best_payload):
 
     for payload in selected:
         heading = str(payload.get("section_heading") or "").strip()
-        text = str(payload.get("description") or payload.get("text") or "").strip()
+        text = str(payload.get("text") or payload.get("description") or "").strip()
         for image_path in payload.get("embedded_image_paths") or []:
             image_path = str(image_path).strip()
             if image_path and image_path not in seen_image_paths:
@@ -2156,6 +2156,31 @@ def dedupe_repeated_source_blocks(text):
     # Keep only content before the repeated source block.
     return text[:second_pos].rstrip()
 
+def dedupe_repeated_answer_body(text):
+    text = str(text or "").strip()
+    if not text:
+        return ""
+
+    marker = "Source:"
+
+    # Case seen in Moore Login:
+    # body
+    # Source: ...
+    # same body again
+    if marker in text:
+        before_source, after_source = text.split(marker, 1)
+
+        before_norm = normalize_simple_text(before_source)
+        after_norm = normalize_simple_text(after_source)
+
+        # If the first body appears again after Source, keep first body + Source line only.
+        # This avoids repeating the full note.
+        if before_norm and before_norm[:300] in after_norm:
+            source_line = marker + after_source.splitlines()[0]
+            return before_source.rstrip() + "\n\n" + source_line.strip()
+
+    return text
+
 def synthesize_answer(payload, roles, collection_name):
     if DEBUG:
         print("🔥 SYNTHESIZER V2 ACTIVE")
@@ -2200,6 +2225,7 @@ def synthesize_answer(payload, roles, collection_name):
 
         answer = "\n\n".join(parts)
         answer = dedupe_repeated_paragraphs(answer)
+        answer = dedupe_repeated_answer_body(answer)
         answer = dedupe_repeated_source_blocks(answer)
         return answer
 
