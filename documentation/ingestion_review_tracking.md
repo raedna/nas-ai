@@ -261,4 +261,6 @@ HALO-005: Ingest exported markdown folder into NAS-AI
 - [ Done ] RDR-007: Fix Payload Inspector to support sample payloads and non-identifier searches
 - [ Done ] RDR-008: Fix inline_images_rendered undefined error
 - [ Done ] RDR-009: Prevent inline images from repeating in Related Images
+| RDR-010 | Split retrieval debug helpers from query_router | query_router.py is accumulating routing, reranking, answer assembly, and debug explanation logic, making fixes risky. | Create core/retrieval_debug.py for score component explanation and debug row construction, while keeping actual retrieval/routing behavior unchanged. | High | Done |
+
 
