@@ -4,6 +4,7 @@ from docx import Document
 from IMAGES.image_parser import parse_image
 import io
 from PIL import Image
+from DOCS.doc_detector import detect_doc_type
 
 try:
     import pytesseract
@@ -479,8 +480,11 @@ def parse_doc(file_path, template_config=None):
         "block_count": len(blocks)
     }
 
+    result["doc_type"] = detect_doc_type(result)
+
     if DEBUG:
         print(f"[DOC PARSER] Loaded {result['block_count']} blocks from {result['source_file']}")
+        print(f"[DOC PARSER] doc_type: {result.get('doc_type')}")
         print(f"[DOCX IMAGE OCR] Extracted {len(blocks)} OCR image blocks from {path.name}")
         if blocks:
             print(f"[DOC PARSER] First block type: {blocks[0]['block_type']}")
