@@ -2352,6 +2352,11 @@ def synthesize_answer(payload, roles, collection_name):
         desc_text = dedupe_repeated_paragraphs(desc_text)
         desc_text = dedupe_repeated_text_halves(desc_text)
 
+        if "Moore Login" in desc_text:
+            print("DESC_TEXT_START")
+            print(desc_text[:3000])
+            print("DESC_TEXT_END")
+
         if desc_text:
             lines = [ln.rstrip() for ln in desc_text.splitlines()]
 
