@@ -89,7 +89,7 @@ Status values:
 	DOC-014a: Confirm final answer text still contains image markers internally.
 	DOC-014b: Build render_answer_with_inline_images().
 	DOC-014c: Replace st.markdown(main_answer) with inline renderer for doc answers only.
-| DOC-015 | Procedural doc classification misses how-to notes | Some operational/how-to notes such as Moore Login are classified as narrative instead of procedural, which affects reranking, answer assembly, and debug interpretation. | Improve doc_type detection for Markdown/Obsidian notes using title, headings, action verbs, numbered/bullet steps, login/access keywords, and command/path patterns. Validate against Moore Login and Recon procedure notes. | High | Not Started |
+| DOC-015 | Procedural doc classification misses how-to notes | Some operational/how-to notes such as Moore Login are classified as narrative instead of procedural, which affects reranking, answer assembly, and debug interpretation. | Improve doc_type detection for Markdown/Obsidian notes using title, headings, action verbs, numbered/bullet steps, login/access keywords, and command/path patterns. Validate against Moore Login and Recon procedure notes. | High | Done |
 
 ---
 
