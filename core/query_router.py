@@ -1113,6 +1113,11 @@ def score_point_shared(p, question):
     negative_terms = extract_negative_terms(q)
 
     payload = p.payload or {}
+    base_score = getattr(p, "score", None)
+    if base_score is None:
+        base_score = 0.0
+
+    base_score = float(base_score)
 
     name = str(payload.get("primary_name") or "").lower()
     desc = str(payload.get("description") or "").lower()
@@ -1206,7 +1211,40 @@ def score_point_shared(p, question):
             if contains_negative_term(desc, negative_terms):
                 score -= 20.0
 
+    if is_document_like_payload(payload):
+        adjustment = score - base_score
+
+        # For documents, rerank is only allowed to nudge semantic ranking.
+        if adjustment > 0.75:
+            adjustment = 0.75
+        elif adjustment < -2.0:
+            adjustment = -2.0
+
+        return base_score + adjustment
+
     return score
+
+def is_document_like_payload(payload):
+    payload = payload or {}
+
+    doc_type = str(payload.get("doc_type") or "").lower()
+    source_type = str(payload.get("source_type") or "").lower()
+    point_type = str(payload.get("point_type") or payload.get("type") or "").lower()
+    file_type = str(payload.get("file_type") or payload.get("filetype") or "").lower()
+
+    if doc_type in {"procedural", "reference", "mixed", "narrative"}:
+        return True
+
+    if source_type in {"doc", "pdf"}:
+        return True
+
+    if point_type in {"doc_chunk", "pdf_chunk"}:
+        return True
+
+    if file_type in {"doc", "docx", "md", "txt", "rtf", "pdf"}:
+        return True
+
+    return False
 
 def dedupe_entity_row_points(points):
     deduped = []
