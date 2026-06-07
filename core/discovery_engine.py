@@ -26,6 +26,15 @@ def _matches_any_term(q, terms):
             return True
     return False
 
+def _matches_any_phrase(q, phrases):
+    q = normalize_simple_text(q)
+
+    for phrase in phrases or []:
+        phrase_norm = normalize_simple_text(phrase)
+        if phrase_norm and phrase_norm in q:
+            return True
+
+    return False
 
 def detect_ask_intent(question: str):
     q = normalize_simple_text(question)
@@ -35,6 +44,20 @@ def detect_ask_intent(question: str):
         return {"mode": "answer", "reason": "empty query"}
 
     hints = load_doc_query_hints()
+
+    intent_routing = hints.get("intent_routing", {})
+
+    if _matches_any_phrase(q, intent_routing.get("answer_patterns", [])):
+        return {
+            "mode": "answer",
+            "reason": "answer-pattern override",
+        }
+
+    if _matches_any_phrase(q, intent_routing.get("discovery_patterns", [])):
+        return {
+            "mode": "discovery_list",
+            "reason": "discovery-pattern override",
+        }
 
     intent_rules = [
         {
@@ -71,6 +94,16 @@ def detect_ask_intent(question: str):
             continue
 
         if _matches_any_term(q, hints.get(rule["terms_key"], [])):
+            if rule["mode"] == "discovery_list":
+                ambiguous_terms = intent_routing.get("ambiguous_discovery_terms", [])
+
+                # Do not let ambiguous terms like "find" trigger discovery by themselves.
+                if _matches_any_term(q, ambiguous_terms):
+                    return {
+                        "mode": "answer",
+                        "reason": "ambiguous discovery term treated as answer",
+                    }
+
             return {
                 "mode": rule["mode"],
                 "reason": rule["reason"],
