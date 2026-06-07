@@ -303,6 +303,12 @@ def lexical_short_query_search(collection, question, limit=25):
         desc_norm = normalize_simple_text(description)
         combined = f"{name_norm} {desc_norm}"
 
+        if q_norm == "hprof" and "case sensitivity" in name_norm:
+            print("LEXICAL DEBUG - CASE SENSITIVITY")
+            print("name_norm:", name_norm)
+            print("contains hprof:", contains_token_or_phrase(combined, "hprof"))
+            print("combined preview:", combined[:1000])
+
         if len(words) == 1 and not contains_token_or_phrase(combined, words[0]):
             continue
 
@@ -2022,6 +2028,12 @@ def route_query(collection, question, mode="best", limit=25):
         exact_title_matches = fetch_entity_row_exact_title_match(collection, question, limit=1)
         if exact_title_matches:
             return synthesize_answer(exact_title_matches[0], roles, collection)
+
+    if query_mode["mode"] == "lexical_short":
+        words = [w for w in normalize_simple_text(question).split() if w]
+
+        if len(words) == 1:
+            return f"No exact match found for '{question}'."
 
     top_payload = points[0].payload or {}
     top_doc_type = infer_doc_type(top_payload)
