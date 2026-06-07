@@ -174,7 +174,7 @@ Status values:
 | RET-012 | Procedural answer formatting | KB/procedural answers retrieve correctly, but step-by-step content can be returned as dense paragraphs with missing line breaks. | Preserve or reconstruct procedural formatting using sentence/step splitting, bullets, and source section headings during answer synthesis. | Medium | Not Started |
 | RET-013 | Final answer/debug path mismatch | Final rerank could show the correct note as top candidate, but the final answer came from a different payload because chunked doc answer selection used a separate picker before rerank. | Updated chunked doc answer path to use the reranked top candidate before building the fuller doc payload. Monitor remaining doc completeness cases separately. | Critical | Done |
 | RET-014 | Discovery intent too sensitive to “find” | Questions using “find” can route to discovery_list even when the user is asking a procedural/how-to question, e.g. “how to find recon PB files on server.” | Refine detect_ask_intent() so discovery only triggers for explicit list/count/explore patterns, while how/where/what/find procedural questions stay in answer/semantic mode. | High | Not Started |
-
+- [x] RET-016: Bound final rerank for document chunks
 ---
 
 ## 11. Discovery harcoding fix
@@ -254,7 +254,7 @@ HALO-005: Ingest exported markdown folder into NAS-AI
 
 - [ Done ] RDR-001: Final rerank debug table shows actual final score, not only semantic score
 - [ Done ] RDR-002: Add rerank score components/reason to debug output
-- [ ] RDR-003: Fix Moore Login query where final reranker promotes Moore To-Do List
+- [ Done ] RDR-003: Fix Moore Login query where final reranker promotes Moore To-Do List
 - [ Done ] RDR-004: Fix lexical-short debug mismatch for "moore login"
 - [ Done ] RDR-005: Fix duplicate answer output for Moore Login note
 - [ Done ] RDR-006: Add doc_type and inferred_doc_type to debug tables
