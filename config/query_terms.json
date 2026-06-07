@@ -13,3 +13,36 @@
     "errors"
   ]
 }
+{
+  "intent_routing": {
+    "answer_patterns": [
+      "how to find",
+      "where to find",
+      "what to find",
+      "how do i find",
+      "where do i find",
+      "where can i find",
+      "how can i find"
+    ],
+    "discovery_patterns": [
+      "list notes",
+      "show notes",
+      "show me notes",
+      "list documents",
+      "show documents",
+      "find all notes",
+      "find all documents",
+      "what notes",
+      "what documents",
+      "available notes",
+      "what do i have about"
+    ],
+    "discovery_verbs": [
+      "list",
+      "show"
+    ],
+    "ambiguous_verbs": [
+      "find"
+    ]
+  }
+}
