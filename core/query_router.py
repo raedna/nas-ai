@@ -291,12 +291,6 @@ def lexical_short_query_search(collection, question, limit=25):
         with_vectors=False
     )
 
-    print("LEXICAL SCANNED POINTS:", len(points))
-    print("LEXICAL HPROF SEEN:", any(
-        "hprof" in normalize_simple_text((p.payload or {}).get("primary_name") or "")
-        for p in points
-    ))
-
     scored = []
 
     for p in points:
