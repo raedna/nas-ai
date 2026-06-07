@@ -54,8 +54,6 @@ def detect_ask_intent(question: str):
     query_terms_cfg = load_query_terms()
     intent_routing = query_terms_cfg.get("intent_routing", {})
 
-    intent_routing = hints.get("intent_routing", {})
-
     if _matches_any_phrase(q, intent_routing.get("answer_patterns", [])):
         return {
             "mode": "answer",
