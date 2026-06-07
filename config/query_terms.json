@@ -11,9 +11,7 @@
     "issues",
     "error",
     "errors"
-  ]
-}
-{
+  ],
   "intent_routing": {
     "answer_patterns": [
       "how to find",
@@ -42,6 +40,9 @@
       "show"
     ],
     "ambiguous_verbs": [
+      "find"
+    ],
+    "ambiguous_discovery_terms": [
       "find"
     ]
   }
