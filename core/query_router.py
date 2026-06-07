@@ -33,6 +33,11 @@ from core.retrieval_debug import (
     contains_negative_term,
 )
 
+from pathlib import Path
+import json
+
+import re
+
 DEBUG = True
 
 
@@ -56,11 +61,6 @@ from core.system_config import load_system_config
 
 cfg = load_system_config()
 client = QdrantClient(url=cfg["qdrant_url"])
-
-from pathlib import Path
-import json
-
-import re
 
 def looks_like_reverse_enum_query(question: str):
     q = normalize_simple_text(question)
@@ -263,6 +263,20 @@ def detect_query_mode(question: str):
         "reason": "query is sentence-like or longer than 2 words"
     }
 
+def contains_token_or_phrase(text_norm, query_norm):
+    text_norm = normalize_simple_text(text_norm)
+    query_norm = normalize_simple_text(query_norm)
+
+    if not text_norm or not query_norm:
+        return False
+
+    # Multi-word phrase: require exact normalized phrase with word boundaries.
+    if " " in query_norm:
+        return re.search(rf"\b{re.escape(query_norm)}\b", text_norm) is not None
+
+    # Single word: require exact token, not substring.
+    return re.search(rf"\b{re.escape(query_norm)}\b", text_norm) is not None
+
 def lexical_short_query_search(collection, question, limit=25):
     q_norm = normalize_simple_text(question)
     if not q_norm:
@@ -289,22 +303,25 @@ def lexical_short_query_search(collection, question, limit=25):
         desc_norm = normalize_simple_text(description)
         combined = f"{name_norm} {desc_norm}"
 
+        if len(words) == 1 and not contains_token_or_phrase(combined, words[0]):
+            continue
+
         score = 0.0
 
         if q_norm == name_norm:
             score += 100.0
-        elif q_norm in name_norm:
+        elif contains_token_or_phrase(name_norm, q_norm):
             score += 25.0
-        elif q_norm in combined:
+        elif contains_token_or_phrase(combined, q_norm):
             score += 10.0
 
-        word_hits_name = sum(1 for w in words if w in name_norm)
-        word_hits_desc = sum(1 for w in words if w in desc_norm)
+        word_hits_name = sum(1 for w in words if contains_token_or_phrase(name_norm, w))
+        word_hits_desc = sum(1 for w in words if contains_token_or_phrase(desc_norm, w))
 
         score += word_hits_name * 8.0
         score += word_hits_desc * 2.0
 
-        if words and all(w in combined for w in words):
+        if words and all(contains_token_or_phrase(combined, w) for w in words):
             score += 8.0
 
         if score > 0:
