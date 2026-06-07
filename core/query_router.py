@@ -291,6 +291,12 @@ def lexical_short_query_search(collection, question, limit=25):
         with_vectors=False
     )
 
+    print("LEXICAL SCANNED POINTS:", len(points))
+    print("LEXICAL HPROF SEEN:", any(
+        "hprof" in normalize_simple_text((p.payload or {}).get("primary_name") or "")
+        for p in points
+    ))
+
     scored = []
 
     for p in points:
@@ -302,12 +308,6 @@ def lexical_short_query_search(collection, question, limit=25):
         name_norm = normalize_simple_text(primary_name)
         desc_norm = normalize_simple_text(description)
         combined = f"{name_norm} {desc_norm}"
-
-        if q_norm == "hprof" and "case sensitivity" in name_norm:
-            print("LEXICAL DEBUG - CASE SENSITIVITY")
-            print("name_norm:", name_norm)
-            print("contains hprof:", contains_token_or_phrase(combined, "hprof"))
-            print("combined preview:", combined[:1000])
 
         if len(words) == 1 and not contains_token_or_phrase(combined, words[0]):
             continue
