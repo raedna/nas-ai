@@ -393,6 +393,66 @@ def resolve_image_payloads_from_related_titles(collection_name, qdrant_url, rela
 
     return matches
 
+def extract_ocr_for_image_from_payload(payload, image_name):
+    payload = payload or {}
+    image_name = str(image_name or "").strip()
+
+    if not image_name:
+        return ""
+
+    candidate_texts = [
+        payload.get("description"),
+        payload.get("text"),
+        payload.get("ocr_text"),
+        payload.get("image_ocr"),
+        payload.get("embedded_image_ocr"),
+    ]
+
+    full_text = "\n\n".join(
+        str(t).strip()
+        for t in candidate_texts
+        if str(t or "").strip()
+    )
+
+    if not full_text:
+        return ""
+
+    markers = [
+        f"[Embedded image OCR from: {image_name}]",
+        f"Embedded image OCR from: {image_name}",
+        f"OCR from: {image_name}",
+    ]
+
+    for marker in markers:
+        marker_pos = full_text.find(marker)
+        if marker_pos == -1:
+            continue
+
+        after = full_text[marker_pos + len(marker):].strip()
+        after = after.lstrip(":\n\r\t -").strip()
+
+        stop_markers = [
+            "[Embedded image OCR from:",
+            "Embedded image OCR from:",
+            "OCR from:",
+            "Related notes:",
+            "Related images:",
+            "Related Images:",
+        ]
+
+        stop_positions = [
+            after.find(stop_marker)
+            for stop_marker in stop_markers
+            if after.find(stop_marker) != -1
+        ]
+
+        if stop_positions:
+            after = after[:min(stop_positions)].strip()
+
+        return after.strip()
+
+    return ""
+
 def fetch_image_paths_for_source_file(collection_name, qdrant_url, source_file, related_titles=None, limit=5000):
     if not collection_name or not qdrant_url or not source_file:
         return []
@@ -457,7 +517,7 @@ def fetch_image_paths_for_source_file(collection_name, qdrant_url, source_file, 
             image_items.append({
                 "path": image_path,
                 "caption": caption or Path(image_path).name,
-                "ocr": "",
+                "ocr": extract_ocr_for_image_from_payload(payload, caption or Path(resolved_path).name),
             })
 
     return image_items
