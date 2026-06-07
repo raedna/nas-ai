@@ -2059,8 +2059,16 @@ def route_query(collection, question, mode="best", limit=25):
     first_payload = points[0].payload or {}
     first_doc_type = infer_doc_type(first_payload)
 
-    if query_mode["mode"] == "lexical_short" and first_doc_type == "entity_row":
-        return lexical_short_query_search(collection, question, limit=limit)
+    if query_mode["mode"] == "lexical_short":
+        lexical_items = lexical_short_query_search(collection, question, limit=limit)
+
+        if lexical_items:
+            return synthesize_answer(lexical_items[0]["payload"], roles, collection)
+
+        words = [w for w in normalize_simple_text(question).split() if w]
+
+        if len(words) == 1:
+            return f"No exact match found for '{question}'."
 
     # chunked narrative/doc-style content (docs + readable pdf)
     top_payload = points[0].payload if points else {}
