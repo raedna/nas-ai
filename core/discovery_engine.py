@@ -18,6 +18,13 @@ from core.query_helpers import (
 cfg = load_system_config()
 client = QdrantClient(url=cfg["qdrant_url"])
 
+QUERY_TERMS_PATH = Path(__file__).resolve().parents[1] / "config" / "query_terms.json"
+
+def load_query_terms():
+    if QUERY_TERMS_PATH.exists():
+        with open(QUERY_TERMS_PATH, "r", encoding="utf-8") as f:
+            return json.load(f)
+    return {}
 
 def _matches_any_term(q, terms):
     for term in terms or []:
@@ -44,19 +51,21 @@ def detect_ask_intent(question: str):
         return {"mode": "answer", "reason": "empty query"}
 
     hints = load_doc_query_hints()
+    query_terms_cfg = load_query_terms()
+    intent_routing = query_terms_cfg.get("intent_routing", {})
 
     intent_routing = hints.get("intent_routing", {})
 
     if _matches_any_phrase(q, intent_routing.get("answer_patterns", [])):
         return {
             "mode": "answer",
-            "reason": "answer-pattern override",
+            "reason": "answer-pattern override from query_terms",
         }
 
     if _matches_any_phrase(q, intent_routing.get("discovery_patterns", [])):
         return {
             "mode": "discovery_list",
-            "reason": "discovery-pattern override",
+            "reason": "discovery-pattern override from query_terms",
         }
 
     intent_rules = [
@@ -97,11 +106,10 @@ def detect_ask_intent(question: str):
             if rule["mode"] == "discovery_list":
                 ambiguous_terms = intent_routing.get("ambiguous_discovery_terms", [])
 
-                # Do not let ambiguous terms like "find" trigger discovery by themselves.
                 if _matches_any_term(q, ambiguous_terms):
                     return {
                         "mode": "answer",
-                        "reason": "ambiguous discovery term treated as answer",
+                        "reason": "ambiguous discovery term treated as answer from query_terms",
                     }
 
             return {
