@@ -2023,12 +2023,6 @@ def route_query(collection, question, mode="best", limit=25):
         if exact_title_matches:
             return synthesize_answer(exact_title_matches[0], roles, collection)
 
-    if query_mode["mode"] == "lexical_short":
-        words = [w for w in normalize_simple_text(question).split() if w]
-
-        if len(words) == 1:
-            return f"No exact match found for '{question}'."
-
     top_payload = points[0].payload or {}
     top_doc_type = infer_doc_type(top_payload)
 
