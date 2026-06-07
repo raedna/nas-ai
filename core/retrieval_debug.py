@@ -189,6 +189,20 @@ def score_point_shared_debug(p, question):
                 score -= 20.0
                 components.append("-20.0 negative term in description")
 
+    if is_document_like_payload(payload):
+        raw_final_score = score
+        adjustment = score - float(base_score)
+
+        if adjustment > 0.75:
+            adjustment = 0.75
+            components.append("+0.75 document rerank cap applied")
+        elif adjustment < -2.0:
+            adjustment = -2.0
+            components.append("-2.0 document rerank floor applied")
+
+        score = float(base_score) + adjustment
+        components.append(f"document bounded rerank: raw={raw_final_score:.4f}, final={score:.4f}")
+
     return {
         "base_score": base_score,
         "final_score": score,
