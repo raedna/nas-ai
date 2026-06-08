@@ -175,7 +175,7 @@
     "component",
     "componentid"
   ],
-  "exact_lexical_noise_terms": [
+  "exact_lexical_query_noise_terms": [
   "where",
   "what",
   "how",
