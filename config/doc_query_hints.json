@@ -184,6 +184,15 @@
   "files",
   "find",
   "are"
-],
-"exact_lexical_min_len": 3
+  ],
+  "exact_lexical_min_len": 3,
+  "exact_lexical_short_allow_terms": [
+    "pb",
+    "qa",
+    "fx",
+    "mt",
+    "uat",
+    "dev",
+    "prod"
+  ]
 }
