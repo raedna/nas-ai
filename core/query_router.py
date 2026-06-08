@@ -437,6 +437,7 @@ def run_query_with_method(collection, question, mode="best", limit=25):
 
         if points:
             payload = points[0].payload or {}
+            payload["_question"] = question
             return {
                 "method": "structured_namespace_lookup",
                 "reason": f"explicit namespace+identifier detected: {namespace}:{identifier}",
@@ -1126,6 +1127,56 @@ def extract_configured_exact_terms(question):
 
     return terms
 
+def exact_term_variants(term):
+    term = normalize_simple_text(term)
+    variants = [term]
+
+    if term and not term.endswith("s"):
+        variants.append(term + "s")
+
+    if term.endswith("s") and len(term) > 3:
+        variants.append(term[:-1])
+
+    return list(dict.fromkeys(v for v in variants if v))
+
+def get_term_source_file_frequency(collection, term, max_scan=10000):
+    term_norm = normalize_simple_text(term)
+
+    if not term_norm:
+        return 0
+
+    points, _ = client.scroll(
+        collection_name=collection,
+        limit=max_scan,
+        with_payload=True,
+        with_vectors=False
+    )
+
+    source_files = set()
+
+    for p in points:
+        payload = p.payload or {}
+
+        source_key = (
+            payload.get("source_path")
+            or payload.get("source_file")
+            or payload.get("primary_name")
+            or payload.get("identifier")
+        )
+
+        text = " ".join([
+            str(payload.get("primary_name") or ""),
+            str(payload.get("section_heading") or ""),
+            str(payload.get("description") or ""),
+            str(payload.get("text") or ""),
+        ])
+
+        text_norm = normalize_simple_text(text)
+
+        if contains_token_or_phrase(text_norm, term_norm):
+            source_files.add(source_key)
+
+    return len(source_files)
 
 def lexical_exact_candidate_points(collection, question, limit=10):
     terms = extract_configured_exact_terms(question)
@@ -1136,117 +1187,94 @@ def lexical_exact_candidate_points(collection, question, limit=10):
     grouped = {}
 
     for term in terms:
-        variants = [term]
-
-        for expanded in expand_terms_with_synonyms([term]):
-            expanded_norm = normalize_simple_text(expanded)
-            if expanded_norm and expanded_norm not in variants:
-                variants.append(expanded_norm)
-
-        for variant in variants:
+        for variant in exact_term_variants(term):
             items = lexical_short_query_search(collection, variant, limit=limit)
 
             for item in items:
                 payload = item.get("payload") or {}
 
-            doc_type = str(payload.get("doc_type") or "").lower()
-            point_type = str(payload.get("point_type") or payload.get("type") or "").lower()
-            source_type = str(payload.get("source_type") or "").lower()
-            file_type = str(payload.get("file_type") or payload.get("filetype") or "").lower()
+                doc_type = str(payload.get("doc_type") or "").lower()
+                point_type = str(payload.get("point_type") or payload.get("type") or "").lower()
+                source_type = str(payload.get("source_type") or "").lower()
+                file_type = str(payload.get("file_type") or payload.get("filetype") or "").lower()
 
-            is_doc_like = (
-                doc_type in {"procedural", "reference", "mixed", "narrative"}
-                or point_type in {"doc_chunk", "pdf_chunk"}
-                or source_type in {"doc", "pdf"}
-                or file_type in {"doc", "docx", "md", "txt", "rtf", "pdf"}
-            )
-
-            if is_doc_like:
-                point_id = (
-                    payload.get("source_path")
-                    or payload.get("source_file")
-                    or payload.get("primary_name")
-                    or payload.get("point_id")
-                    or payload.get("id")
-                )
-            else:
-                point_id = (
-                    payload.get("point_id")
-                    or payload.get("id")
-                    or payload.get("identifier")
-                    or f"lexical_exact:{payload.get('source_file')}:{payload.get('primary_name')}"
+                is_doc_like = (
+                    doc_type in {"procedural", "reference", "mixed", "narrative"}
+                    or point_type in {"doc_chunk", "pdf_chunk"}
+                    or source_type in {"doc", "pdf"}
+                    or file_type in {"doc", "docx", "md", "txt", "rtf", "pdf"}
                 )
 
-            if not point_id:
-                continue
+                if is_doc_like:
+                    point_id = (
+                        payload.get("source_path")
+                        or payload.get("source_file")
+                        or payload.get("primary_name")
+                        or payload.get("point_id")
+                        or payload.get("id")
+                    )
+                else:
+                    point_id = (
+                        payload.get("point_id")
+                        or payload.get("id")
+                        or payload.get("identifier")
+                        or f"lexical_exact:{payload.get('source_file')}:{payload.get('primary_name')}"
+                    )
 
-            name_norm = normalize_simple_text(payload.get("primary_name") or "")
-            desc_norm = normalize_simple_text(payload.get("description") or "")
-            heading_norm = normalize_simple_text(payload.get("section_heading") or "")
-            combined_norm = f"{name_norm} {heading_norm} {desc_norm}"
+                if not point_id:
+                    continue
 
-            same_chunk_terms = set()
-            heading_terms = set()
-            title_terms = set()
+                name_norm = normalize_simple_text(payload.get("primary_name") or "")
+                desc_norm = normalize_simple_text(payload.get("description") or "")
+                heading_norm = normalize_simple_text(payload.get("section_heading") or "")
+                combined_norm = f"{name_norm} {heading_norm} {desc_norm}"
 
-            for t in terms:
-                variants = [t]
+                same_chunk_terms = set()
+                heading_terms = set()
+                title_terms = set()
 
-                for expanded in expand_terms_with_synonyms([t]):
-                    expanded_norm = normalize_simple_text(expanded)
-                    if expanded_norm and expanded_norm not in variants:
-                        variants.append(expanded_norm)
+                for t in terms:
+                    t_variants = exact_term_variants(t)
 
-                if any(contains_token_or_phrase(combined_norm, v) for v in variants):
-                    same_chunk_terms.add(t)
+                    if any(contains_token_or_phrase(combined_norm, v) for v in t_variants):
+                        same_chunk_terms.add(t)
 
-                if any(contains_token_or_phrase(heading_norm, v) for v in variants):
-                    heading_terms.add(t)
+                    if any(contains_token_or_phrase(heading_norm, v) for v in t_variants):
+                        heading_terms.add(t)
 
-                if any(contains_token_or_phrase(name_norm, v) for v in variants):
-                    title_terms.add(t)
+                    if any(contains_token_or_phrase(name_norm, v) for v in t_variants):
+                        title_terms.add(t)
 
-            heading_terms = {
-                t for t in terms
-                if contains_token_or_phrase(heading_norm, t)
-            }
+                item_quality = (
+                    len(same_chunk_terms) * 10
+                    + len(heading_terms) * 5
+                    + len(title_terms) * 3
+                    + float(item.get("score") or 0.0)
+                )
 
-            title_terms = {
-                t for t in terms
-                if contains_token_or_phrase(name_norm, t)
-            }
+                if point_id not in grouped:
+                    grouped[point_id] = {
+                        "payload": payload,
+                        "matched_terms": set(),
+                        "same_chunk_terms": set(),
+                        "heading_terms": set(),
+                        "title_terms": set(),
+                        "best_raw_score": 0.0,
+                        "best_item_quality": -1.0,
+                    }
 
-            item_quality = (
-                len(same_chunk_terms) * 10
-                + len(heading_terms) * 5
-                + len(title_terms) * 3
-                + float(item.get("score") or 0.0)
-            )
+                grouped[point_id]["matched_terms"].add(term)
+                grouped[point_id]["same_chunk_terms"].update(same_chunk_terms)
+                grouped[point_id]["heading_terms"].update(heading_terms)
+                grouped[point_id]["title_terms"].update(title_terms)
+                grouped[point_id]["best_raw_score"] = max(
+                    grouped[point_id]["best_raw_score"],
+                    float(item.get("score") or 0.0)
+                )
 
-            if point_id not in grouped:
-                grouped[point_id] = {
-                    "payload": payload,
-                    "matched_terms": set(),
-                    "same_chunk_terms": set(),
-                    "heading_terms": set(),
-                    "title_terms": set(),
-                    "best_raw_score": 0.0,
-                    "best_item_quality": -1.0,
-                }
-
-            grouped[point_id]["matched_terms"].add(term)
-            grouped[point_id]["same_chunk_terms"].update(same_chunk_terms)
-            grouped[point_id]["heading_terms"].update(heading_terms)
-            grouped[point_id]["title_terms"].update(title_terms)
-            grouped[point_id]["best_raw_score"] = max(
-                grouped[point_id]["best_raw_score"],
-                float(item.get("score") or 0.0)
-            )
-
-            # Keep the best representative chunk for this note.
-            if item_quality > grouped[point_id]["best_item_quality"]:
-                grouped[point_id]["payload"] = payload
-                grouped[point_id]["best_item_quality"] = item_quality
+                if item_quality > grouped[point_id]["best_item_quality"]:
+                    grouped[point_id]["payload"] = payload
+                    grouped[point_id]["best_item_quality"] = item_quality
 
     term_count = len(terms)
 
@@ -2413,6 +2441,17 @@ def dedupe_repeated_paragraphs(text):
 
     return "\n\n".join(cleaned).strip()
 
+def _question_requests_enums(question: str) -> bool:
+    if not question:
+        return False
+    q = question.lower()
+    enum_triggers = [
+        "what values", "which values", "allowed values",
+        "possible values", "can have", "enum", "values can",
+        "values does", "values for"
+    ]
+    return any(trigger in q for trigger in enum_triggers)
+
 def synthesize_answer(payload, roles, collection_name):
     if DEBUG:
         print("🔥 SYNTHESIZER V2 ACTIVE")
@@ -2423,6 +2462,9 @@ def synthesize_answer(payload, roles, collection_name):
         primary_name = payload.get("primary_name")
         description = payload.get("description")
         enum_values = payload.get("enum_values") or []
+
+        question = payload.get("_question", "")
+        include_enums = "enum_value" in roles or _question_requests_enums(question)
 
         lines = []
 
@@ -2436,7 +2478,7 @@ def synthesize_answer(payload, roles, collection_name):
         if description:
             lines.append(f"\nDescription: {description}")
 
-        if enum_values:
+        if include_enums and enum_values:
             lines.append("\nAllowed values:")
             for e in enum_values:
                 if isinstance(e, dict):

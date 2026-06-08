@@ -464,6 +464,9 @@ def synthesize_structured_plan_answer(
     if "enum_values" in return_fields and items:
         return _format_enum_values_answer(items[0])
 
+    if intent == "reverse_enum_lookup" and items:
+        return _format_reverse_enum_answer(items, plan)
+
     if intent == "lookup" and len(items) == 1:
         return _format_single_item(items[0], return_fields)
 
@@ -488,6 +491,52 @@ def synthesize_structured_plan_answer(
 
     return "\n".join(lines)
 
+def _format_reverse_enum_answer(
+    items: List[Dict[str, Any]],
+    plan: Dict[str, Any],
+) -> str:
+    search_concept = plan.get("search_concept") or ""
+    lines = []
+
+    for item in items:
+        payload = item.get("payload") or {}
+        matched_enum = item.get("matched_enum") or {}
+
+        identifier_field = payload.get("identifier_field") or "Tag"
+        identifier = payload.get("identifier")
+        primary_name = payload.get("primary_name")
+
+        enum_value = matched_enum.get("enum_value") or matched_enum.get("Value") or ""
+        enum_name = matched_enum.get("enum_name") or matched_enum.get("SymbolicName") or ""
+        enum_desc = matched_enum.get("description") or ""
+
+        owner = ""
+        if identifier and primary_name:
+            owner = f"{identifier_field} {identifier} ({primary_name})"
+        elif identifier:
+            owner = f"{identifier_field} {identifier}"
+        elif primary_name:
+            owner = primary_name
+
+        enum_text = ""
+        if enum_value and enum_name:
+            enum_text = f"{enum_value}: {enum_name}"
+            if enum_desc and enum_desc != enum_name:
+                enum_text += f" — {enum_desc}"
+        elif enum_value:
+            enum_text = enum_value
+        elif enum_name:
+            enum_text = enum_name
+
+        if owner and enum_text:
+            lines.append(f"{owner} allows value {enum_text}.")
+        elif owner:
+            lines.append(owner)
+
+    if not lines:
+        return f"No tag found with allowed value '{search_concept}'."
+
+    return "\n".join(lines)
 
 def _format_single_item(
     item: Dict[str, Any],

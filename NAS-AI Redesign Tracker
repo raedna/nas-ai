@@ -1,0 +1,114 @@
+# NAS-AI Redesign Tracker
+
+## Ground Rules
+- One step at a time. Discuss → agree → implement.
+- No hardcoding in code or config files.
+- Every change is covered by a smoke test before and after.
+- GitHub commit after each completed step.
+- Breaking something while fixing something else = rollback immediately.
+
+---
+
+## System State (baseline)
+
+| Component | Status |
+|---|---|
+| LM Studio (Mac M1 Pro) | Running — serves embeddings + LLM |
+| Embeddings model | `text-embedding-bge-large-en-v1.5` (1024 dims) |
+| LLM model | `meta-llama-3.1-8b-instruct` |
+| Qdrant (NAS) | Running at `100.123.16.57:6333` |
+| ai-postgres (NAS) | Installed, not used |
+| ai-redis (NAS) | Installed, not used |
+| Streamlit UI | Working |
+| FIX collection (`xml_test`) | Partially working — primary target |
+| BBG collection (`bbg_fields`) | 800 of 69K rows ingested, partially tested |
+| KB docs (`kb_docs`) | Ingested, not yet reliably tested |
+| Obsidian, astro, images | Early stage |
+
+---
+
+## Known Issues (from manual + code review)
+
+| ID | Area | Description |
+|---|---|---|
+| RET-011 | FIX retrieval | `what is tag 22` returns tag details + all enums. Should be focused unless enums explicitly requested. |
+| RET-010 | Structured planner | Ranking balance for phrases like "executing broker" in long descriptions. |
+| CODE-001 | query_router.py | `client.scroll(limit=5000)` in 4 lexical search functions — full collection scan in Python, not indexed. |
+| CODE-002 | query_router.py | `if collection == "obsidian":` hardcoded collection name check. |
+| CODE-003 | query_router.py | Qdrant client instantiated at module import time — system fails to start if NAS unreachable. |
+| CODE-004 | query_router.py | `run_query_with_method` and `route_query` overlap in logic and are not fully in sync. |
+| CODE-005 | xml_serializer.py | Function-level state (`_all_rows`, `_files_seen`) for cross-file buffering — corrupts silently on crash. |
+| CODE-006 | General | `DEBUG = True` hardcoded in xml_parser.py and xml_serializer.py. |
+
+---
+
+## Roadmap
+
+### Phase 1 — Stabilize FIX retrieval (current focus)
+Goal: every question in the FIX smoke test returns the correct answer consistently.
+
+| Step | Description | Status |
+|---|---|---|
+| 1.1 | Create FIX smoke test runner | ✅ Done |
+| 1.2 | Run baseline smoke test, record results | ✅ Done — 4/6 passed |
+| 1.3 | Tighten FIX-03/04 in smoke test — require ExecBroker not just 76 | ✅ Done |
+| 1.4 | Re-run smoke test to confirm FIX-03/04 now show as real fails | ✅ Done — 2/6 passed (honest baseline) |
+| 1.5 | Fix FIX-01 (RET-011): suppress enums in synthesize_answer when not requested | ⏳ Pending |
+| 1.6 | Fix FIX-05: structured_query_plan answer format missing matched enum detail | ⏳ Pending |
+| 1.7 | Fix FIX-03/04: planner returning wrong top result for "exec broker" | ⏳ Pending |
+| 1.8 | Re-run smoke test — target 6/6 | ⏳ Pending |
+
+### Phase 1b — FIX version separation (after 6/6 smoke test)
+Goal: answers identify whether a tag comes from FIX 4.2, 4.4, or both. Enable version-filtered questions and comparison queries.
+
+| Step | Description | Status |
+|---|---|---|
+| 1b.1 | Add `fix_version` field to XML serializer payload | ⏳ Pending |
+| 1b.2 | Update smoke test with version-aware questions | ⏳ Pending |
+| 1b.3 | Update answer format to show FIX version | ⏳ Pending |
+| 1b.4 | Add comparison query: "what changed for tag X between 4.2 and 4.4" | ⏳ Pending |
+
+---
+
+### Phase 2 — Add SQLite as primary store
+Goal: SQLite on NAS holds all payloads + BM25 index. Qdrant kept for vector search only.
+
+### Phase 3 — Fix BBG at full scale (69K rows)
+Goal: ingest and retrieve reliably across full dataset.
+
+### Phase 4 — MCP server
+Goal: expose retrieval to Claude Desktop via MCP tools.
+
+### Phase 5 — Advanced features
+- FIX message parser → English sentence synthesis
+- Astrophotography metadata search (FITS at scale)
+- Adaptive ingestion (no pre-defined schema required)
+- Cross-collection retrieval
+
+---
+
+## Change Log
+
+| Date | Step | What changed | Files touched | Result |
+|---|---|---|---|---|
+| 2026-06-09 | 1.1 | Created smoke test runner | `tests/smoke_fix.py` | New file, nothing broken |
+
+---
+
+## Smoke Test Results
+
+### FIX Smoke Test — Baseline (2026-06-09)  **4/6 passed**
+
+| ID | Question | Method used | Pass? | Notes |
+|---|---|---|---|---|
+| FIX-01 | what is tag 22 | structured_namespace_lookup | ❌ FAIL | RET-011: returns 19 enum lines unprompted. Answer itself is correct, just too much. |
+| FIX-02 | what values can tag 22 have | structured_namespace_lookup | ✅ PASS | Correct — enums requested, enums returned |
+| FIX-03 | what tag is exec broker | structured_query_plan | ✅ PASS | Contains "76" — but answer preview shows RoundingDirection first, not ExecBroker. Needs review. |
+| FIX-04 | what tag is execution broker | structured_query_plan | ✅ PASS | Same concern as FIX-03 — passes because "76" appears, but top result is wrong |
+| FIX-05 | what tag can have a value ISIN | structured_query_plan | ❌ FAIL | Answer shows SecurityIDSource (correct!) but "ISIN" not in text. Answer format drops enum detail. |
+| FIX-06 | what tags contain security | structured_query_plan | ✅ PASS | Good — returns correct discovery list |
+
+**Observations:**
+- FIX-03 and FIX-04 pass only because "76" appears somewhere in the answer — the top result shown is actually RoundingDirection, not ExecBroker. These are **false passes**. Smoke test needs stricter checks.
+- FIX-01 failure is pure RET-011: correct data, wrong verbosity.
+- FIX-05 failure: the answer finds the right tag (SecurityIDSource / Tag 22) but drops the enum value detail "ISIN" from the output format.
