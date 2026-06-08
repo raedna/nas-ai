@@ -37,6 +37,7 @@ from pathlib import Path
 import json
 
 import re
+from types import SimpleNamespace
 
 DEBUG = True
 
@@ -1100,8 +1101,75 @@ def merge_points_by_id(*point_lists):
                 merged[key] = p
     return list(merged.values())
 
+def extract_configured_exact_terms(question):
+    hints = load_doc_query_hints()
+
+    noise_terms = set(hints.get("exact_lexical_query_noise_terms", []))
+    min_len = int(hints.get("exact_lexical_min_len", 3))
+
+    q = normalize_simple_text(question)
+
+    terms = []
+    seen = set()
+
+    for word in q.split():
+        if len(word) < min_len:
+            continue
+        if word in noise_terms:
+            continue
+        if word in seen:
+            continue
+
+        seen.add(word)
+        terms.append(word)
+
+    return terms
+
+
+def lexical_exact_candidate_points(collection, question, limit=10):
+    exact_points = []
+
+    for term in extract_configured_exact_terms(question):
+        items = lexical_short_query_search(collection, term, limit=limit)
+
+        for item in items:
+            payload = item.get("payload") or {}
+
+            point_id = (
+                payload.get("point_id")
+                or payload.get("id")
+                or payload.get("identifier")
+                or f"lexical_exact:{term}:{payload.get('source_file')}:{payload.get('primary_name')}"
+            )
+
+            exact_points.append(
+                SimpleNamespace(
+                    id=point_id,
+                    payload=payload,
+                    # Keep score near semantic scale; do not use raw lexical score.
+                    score=1.0,
+                )
+            )
+
+    return exact_points
+
 def build_candidate_points(collection, question, limit=25):
     semantic_points = semantic_search(collection, question, limit=limit)
+
+    lexical_exact_points = []
+
+    print("BUILD CANDIDATES collection:", collection)
+    print("BUILD CANDIDATES question:", question)
+    print("BUILD CANDIDATES exact terms:", extract_configured_exact_terms(question))
+
+    # Safe scope: only Obsidian docs get exact lexical safety-net candidates.
+    # FIX/BBG/structured collections remain unchanged.
+    if collection == "obsidian":
+        lexical_exact_points = lexical_exact_candidate_points(
+            collection,
+            question,
+            limit=10
+        )
 
     lexical_chunk_points = []
     lexical_structured_points = []
@@ -1112,12 +1180,14 @@ def build_candidate_points(collection, question, limit=25):
 
     points = merge_points_by_id(
         semantic_points,
+        lexical_exact_points,
         lexical_chunk_points,
         lexical_structured_points
     )
 
     return {
         "semantic_points": semantic_points,
+        "lexical_exact_points": lexical_exact_points,
         "lexical_chunk_points": lexical_chunk_points,
         "lexical_structured_points": lexical_structured_points,
         "merged_points": points
