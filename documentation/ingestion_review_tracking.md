@@ -176,6 +176,8 @@ Status values:
 | RET-014 | Discovery intent too sensitive to “find” | Questions using “find” can route to discovery_list even when the user is asking a procedural/how-to question, e.g. “how to find recon PB files on server.” | Refine detect_ask_intent() so discovery only triggers for explicit list/count/explore patterns, while how/where/what/find procedural questions stay in answer/semantic mode. | High | Done |
 - [x] RET-016: Bound final rerank for document chunks
 - [x] RET-017: Fix lexical_short exact-term ranking for rare terms like hprof
+- [ ] RET-018: Add config-driven exact lexical candidate merge for sentence-like answer queries
+
 ---
 
 ## 11. Discovery harcoding fix
