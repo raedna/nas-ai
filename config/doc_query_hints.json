@@ -183,7 +183,9 @@
   "file",
   "files",
   "find",
-  "are"
+  "are",
+  "at",
+  "who"
   ],
   "exact_lexical_min_len": 3,
   "exact_lexical_short_allow_terms": [

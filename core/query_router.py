@@ -1136,10 +1136,18 @@ def lexical_exact_candidate_points(collection, question, limit=10):
     grouped = {}
 
     for term in terms:
-        items = lexical_short_query_search(collection, term, limit=limit)
+        variants = [term]
 
-        for item in items:
-            payload = item.get("payload") or {}
+        for expanded in expand_terms_with_synonyms([term]):
+            expanded_norm = normalize_simple_text(expanded)
+            if expanded_norm and expanded_norm not in variants:
+                variants.append(expanded_norm)
+
+        for variant in variants:
+            items = lexical_short_query_search(collection, variant, limit=limit)
+
+            for item in items:
+                payload = item.get("payload") or {}
 
             doc_type = str(payload.get("doc_type") or "").lower()
             point_type = str(payload.get("point_type") or payload.get("type") or "").lower()
@@ -1172,18 +1180,73 @@ def lexical_exact_candidate_points(collection, question, limit=10):
             if not point_id:
                 continue
 
+            name_norm = normalize_simple_text(payload.get("primary_name") or "")
+            desc_norm = normalize_simple_text(payload.get("description") or "")
+            heading_norm = normalize_simple_text(payload.get("section_heading") or "")
+            combined_norm = f"{name_norm} {heading_norm} {desc_norm}"
+
+            same_chunk_terms = set()
+            heading_terms = set()
+            title_terms = set()
+
+            for t in terms:
+                variants = [t]
+
+                for expanded in expand_terms_with_synonyms([t]):
+                    expanded_norm = normalize_simple_text(expanded)
+                    if expanded_norm and expanded_norm not in variants:
+                        variants.append(expanded_norm)
+
+                if any(contains_token_or_phrase(combined_norm, v) for v in variants):
+                    same_chunk_terms.add(t)
+
+                if any(contains_token_or_phrase(heading_norm, v) for v in variants):
+                    heading_terms.add(t)
+
+                if any(contains_token_or_phrase(name_norm, v) for v in variants):
+                    title_terms.add(t)
+
+            heading_terms = {
+                t for t in terms
+                if contains_token_or_phrase(heading_norm, t)
+            }
+
+            title_terms = {
+                t for t in terms
+                if contains_token_or_phrase(name_norm, t)
+            }
+
+            item_quality = (
+                len(same_chunk_terms) * 10
+                + len(heading_terms) * 5
+                + len(title_terms) * 3
+                + float(item.get("score") or 0.0)
+            )
+
             if point_id not in grouped:
                 grouped[point_id] = {
                     "payload": payload,
                     "matched_terms": set(),
+                    "same_chunk_terms": set(),
+                    "heading_terms": set(),
+                    "title_terms": set(),
                     "best_raw_score": 0.0,
+                    "best_item_quality": -1.0,
                 }
 
             grouped[point_id]["matched_terms"].add(term)
+            grouped[point_id]["same_chunk_terms"].update(same_chunk_terms)
+            grouped[point_id]["heading_terms"].update(heading_terms)
+            grouped[point_id]["title_terms"].update(title_terms)
             grouped[point_id]["best_raw_score"] = max(
                 grouped[point_id]["best_raw_score"],
                 float(item.get("score") or 0.0)
             )
+
+            # Keep the best representative chunk for this note.
+            if item_quality > grouped[point_id]["best_item_quality"]:
+                grouped[point_id]["payload"] = payload
+                grouped[point_id]["best_item_quality"] = item_quality
 
     term_count = len(terms)
 
@@ -1203,13 +1266,18 @@ def lexical_exact_candidate_points(collection, question, limit=10):
         if len(matched_terms) < required_matches:
             continue
 
+        same_chunk_terms = data.get("same_chunk_terms", set())
+        heading_terms = data.get("heading_terms", set())
+        title_terms = data.get("title_terms", set())
+
         name_norm = normalize_simple_text(payload.get("primary_name") or "")
         desc_norm = normalize_simple_text(payload.get("description") or "")
+        heading_norm = normalize_simple_text(payload.get("section_heading") or "")
 
-        title_hits = sum(
-            1 for term in matched_terms
-            if contains_token_or_phrase(name_norm, term)
-        )
+        title_hits = len(title_terms)
+        heading_hits = len(heading_terms)
+        same_chunk_hits = len(same_chunk_terms)
+
         desc_hits = sum(
             1 for term in matched_terms
             if contains_token_or_phrase(desc_norm, term)
@@ -1218,9 +1286,16 @@ def lexical_exact_candidate_points(collection, question, limit=10):
         semantic_like_score = (
             1.0
             + (0.10 * len(matched_terms))
-            + (0.15 * title_hits)
-            + (0.03 * desc_hits)
+            + (0.20 * same_chunk_hits)
+            + (0.20 * heading_hits)
+            + (0.10 * title_hits)
+            + (0.02 * desc_hits)
         )
+
+        # If a multi-term query only matched across scattered chunks/OCR,
+        # keep it as a weak safety-net candidate, not a top result.
+        if len(matched_terms) >= 2 and same_chunk_hits < 2 and heading_hits == 0:
+            semantic_like_score -= 0.35
 
         exact_points.append(
             SimpleNamespace(
