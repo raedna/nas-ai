@@ -29,6 +29,8 @@
     "what",
     "was",
     "were",
+    "where",
+    "how",
     "the",
     "a",
     "an",
@@ -172,5 +174,14 @@
     "field",
     "component",
     "componentid"
-  ]
+  ],
+  "exact_lexical_noise_terms": [
+  "where",
+  "what",
+  "how",
+  "to",
+  "file",
+  "files"
+],
+"exact_lexical_min_len": 3
 }
