@@ -55,5 +55,9 @@
 
   "send": ["sender", "sending", "sent"],
   "sender": ["send", "sending", "sent"],
-  "sending": ["send", "sender", "sent"]
+  "sending": ["send", "sender", "sent"],
+
+  "pb": ["prime broker", "prime brokerage"],
+  "citi": ["citibank", "citigroup", "citi pb"],
+  "contacts": ["contact", "email", "distribution list", "dl"]
 }
