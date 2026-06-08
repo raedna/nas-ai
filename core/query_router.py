@@ -1105,6 +1105,7 @@ def extract_configured_exact_terms(question):
     hints = load_doc_query_hints()
 
     noise_terms = set(hints.get("exact_lexical_query_noise_terms", []))
+    short_allow_terms = set(hints.get("exact_lexical_short_allow_terms", []))
     min_len = int(hints.get("exact_lexical_min_len", 3))
 
     q = normalize_simple_text(question)
@@ -1113,7 +1114,7 @@ def extract_configured_exact_terms(question):
     seen = set()
 
     for word in q.split():
-        if len(word) < min_len:
+        if len(word) < min_len and word not in short_allow_terms:
             continue
         if word in noise_terms:
             continue
@@ -1127,31 +1128,117 @@ def extract_configured_exact_terms(question):
 
 
 def lexical_exact_candidate_points(collection, question, limit=10):
-    exact_points = []
+    terms = extract_configured_exact_terms(question)
 
-    for term in extract_configured_exact_terms(question):
+    if not terms:
+        return []
+
+    grouped = {}
+
+    for term in terms:
         items = lexical_short_query_search(collection, term, limit=limit)
 
         for item in items:
             payload = item.get("payload") or {}
 
-            point_id = (
-                payload.get("point_id")
-                or payload.get("id")
-                or payload.get("identifier")
-                or f"lexical_exact:{term}:{payload.get('source_file')}:{payload.get('primary_name')}"
+            doc_type = str(payload.get("doc_type") or "").lower()
+            point_type = str(payload.get("point_type") or payload.get("type") or "").lower()
+            source_type = str(payload.get("source_type") or "").lower()
+            file_type = str(payload.get("file_type") or payload.get("filetype") or "").lower()
+
+            is_doc_like = (
+                doc_type in {"procedural", "reference", "mixed", "narrative"}
+                or point_type in {"doc_chunk", "pdf_chunk"}
+                or source_type in {"doc", "pdf"}
+                or file_type in {"doc", "docx", "md", "txt", "rtf", "pdf"}
             )
 
-            exact_points.append(
-                SimpleNamespace(
-                    id=point_id,
-                    payload=payload,
-                    # Keep score near semantic scale; do not use raw lexical score.
-                    score=1.0,
+            if is_doc_like:
+                point_id = (
+                    payload.get("source_path")
+                    or payload.get("source_file")
+                    or payload.get("primary_name")
+                    or payload.get("point_id")
+                    or payload.get("id")
                 )
+            else:
+                point_id = (
+                    payload.get("point_id")
+                    or payload.get("id")
+                    or payload.get("identifier")
+                    or f"lexical_exact:{payload.get('source_file')}:{payload.get('primary_name')}"
+                )
+
+            if not point_id:
+                continue
+
+            if point_id not in grouped:
+                grouped[point_id] = {
+                    "payload": payload,
+                    "matched_terms": set(),
+                    "best_raw_score": 0.0,
+                }
+
+            grouped[point_id]["matched_terms"].add(term)
+            grouped[point_id]["best_raw_score"] = max(
+                grouped[point_id]["best_raw_score"],
+                float(item.get("score") or 0.0)
             )
 
-    return exact_points
+    term_count = len(terms)
+
+    if term_count == 1:
+        required_matches = 1
+    elif term_count == 2:
+        required_matches = 2
+    else:
+        required_matches = 2
+
+    exact_points = []
+
+    for point_id, data in grouped.items():
+        payload = data["payload"]
+        matched_terms = data["matched_terms"]
+
+        if len(matched_terms) < required_matches:
+            continue
+
+        name_norm = normalize_simple_text(payload.get("primary_name") or "")
+        desc_norm = normalize_simple_text(payload.get("description") or "")
+
+        title_hits = sum(
+            1 for term in matched_terms
+            if contains_token_or_phrase(name_norm, term)
+        )
+        desc_hits = sum(
+            1 for term in matched_terms
+            if contains_token_or_phrase(desc_norm, term)
+        )
+
+        semantic_like_score = (
+            1.0
+            + (0.10 * len(matched_terms))
+            + (0.15 * title_hits)
+            + (0.03 * desc_hits)
+        )
+
+        exact_points.append(
+            SimpleNamespace(
+                id=point_id,
+                payload=payload,
+                score=semantic_like_score,
+            )
+        )
+
+    exact_points.sort(
+        key=lambda p: (
+            getattr(p, "score", 0.0),
+            normalize_simple_text((p.payload or {}).get("primary_name") or "")
+        ),
+        reverse=True
+    )
+
+    return exact_points[:limit]
 
 def build_candidate_points(collection, question, limit=25):
     semantic_points = semantic_search(collection, question, limit=limit)
