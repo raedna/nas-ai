@@ -79,18 +79,34 @@ Goal: PostgreSQL replaces Qdrant payloads, collection state JSON, and collection
 | 2.2 | Deploy pgAdmin container (port 5055) | ✅ Done |
 | 2.3 | Design and create schema (10 tables, 2 views) | ✅ Done |
 | 2.4 | Migrate collections.json → collections table | ⏳ Pending |
-| 2.5 | Write Python db layer (db.py) — connection + CRUD | ⏳ Pending |
-| 2.6 | Update ingestion to write to PostgreSQL + Qdrant in parallel | ⏳ Pending |
-| 2.7 | Migrate existing Qdrant data → PostgreSQL | ⏳ Pending |
-| 2.8 | Update query_router to read from PostgreSQL | ⏳ Pending |
+| 2.5 | Write Python db layer (core/db.py) — connection + CRUD | ✅ Done |
+| 2.6 | Update ingestion to write to PostgreSQL (pg_client.py) | ✅ Done |
+| 2.7 | Re-ingest xml_test into PostgreSQL — 1168 chunks, 1791 enum values | ✅ Done |
+| 2.8 | Split query_router into retrieval package | 🔄 In progress |
+| 2.8.1 | core/retrieval/db_retrieval.py — PostgreSQL query layer | ✅ Done |
+| 2.8.2 | core/retrieval/structured.py — structured + namespace lookup | ✅ Done |
+| 2.8.3 | core/retrieval/lexical.py — BM25 + lexical search | ✅ Done |
+| 2.8.4 | core/retrieval/semantic.py — vector search | ✅ Done |
+| 2.8.5 | core/retrieval/crosslink.py — relationships | ✅ Done |
+| 2.8.6 | core/retrieval/discovery.py — count/list queries | ✅ Done |
+| 2.8.7 | core/retrieval/reranker.py — scoring + reranking | ⏳ Pending |
+| 2.8.8 | core/retrieval/answer.py — answer synthesis | ⏳ Pending |
+| 2.8.9 | core/retrieval/router.py — query routing entry point | ⏳ Pending |
 | 2.9 | Run smoke tests against PostgreSQL backend | ⏳ Pending |
 | 2.10 | Retire Qdrant as primary store | ⏳ Pending |
 
 ### Phase 3 — Fix BBG at full scale (69K rows)
 Goal: ingest and retrieve reliably across full dataset.
 
-### Phase 4 — MCP server
-Goal: expose retrieval to Claude Desktop via MCP tools.
+### Phase 4 — MCP Server
+Goal: expose NAS-AI retrieval as MCP tools. Two modes, one server.
+
+| Mode | LLM | Client | Internet required |
+|---|---|---|---|
+| Local | LM Studio (LLaMA 3.1 8B) | Open WebUI | No |
+| Online | Claude API | Claude Desktop | Yes |
+
+Switch controlled by config — no code changes between modes.
 
 ### Phase 5 — Advanced features
 - FIX message parser → English sentence synthesis
