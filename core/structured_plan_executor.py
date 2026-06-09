@@ -19,7 +19,7 @@ def normalize_match_value(value: Any) -> str:
 
 def compact_match_value(value: Any) -> str:
     text = normalize_match_value(value)
-    return "".join(ch for ch in text if ch.isalnum())
+    return " ".join("".join(ch for ch in word if ch.isalnum()) for word in text.split())
 
 def _payload_role_values(payload: Dict[str, Any], role: str) -> List[str]:
     value = payload.get(role)
@@ -168,9 +168,9 @@ def _score_payload_against_search_concept(
     best_score = 0.0
 
     role_weights = {
-        "primary_name": 1.3,
-        "aliases": 1.2,
-        "description": 1.0,
+        "primary_name": 3.0,
+        "aliases": 2.0,
+        "description": 0.4,
         "identifier": 0.7,
     }
 

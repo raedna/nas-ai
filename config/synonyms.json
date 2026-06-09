@@ -1,6 +1,7 @@
 {
   "execution": ["exec", "executing", "executed"],
   "exec": ["execution", "executing"],
+  "executing": ["exec", "execution"],
   
   "quantity": ["qty", "quant"],
   "qty": ["quantity"],
