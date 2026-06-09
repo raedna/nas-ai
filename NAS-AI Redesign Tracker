@@ -53,10 +53,10 @@ Goal: every question in the FIX smoke test returns the correct answer consistent
 | 1.2 | Run baseline smoke test, record results | ✅ Done — 4/6 passed |
 | 1.3 | Tighten FIX-03/04 in smoke test — require ExecBroker not just 76 | ✅ Done |
 | 1.4 | Re-run smoke test to confirm FIX-03/04 now show as real fails | ✅ Done — 2/6 passed (honest baseline) |
-| 1.5 | Fix FIX-01 (RET-011): suppress enums in synthesize_answer when not requested | ⏳ Pending |
-| 1.6 | Fix FIX-05: structured_query_plan answer format missing matched enum detail | ⏳ Pending |
-| 1.7 | Fix FIX-03/04: planner returning wrong top result for "exec broker" | ⏳ Pending |
-| 1.8 | Re-run smoke test — target 6/6 | ⏳ Pending |
+| 1.5 | Fix FIX-01 (RET-011): suppress enums in synthesize_answer when not requested | ✅ Done — 3/6 passed |
+| 1.6 | Fix FIX-05: structured_query_plan answer format missing matched enum detail | ✅ Done — 4/6 passed |
+| 1.7 | Fix FIX-03/04: doc_type None in xml_serializer payload — added doc_type passthrough | ✅ Done — 6/6 passed |
+| 1.8 | Re-run smoke test — 6/6 | ✅ Done |
 
 ### Phase 1b — FIX version separation (after 6/6 smoke test)
 Goal: answers identify whether a tag comes from FIX 4.2, 4.4, or both. Enable version-filtered questions and comparison queries.
