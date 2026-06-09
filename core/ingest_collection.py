@@ -5,7 +5,8 @@ from typing import Any, Dict, List
 from core.paths import FILETYPES_PATH
 from core.embedder import embed_texts
 from core.orchestrator import FileTask, IngestionOrchestrator
-from core.qdrant_client import upsert_vectors, recreate_collection
+#from core.qdrant_client import upsert_vectors, recreate_collection. # disabled since moved to postgres
+from core.pg_client import upsert_vectors, recreate_collection # the postgres pgvector
 from core.registry_setup import registry
 import json
 from pathlib import Path

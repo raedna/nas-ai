@@ -38,7 +38,7 @@
 | CODE-003 | query_router.py | Qdrant client instantiated at module import time — system fails to start if NAS unreachable. |
 | CODE-004 | query_router.py | `run_query_with_method` and `route_query` overlap in logic and are not fully in sync. |
 | CODE-005 | xml_serializer.py | Function-level state (`_all_rows`, `_files_seen`) for cross-file buffering — corrupts silently on crash. |
-| CODE-006 | General | `DEBUG = True` hardcoded in xml_parser.py and xml_serializer.py. |
+| CODE-007 | collection_state | Deleting a Qdrant collection does NOT clear `config/collection_state/<name>.json`. Files are skipped on next ingest as "unchanged". Workaround: manually delete the state file before re-ingesting. Permanent fix: move state to PostgreSQL in Phase 2. |
 
 ---
 
@@ -56,7 +56,7 @@ Goal: every question in the FIX smoke test returns the correct answer consistent
 | 1.5 | Fix FIX-01 (RET-011): suppress enums in synthesize_answer when not requested | ✅ Done — 3/6 passed |
 | 1.6 | Fix FIX-05: structured_query_plan answer format missing matched enum detail | ✅ Done — 4/6 passed |
 | 1.7 | Fix FIX-03/04: doc_type None in xml_serializer payload — added doc_type passthrough | ✅ Done — 6/6 passed |
-| 1.8 | Re-run smoke test — 6/6 | ✅ Done |
+| 1.9 | Fix "executing broker" ranking — add "executing" as synonym key in synonyms.json | ✅ Done — 6/6 passed |
 
 ### Phase 1b — FIX version separation (after 6/6 smoke test)
 Goal: answers identify whether a tag comes from FIX 4.2, 4.4, or both. Enable version-filtered questions and comparison queries.
@@ -70,8 +70,21 @@ Goal: answers identify whether a tag comes from FIX 4.2, 4.4, or both. Enable ve
 
 ---
 
-### Phase 2 — Add SQLite as primary store
-Goal: SQLite on NAS holds all payloads + BM25 index. Qdrant kept for vector search only.
+### Phase 2 — PostgreSQL as primary store (current focus)
+Goal: PostgreSQL replaces Qdrant payloads, collection state JSON, and collections JSON. Qdrant kept for vector search only until pgvector migration complete.
+
+| Step | Description | Status |
+|---|---|---|
+| 2.1 | Deploy ai-pgvector container on NAS (port 5433) | ✅ Done |
+| 2.2 | Deploy pgAdmin container (port 5055) | ✅ Done |
+| 2.3 | Design and create schema (10 tables, 2 views) | ✅ Done |
+| 2.4 | Migrate collections.json → collections table | ⏳ Pending |
+| 2.5 | Write Python db layer (db.py) — connection + CRUD | ⏳ Pending |
+| 2.6 | Update ingestion to write to PostgreSQL + Qdrant in parallel | ⏳ Pending |
+| 2.7 | Migrate existing Qdrant data → PostgreSQL | ⏳ Pending |
+| 2.8 | Update query_router to read from PostgreSQL | ⏳ Pending |
+| 2.9 | Run smoke tests against PostgreSQL backend | ⏳ Pending |
+| 2.10 | Retire Qdrant as primary store | ⏳ Pending |
 
 ### Phase 3 — Fix BBG at full scale (69K rows)
 Goal: ingest and retrieve reliably across full dataset.

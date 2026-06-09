@@ -6,7 +6,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 from core.collection_merger import merge_collection_docs
-from core.collection_state import update_file_state, should_skip_file
+# from core.collection_state import update_file_state, should_skip_file  # disabed since moved to postgres pgvector
+from core.pg_client import update_file_state_pg as update_file_state, should_skip_file_with_hash as should_skip_file # the import for pgvector
 
 
 DEBUG = True
