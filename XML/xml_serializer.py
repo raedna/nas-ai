@@ -148,6 +148,7 @@ def xml_finalize(file_path, collection_name, file_tags):
             "description": doc.get("description"),
             "enum_values": doc.get("enum_values"),
             "type": doc.get("type"),
+            "doc_type": doc.get("doc_type"),
             "source_file": primary_source_file,
             "source_files": source_files,
             "ingest_source": primary_source_file,
