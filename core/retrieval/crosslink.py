@@ -35,6 +35,7 @@ from core.retrieval.db_retrieval import (
     get_by_related_link_key,
     search_enum_values,
     scroll_collection,
+    get_by_source_file,
     Point,
 )
 
@@ -560,3 +561,202 @@ def run_comparison_query(
         "reason": "comparison query detected but no direct pair resolved",
         "result": [],
     }
+
+
+# ---------------------------------------------------------------------------
+# Document chunk fetching and payload enrichment
+# Ported from query_router.py — fetch_doc_chunks_by_source_file and
+# build_fuller_doc_payload.
+# ---------------------------------------------------------------------------
+
+def fetch_doc_chunks_by_source_file(
+    collection_name: str,
+    source_file: str,
+    limit: int = 50,
+) -> List[Point]:
+    """Return all chunks for a given source_file, ordered by chunk_id."""
+    if not source_file:
+        return []
+    return get_by_source_file(collection_name, source_file, limit=limit)
+
+
+def build_fuller_doc_payload(
+    collection_name: str,
+    best_payload: Dict[str, Any],
+) -> Dict[str, Any]:
+    """
+    Enrich a chunked-document payload by merging nearby / same-section chunks.
+
+    For markdown notes and procedural/reference/mixed doc_types the full
+    document is merged.  For all others only chunks within the same section
+    heading (or within ±1 chunk_id) are merged.
+
+    Returns a new payload dict with a combined 'description' field.
+    Falls back to best_payload unchanged if no chunks are found.
+    """
+    from core.query_helpers import normalize_simple_text
+
+    source_file = best_payload.get("source_file")
+    if not source_file:
+        return best_payload
+
+    points = fetch_doc_chunks_by_source_file(collection_name, source_file, limit=50)
+    if not points:
+        return best_payload
+
+    def _chunk_sort_key(p: Point) -> int:
+        try:
+            return int((p.payload or {}).get("chunk_id", 999999))
+        except Exception:
+            return 999999
+
+    ordered = sorted(points, key=_chunk_sort_key)
+
+    best_chunk_id = best_payload.get("chunk_id")
+    try:
+        best_chunk_id = int(best_chunk_id)
+    except Exception:
+        best_chunk_id = None
+
+    best_heading = str(best_payload.get("section_heading") or "").strip()
+    doc_type = str(best_payload.get("doc_type") or "").lower()
+    source_file_lower = str(source_file).lower()
+
+    include_full_note = (
+        source_file_lower.endswith(".md")
+        or doc_type in {"procedural", "reference", "mixed"}
+    )
+
+    selected: List[Dict] = []
+
+    if include_full_note:
+        selected = [p.payload or {} for p in ordered]
+    else:
+        for p in ordered:
+            payload = p.payload or {}
+            cid = payload.get("chunk_id")
+            try:
+                cid = int(cid)
+            except Exception:
+                cid = None
+
+            heading = str(payload.get("section_heading") or "").strip()
+
+            if best_chunk_id is None:
+                if best_heading:
+                    if heading == best_heading or not heading:
+                        selected.append(payload)
+                else:
+                    selected.append(payload)
+            else:
+                if cid is None:
+                    continue
+                if best_heading:
+                    if heading == best_heading:
+                        selected.append(payload)
+                    elif abs(cid - best_chunk_id) <= 1 and not heading:
+                        selected.append(payload)
+                else:
+                    if abs(cid - best_chunk_id) <= 1:
+                        selected.append(payload)
+
+    # Deduplicate selected chunks
+    deduped: List[Dict] = []
+    seen_chunk_keys: set = set()
+    for payload in selected:
+        text = str(payload.get("description") or payload.get("text") or "").strip()
+        chunk_key = (
+            payload.get("source_file"),
+            payload.get("chunk_id"),
+            normalize_simple_text(text)[:500],
+        )
+        if chunk_key in seen_chunk_keys:
+            continue
+        seen_chunk_keys.add(chunk_key)
+        deduped.append(payload)
+
+    selected = deduped or [best_payload]
+
+    # Merge selected chunks into a single payload
+    max_chars = 12000
+    current_chars = 0
+
+    combined_parts: List[str] = []
+    seen_headings: set = set()
+    seen_text_parts: set = set()
+    seen_related: set = set()
+    merged_related_titles: List[str] = []
+    seen_image_paths: set = set()
+    merged_image_paths: List[str] = []
+    seen_image_targets: set = set()
+    merged_image_targets: List[str] = []
+
+    note_title = str(best_payload.get("primary_name") or "").strip()
+
+    for payload in selected:
+        heading = str(payload.get("section_heading") or "").strip()
+        text = str(payload.get("text") or payload.get("description") or "").strip()
+
+        for image_path in payload.get("embedded_image_paths") or []:
+            image_path = str(image_path).strip()
+            if image_path and image_path not in seen_image_paths:
+                seen_image_paths.add(image_path)
+                merged_image_paths.append(image_path)
+
+        for image_target in payload.get("embedded_image_targets") or []:
+            image_target = str(image_target).strip()
+            if image_target and image_target not in seen_image_targets:
+                seen_image_targets.add(image_target)
+                merged_image_targets.append(image_target)
+
+        for title in payload.get("related_titles") or []:
+            title = str(title).strip()
+            if title and title not in seen_related:
+                seen_related.add(title)
+                merged_related_titles.append(title)
+
+        if heading and heading not in seen_headings:
+            seen_headings.add(heading)
+            heading_norm = normalize_simple_text(heading)
+            title_norm = normalize_simple_text(note_title)
+            if heading_norm != title_norm and not text.startswith(heading):
+                combined_parts.append(heading)
+
+        if text:
+            text_lines = [ln for ln in text.splitlines() if ln.strip()]
+            if text_lines:
+                first_line_norm = normalize_simple_text(text_lines[0])
+                title_norm = normalize_simple_text(note_title)
+                heading_norm = normalize_simple_text(heading)
+                if first_line_norm == title_norm or (heading and first_line_norm == heading_norm):
+                    text = "\n".join(text_lines[1:]).strip()
+
+            if text:
+                text_key = normalize_simple_text(text)
+                if text_key and text_key in seen_text_parts:
+                    continue
+                if text_key:
+                    seen_text_parts.add(text_key)
+
+                remaining = max_chars - current_chars
+                if remaining <= 0:
+                    break
+
+                if len(text) > remaining:
+                    combined_parts.append(text[:remaining].rstrip() + "\n\n[Answer truncated due to length.]")
+                    current_chars = max_chars
+                    break
+
+                combined_parts.append(text)
+                current_chars += len(text)
+
+    merged_payload = dict(best_payload)
+    merged_payload["description"] = "\n\n".join(part for part in combined_parts if part).strip()
+    merged_payload["related_titles"] = merged_related_titles
+
+    if merged_image_paths:
+        merged_payload["embedded_image_paths"] = merged_image_paths
+    if merged_image_targets:
+        merged_payload["embedded_image_targets"] = merged_image_targets
+
+    return merged_payload

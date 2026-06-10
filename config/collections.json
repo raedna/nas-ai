@@ -93,17 +93,6 @@
       "field_filters": []
     }
   },
-  "bbg_fields": {
-    "path": "/Users/raednasr/Documents/OmniVista/BBG_FIELDS_TEST.xlsx",
-    "allowed_filetypes": [
-      "tables"
-    ],
-    "source_label": "BBG Fields - short",
-    "notes": "",
-    "filters": {
-      "field_filters": []
-    }
-  },
   "M51": {
     "path": "/Users/raednasr/M51-Whirlpool",
     "allowed_filetypes": [
@@ -137,6 +126,36 @@
     "path": "/Users/raednasr/RaedsMacM1/nas-ai/images_tests",
     "allowed_filetypes": [
       "image"
+    ],
+    "allowed_extensions": [],
+    "exclude_dirs": [],
+    "exclude_extensions": [],
+    "asset_search_roots": [],
+    "source_label": "",
+    "notes": "",
+    "filters": {
+      "field_filters": []
+    }
+  },
+  "bbg_test": {
+    "path": "/Users/raednasr/RaedsMacM1/nas-ai/table_test_input/BBG_FIELDS_TEST.xlsx",
+    "allowed_filetypes": [
+      "tables"
+    ],
+    "allowed_extensions": [],
+    "exclude_dirs": [],
+    "exclude_extensions": [],
+    "asset_search_roots": [],
+    "source_label": "",
+    "notes": "",
+    "filters": {
+      "field_filters": []
+    }
+  },
+  "bbg_fields": {
+    "path": "/Users/raednasr/RaedsMacM1/nas-ai/table_test_input/BBG_FIELDS_TEST.xlsx",
+    "allowed_filetypes": [
+      "tables"
     ],
     "allowed_extensions": [],
     "exclude_dirs": [],

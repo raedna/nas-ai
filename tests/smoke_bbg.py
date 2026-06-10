@@ -1,16 +1,19 @@
 """
-FIX Smoke Test Runner
+BBG Smoke Test Runner
 =====================
-Runs the standard FIX question set against the live system and reports
+Runs the standard BBG question set against the live system and reports
 pass/fail for each question.
 
-Usage (from project root, with nas-ai conda env active):
-    python tests/smoke_fix.py
-    python tests/smoke_fix.py --verbose
-    python tests/smoke_fix.py --out results/smoke_fix.json
+BBG fields have no enum values — tests focus on:
+  - Mnemonic (primary_name) lookup
+  - Description lookup
+  - DataType lookup
+  - Discovery list (multiple results by keyword or category)
 
-No hardcoding: collection name and expected patterns are defined in
-SMOKE_TESTS below as plain data.
+Usage (from project root, with nas-ai conda env active):
+    python tests/smoke_bbg.py
+    python tests/smoke_bbg.py --verbose
+    python tests/smoke_bbg.py --out results/smoke_bbg.json
 """
 
 import argparse
@@ -25,74 +28,64 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-COLLECTION = "xml_test"
+COLLECTION = "bbg_fields"
 
 SMOKE_TESTS = [
     {
-        "id": "FIX-01",
-        "question": "what is tag 22",
-        "description": "Single field lookup — returns tag 22 name + description, no enum flood",
-        "must_contain": ["22", "SecurityIDSource"],
+        "id": "BBG-01",
+        "question": "what is PX_ASK",
+        "description": "Mnemonic lookup — returns PX_ASK with description 'Ask Price'",
+        "must_contain": ["PX_ASK", "Ask Price"],
         "must_not_contain": [],
-        "expected_methods": ["structured_namespace_lookup"],
+        "expected_methods": ["structured_namespace_lookup", "lexical_short", "semantic"],
         "min_results": 1,
-        "enum_count_max": 3,
+        "enum_count_max": 0,
     },
     {
-        "id": "FIX-02",
-        "question": "what values can tag 22 have",
-        "description": "Enum lookup — returns enum values for tag 22 including ISIN",
-        "must_contain": ["22", "ISIN"],
+        "id": "BBG-02",
+        "question": "what is the description of ARD_OPERATING_EXP_PER_ASM_ASK",
+        "description": "Description lookup — returns ARD Operating Expense Per ASM",
+        "must_contain": ["ARD", "ASM"],
         "must_not_contain": [],
-        "expected_methods": ["structured_namespace_lookup", "reverse_enum_lookup"],
+        "expected_methods": ["structured_namespace_lookup", "lexical_short", "semantic"],
         "min_results": 1,
-        "enum_count_max": None,
+        "enum_count_max": 0,
     },
     {
-        "id": "FIX-03",
-        "question": "what tag is exec broker",
-        "description": "Name lookup — returns tag 76 ExecBroker",
-        "must_contain": ["76", "ExecBroker"],
+        "id": "BBG-03",
+        "question": "what type is PX_ASK",
+        "description": "Type lookup — returns DataType Double for PX_ASK",
+        "must_contain": ["Double"],
         "must_not_contain": [],
-        "expected_methods": ["structured_query_plan", "lexical_short", "semantic"],
+        "expected_methods": ["structured_namespace_lookup", "lexical_short", "semantic"],
         "min_results": 1,
-        "enum_count_max": None,
+        "enum_count_max": 0,
     },
     {
-        "id": "FIX-04",
-        "question": "what tag is execution broker",
-        "description": "Synonym lookup — returns tag 76 ExecBroker via synonym",
-        "must_contain": ["76", "ExecBroker"],
-        "must_not_contain": [],
-        "expected_methods": ["structured_query_plan", "lexical_short", "semantic"],
-        "min_results": 1,
-        "enum_count_max": None,
-    },
-    {
-        "id": "FIX-05",
-        "question": "what tag can have a value ISIN",
-        "description": "Reverse enum lookup — returns tag 22 SecurityIDSource",
-        "must_contain": ["22", "ISIN"],
-        "must_not_contain": [],
-        "expected_methods": ["reverse_enum_lookup", "structured_namespace_lookup"],
-        "min_results": 1,
-        "enum_count_max": None,
-    },
-    {
-        "id": "FIX-06",
-        "question": "what tags contain security",
-        "description": "Discovery list — returns multiple tags with security in name/desc",
-        "must_contain": ["security"],
+        "id": "BBG-04",
+        "question": "what fields contain ask price",
+        "description": "Discovery list — returns multiple fields with ask price in name/desc",
+        "must_contain": ["ASK"],
         "must_not_contain": [],
         "expected_methods": ["discovery_list", "structured_query_plan"],
         "min_results": 3,
         "enum_count_max": None,
     },
     {
-        "id": "FIX-07",
-        "question": "what tags contain broker",
-        "description": "Discovery list — returns multiple tags with broker in name/desc",
-        "must_contain": ["broker"],
+        "id": "BBG-05",
+        "question": "what fields are in category airlines",
+        "description": "Category discovery — returns multiple ARD airline fields",
+        "must_contain": ["ARD"],
+        "must_not_contain": [],
+        "expected_methods": ["discovery_list", "structured_query_plan"],
+        "min_results": 3,
+        "enum_count_max": None,
+    },
+    {
+        "id": "BBG-06",
+        "question": "what string fields are available",
+        "description": "Type discovery — returns multiple String type fields",
+        "must_contain": ["String"],
         "must_not_contain": [],
         "expected_methods": ["discovery_list", "structured_query_plan"],
         "min_results": 3,
@@ -101,7 +94,7 @@ SMOKE_TESTS = [
 ]
 
 # ---------------------------------------------------------------------------
-# Helpers
+# Helpers (shared pattern with smoke_fix.py)
 # ---------------------------------------------------------------------------
 
 def answer_to_text(answer) -> str:
@@ -124,7 +117,9 @@ def answer_to_text(answer) -> str:
             for item in answer.get("results", []):
                 name = item.get("primary_name") or item.get("identifier") or ""
                 preview = item.get("preview") or ""
-                lines.append(f"- {name}: {preview}" if preview else f"- {name}")
+                type_val = item.get("payload", {}).get("type", "") if item.get("payload") else ""
+                suffix = f" [{type_val}]" if type_val and type_val != "structured" else ""
+                lines.append(f"- {name}: {preview}{suffix}" if preview else f"- {name}{suffix}")
             return "\n".join(lines)
         return json.dumps(answer)
     return str(answer)
@@ -135,7 +130,6 @@ def count_enum_lines(text: str) -> int:
 
 
 def count_result_lines(text: str) -> int:
-    """Count non-empty lines as a proxy for number of results returned."""
     return sum(1 for line in text.splitlines() if line.strip())
 
 
@@ -168,7 +162,8 @@ def evaluate(test: dict, answer_text: str, method: str) -> dict:
         if enum_count > max_enums:
             result["pass"] = False
             result["failures"].append(
-                f"TOO MANY enum lines: got {enum_count}, max {max_enums}"
+                f"TOO MANY enum lines: got {enum_count}, max {max_enums} "
+                f"(BBG fields have no enums — something is wrong)"
             )
 
     min_results = test.get("min_results")
@@ -206,7 +201,7 @@ def run(verbose: bool = False) -> list:
     results = []
 
     print(f"\n{'='*60}")
-    print(f"  NAS-AI FIX Smoke Test  —  collection: {COLLECTION}")
+    print(f"  NAS-AI BBG Smoke Test  —  collection: {COLLECTION}")
     print(f"  {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print(f"{'='*60}\n")
 
@@ -262,7 +257,7 @@ def run(verbose: bool = False) -> list:
 
 
 def main():
-    parser = argparse.ArgumentParser(description="FIX smoke test runner")
+    parser = argparse.ArgumentParser(description="BBG smoke test runner")
     parser.add_argument("--out", type=str, help="Save JSON results to this path")
     parser.add_argument("--verbose", action="store_true", help="Print full answers")
     args = parser.parse_args()

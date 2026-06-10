@@ -462,6 +462,14 @@ def search_enum_values(
 
     return points
 
+def collection_has_enums(collection_name: str) -> bool:
+    """Return True if the collection has any enum values ingested."""
+    rows = fetchall(
+        "SELECT 1 FROM enum_values WHERE collection_name = %s LIMIT 1",
+        (collection_name,)
+    )
+    return len(rows) > 0
+
 
 # ---------------------------------------------------------------------------
 # Structured role search

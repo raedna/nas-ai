@@ -141,6 +141,17 @@ def detect_ask_intent(question: str) -> Dict[str, str]:
 
             return {"mode": rule["mode"], "reason": rule["reason"]}
 
+    # Ambiguous terms (contain/contains/has/have) without a value indicator
+    # are discovery list queries, not reverse enum lookups
+    ambiguous_discovery = {"contain", "contains"}
+    value_indicators = {"value", "values", "allowed", "valid", "option", "options"}
+    has_value_indicator = any(
+        re.search(rf"\b{re.escape(v)}\b", q) for v in value_indicators
+    )
+    if not has_value_indicator:
+        if any(re.search(rf"\b{re.escape(t)}\b", q) for t in ambiguous_discovery):
+            return {"mode": "discovery_list", "reason": "contain/contains without value indicator treated as discovery list"}
+
     return {"mode": "answer", "reason": "default answer mode"}
 
 

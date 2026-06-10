@@ -20,7 +20,18 @@
       "how do i find",
       "where do i find",
       "where can i find",
-      "how can i find"
+      "how can i find",
+      "can have a value",
+      "can have value",
+      "have a value",
+      "what tag can have",
+      "what field can have",
+      "which tag can have",
+      "which field can have",
+      "what tag has value",
+      "what field has value",
+      "which tag has value",
+      "which field has value"
     ],
     "discovery_patterns": [
       "list notes",
@@ -33,7 +44,12 @@
       "what notes",
       "what documents",
       "available notes",
-      "what do i have about"
+      "what do i have about",
+      "fields are in category",
+      "fields in category",
+      "fields for category",
+      "fields are in",
+      "fields available in"
     ],
     "discovery_verbs": [
       "list",

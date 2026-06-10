@@ -9,42 +9,48 @@
 
 ---
 
-## System State (baseline)
+## System State (current)
 
 | Component | Status |
 |---|---|
 | LM Studio (Mac M1 Pro) | Running — serves embeddings + LLM |
 | Embeddings model | `text-embedding-bge-large-en-v1.5` (1024 dims) |
 | LLM model | `meta-llama-3.1-8b-instruct` |
-| Qdrant (NAS) | Running at `100.123.16.57:6333` |
-| ai-postgres (NAS) | Installed, not used |
+| Qdrant (NAS) | Running at `100.123.16.57:6333` — vector search only (admin UI only) |
+| ai-pgvector (NAS) | Running at port 5433, db=nasai — PRIMARY STORE |
 | ai-redis (NAS) | Installed, not used |
-| Streamlit UI | Working |
-| FIX collection (`xml_test`) | Partially working — primary target |
-| BBG collection (`bbg_fields`) | 800 of 69K rows ingested, partially tested |
+| Streamlit UI | Working — wired to new retrieval package |
+| FIX collection (`xml_test`) | 1168 chunks + 1791 enum values in PostgreSQL — 7/7 smoke tests passing |
+| BBG collection (`bbg_fields`) | 730 rows (test subset) in PostgreSQL — 6/6 smoke tests passing |
 | KB docs (`kb_docs`) | Ingested, not yet reliably tested |
 | Obsidian, astro, images | Early stage |
 
 ---
 
-## Known Issues (from manual + code review)
+## Known Issues
 
-| ID | Area | Description |
-|---|---|---|
-| RET-011 | FIX retrieval | `what is tag 22` returns tag details + all enums. Should be focused unless enums explicitly requested. |
-| RET-010 | Structured planner | Ranking balance for phrases like "executing broker" in long descriptions. |
-| CODE-001 | query_router.py | `client.scroll(limit=5000)` in 4 lexical search functions — full collection scan in Python, not indexed. |
-| CODE-002 | query_router.py | `if collection == "obsidian":` hardcoded collection name check. |
-| CODE-003 | query_router.py | Qdrant client instantiated at module import time — system fails to start if NAS unreachable. |
-| CODE-004 | query_router.py | `run_query_with_method` and `route_query` overlap in logic and are not fully in sync. |
-| CODE-005 | xml_serializer.py | Function-level state (`_all_rows`, `_files_seen`) for cross-file buffering — corrupts silently on crash. |
-| CODE-007 | collection_state | Deleting a Qdrant collection does NOT clear `config/collection_state/<name>.json`. Files are skipped on next ingest as "unchanged". Workaround: manually delete the state file before re-ingesting. Permanent fix: move state to PostgreSQL in Phase 2. |
+| ID | Area | Description | Status |
+|---|---|---|---|
+| RET-010 | Structured planner | Ranking balance for phrases like "executing broker" in long descriptions. | Mitigated via synonyms.json |
+| CODE-005 | xml_serializer.py | Function-level state (`_all_rows`, `_files_seen`) for cross-file buffering — corrupts silently on crash. | ⏳ Pending |
+| CODE-008 | ui_app.py | Collection management UI still uses Qdrant REST API (get_qdrant_collections, get_collection_stats, delete_qdrant_collection). Needs migration to PostgreSQL. | ⏳ Phase 3 follow-up |
+| CODE-009 | ui_app.py | Force re-ingest does not always delete existing DB rows before re-inserting — stale data can persist. | ⏳ Pending |
+| CODE-010 | ingestion | Collection name mismatch between UI and PostgreSQL collections table causes ForeignKeyViolation on ingest. Collections should be created in DB when created in UI. | ⏳ Pending |
+| CODE-011 | schema_loader.py | Schema files stored on disk (`schemas/`) — should be migrated to PostgreSQL schemas table for consistency. | ⏳ Pending |
+
+**Retired issues (resolved):**
+- RET-011 — FIX-01 enum suppression: fixed in Phase 1
+- CODE-001 — `scroll(limit=5000)`: eliminated by BM25/pgvector in Phase 2
+- CODE-002 — hardcoded collection name: eliminated in retrieval package
+- CODE-003 — Qdrant client at import time: eliminated — db_retrieval.py connects lazily
+- CODE-004 — `run_query_with_method` / `route_query` overlap: resolved in router.py
+- CODE-007 — collection state JSON: eliminated — ingestion state now in PostgreSQL `files` table
 
 ---
 
 ## Roadmap
 
-### Phase 1 — Stabilize FIX retrieval (current focus)
+### Phase 1 — Stabilize FIX retrieval ✅ COMPLETE
 Goal: every question in the FIX smoke test returns the correct answer consistently.
 
 | Step | Description | Status |
@@ -58,8 +64,8 @@ Goal: every question in the FIX smoke test returns the correct answer consistent
 | 1.7 | Fix FIX-03/04: doc_type None in xml_serializer payload — added doc_type passthrough | ✅ Done — 6/6 passed |
 | 1.9 | Fix "executing broker" ranking — add "executing" as synonym key in synonyms.json | ✅ Done — 6/6 passed |
 
-### Phase 1b — FIX version separation (after 6/6 smoke test)
-Goal: answers identify whether a tag comes from FIX 4.2, 4.4, or both. Enable version-filtered questions and comparison queries.
+### Phase 1b — FIX version separation
+Goal: answers identify whether a tag comes from FIX 4.2, 4.4, or both.
 
 | Step | Description | Status |
 |---|---|---|
@@ -70,33 +76,73 @@ Goal: answers identify whether a tag comes from FIX 4.2, 4.4, or both. Enable ve
 
 ---
 
-### Phase 2 — PostgreSQL as primary store (current focus)
-Goal: PostgreSQL replaces Qdrant payloads, collection state JSON, and collections JSON. Qdrant kept for vector search only until pgvector migration complete.
+### Phase 2 — PostgreSQL as primary store ✅ COMPLETE
+Goal: PostgreSQL replaces Qdrant payloads, collection state JSON, and collections JSON.
 
 | Step | Description | Status |
 |---|---|---|
 | 2.1 | Deploy ai-pgvector container on NAS (port 5433) | ✅ Done |
 | 2.2 | Deploy pgAdmin container (port 5055) | ✅ Done |
 | 2.3 | Design and create schema (10 tables, 2 views) | ✅ Done |
-| 2.4 | Migrate collections.json → collections table | ⏳ Pending |
+| 2.4 | Migrate collections.json → collections table | ✅ Done (via collection_config.py) |
 | 2.5 | Write Python db layer (core/db.py) — connection + CRUD | ✅ Done |
 | 2.6 | Update ingestion to write to PostgreSQL (pg_client.py) | ✅ Done |
 | 2.7 | Re-ingest xml_test into PostgreSQL — 1168 chunks, 1791 enum values | ✅ Done |
-| 2.8 | Split query_router into retrieval package | 🔄 In progress |
-| 2.8.1 | core/retrieval/db_retrieval.py — PostgreSQL query layer | ✅ Done |
-| 2.8.2 | core/retrieval/structured.py — structured + namespace lookup | ✅ Done |
-| 2.8.3 | core/retrieval/lexical.py — BM25 + lexical search | ✅ Done |
-| 2.8.4 | core/retrieval/semantic.py — vector search | ✅ Done |
-| 2.8.5 | core/retrieval/crosslink.py — relationships | ✅ Done |
-| 2.8.6 | core/retrieval/discovery.py — count/list queries | ✅ Done |
-| 2.8.7 | core/retrieval/reranker.py — scoring + reranking | ⏳ Pending |
-| 2.8.8 | core/retrieval/answer.py — answer synthesis | ⏳ Pending |
-| 2.8.9 | core/retrieval/router.py — query routing entry point | ⏳ Pending |
-| 2.9 | Run smoke tests against PostgreSQL backend | ⏳ Pending |
-| 2.10 | Retire Qdrant as primary store | ⏳ Pending |
+| 2.8 | Split query_router into retrieval package (10 files) | ✅ Done |
+| 2.9 | ui_app.py wired to new retrieval package | ✅ Done |
+| 2.10 | smoke_retrieval.py — 23/23 passed | ✅ Done |
+| 2.11 | smoke_fix.py — 6/6 passed against PostgreSQL backend | ✅ Done |
+| 2.12 | Retire query_router.py, discovery_engine.py, crosslink_engine.py | ✅ Done — archived to core/_retired/ |
+| 2.13 | Retire qdrant_client.py, fix structured_plan_executor.py Qdrant import | ✅ Done |
 
-### Phase 3 — Fix BBG at full scale (69K rows)
-Goal: ingest and retrieve reliably across full dataset.
+**Retrieval package summary (`core/retrieval/`):**
+
+| File | Role |
+|---|---|
+| `db_retrieval.py` | Only file that touches PostgreSQL — all SQL here |
+| `structured.py` | Namespace / identifier / primary_name lookups |
+| `lexical.py` | BM25 search — trusts PostgreSQL ranking, no Python re-scoring |
+| `semantic.py` | pgvector similarity search |
+| `crosslink.py` | Relationships, enum lookups, doc chunk enrichment |
+| `discovery.py` | Count / list queries |
+| `reranker.py` | Scoring, deduplication, reranking |
+| `answer.py` | Answer synthesis, display labels |
+| `router.py` | Entry point — `run_query_with_method`, `route_query` |
+| `__init__.py` | Package exports |
+
+---
+
+### Phase 3 — BBG ingestion and retrieval ← CURRENT FOCUS
+Goal: ingest and retrieve reliably across BBG dataset. Test subset (730 rows) complete. Full dataset pending.
+
+| Step | Description | Status |
+|---|---|---|
+| 3.1 | Audit BBG file structure — 5 columns, 730 rows test subset | ✅ Done |
+| 3.2 | Confirm schema file exists (`schemas/bbg_fields_BBG_FIELDS_TEST_schema.json`) | ✅ Done |
+| 3.3 | Ingest BBG test subset (730 rows) into PostgreSQL | ✅ Done |
+| 3.4 | Write BBG smoke test (`tests/smoke_bbg.py`) — 6 questions | ✅ Done |
+| 3.5 | Fix routing regressions affecting both FIX and BBG | ✅ Done |
+| 3.5.1 | `looks_like_reverse_enum_query` — Guard 1: skip if collection has no enums | ✅ Done |
+| 3.5.2 | `looks_like_reverse_enum_query` — Guard 2: ambiguous terms require value indicator | ✅ Done |
+| 3.5.3 | `detect_ask_intent` — contain/contains without value indicator → discovery_list | ✅ Done |
+| 3.5.4 | `lexical_short_query_search` — trust BM25 fully, drop Python re-scoring | ✅ Done |
+| 3.5.5 | `_build_candidate_points` — lexical-first, semantic fallback | ✅ Done |
+| 3.5.6 | `reranker.py` — structured exact match boost (100pts), BM25-preserving cap | ✅ Done |
+| 3.5.7 | `answer.py` — surface `type` field in structured answers | ✅ Done |
+| 3.5.8 | `nlp_generator.py` — replace `/` with spaces in other fields for tokenization | ✅ Done |
+| 3.5.9 | `config/query_terms.json` — reverse-enum answer_patterns, category discovery_patterns | ✅ Done |
+| 3.5.10 | `db_retrieval.py` — add `collection_has_enums()` helper | ✅ Done |
+| 3.5.11 | `smoke_fix.py` — add FIX-07, method assertions, min_results checks | ✅ Done |
+| 3.5.12 | `smoke_bbg.py` — fix `answer_to_text` to handle discovery result dict | ✅ Done |
+| 3.6 | Run BBG smoke tests — 6/6 passed | ✅ Done |
+| 3.7 | Run FIX smoke tests — 7/7 passed (no regressions) | ✅ Done |
+| 3.8 | Fix force re-ingest — ensure DB rows deleted before re-inserting | ⏳ Pending |
+| 3.9 | Fix collection name mismatch (CODE-010) | ⏳ Pending |
+| 3.10 | Ingest full BBG dataset | ⏳ Pending |
+| 3.11 | Re-run BBG smoke tests against full dataset | ⏳ Pending |
+| 3.12 | ui_app.py — migrate collection management from Qdrant REST to PostgreSQL (CODE-008) | ⏳ Pending |
+
+---
 
 ### Phase 4 — MCP Server
 Goal: expose NAS-AI retrieval as MCP tools. Two modes, one server.
@@ -106,13 +152,22 @@ Goal: expose NAS-AI retrieval as MCP tools. Two modes, one server.
 | Local | LM Studio (LLaMA 3.1 8B) | Open WebUI | No |
 | Online | Claude API | Claude Desktop | Yes |
 
-Switch controlled by config — no code changes between modes.
+| Step | Description | Status |
+|---|---|---|
+| 4.1 | Design MCP tool surface (tool names, inputs, outputs) | ⏳ Pending |
+| 4.2 | Implement MCP server (core/mcp_server.py) | ⏳ Pending |
+| 4.3 | Local mode: wire to LM Studio via Open WebUI | ⏳ Pending |
+| 4.4 | Online mode: wire to Claude API via Claude Desktop | ⏳ Pending |
+| 4.5 | Smoke test both modes | ⏳ Pending |
+
+---
 
 ### Phase 5 — Advanced features
 - FIX message parser → English sentence synthesis
 - Astrophotography metadata search (FITS at scale)
 - Adaptive ingestion (no pre-defined schema required)
 - Cross-collection retrieval
+- Schema files migrated to PostgreSQL (CODE-011)
 
 ---
 
@@ -120,24 +175,47 @@ Switch controlled by config — no code changes between modes.
 
 | Date | Step | What changed | Files touched | Result |
 |---|---|---|---|---|
-| 2026-06-09 | 1.1 | Created smoke test runner | `tests/smoke_fix.py` | New file, nothing broken |
+| 2026-06-09 | 1.1 | Created smoke test runner | `tests/smoke_fix.py` | New file |
+| 2026-06-09 | 1.2–1.9 | Phase 1 FIX fixes | `query_router.py`, `xml_serializer.py`, `config/synonyms.json` | 6/6 smoke tests passing |
+| 2026-06-09 | 2.1–2.7 | PostgreSQL schema + ingestion | `core/db.py`, `core/pg_client.py`, `core/ingest_collection.py` | xml_test ingested into PostgreSQL |
+| 2026-06-09 | 2.8–2.12 | Retrieval package + ui_app cutover + retirement | `core/retrieval/` (10 files), `core/ui_app.py`, `tests/smoke_fix.py`, `tests/smoke_retrieval.py` | 23/23 + 6/6 smoke tests passing; query_router.py retired |
+| 2026-06-10 | 2.12 hotfix | FIX-05 regression: `_extract_reverse_lookup_candidate` stripping incomplete | `core/retrieval/router.py`, `config/query_terms.json` | 6/6 smoke tests passing |
+| 2026-06-10 | 2.13 | Retire qdrant_client.py; fix structured_plan_executor.py Qdrant import | `core/structured_plan_executor.py` | No regressions |
+| 2026-06-10 | 3.1–3.7 | BBG ingestion + retrieval fixes | `core/retrieval/router.py`, `core/retrieval/reranker.py`, `core/retrieval/lexical.py`, `core/retrieval/discovery.py`, `core/retrieval/answer.py`, `core/nlp_generator.py`, `core/retrieval/db_retrieval.py`, `config/query_terms.json`, `tests/smoke_fix.py`, `tests/smoke_bbg.py` | FIX 7/7, BBG 6/6 |
 
 ---
 
 ## Smoke Test Results
 
-### FIX Smoke Test — Baseline (2026-06-09)  **4/6 passed**
+### FIX Smoke Test — Phase 3 (2026-06-10) **7/7 passed**
 
-| ID | Question | Method used | Pass? | Notes |
-|---|---|---|---|---|
-| FIX-01 | what is tag 22 | structured_namespace_lookup | ❌ FAIL | RET-011: returns 19 enum lines unprompted. Answer itself is correct, just too much. |
-| FIX-02 | what values can tag 22 have | structured_namespace_lookup | ✅ PASS | Correct — enums requested, enums returned |
-| FIX-03 | what tag is exec broker | structured_query_plan | ✅ PASS | Contains "76" — but answer preview shows RoundingDirection first, not ExecBroker. Needs review. |
-| FIX-04 | what tag is execution broker | structured_query_plan | ✅ PASS | Same concern as FIX-03 — passes because "76" appears, but top result is wrong |
-| FIX-05 | what tag can have a value ISIN | structured_query_plan | ❌ FAIL | Answer shows SecurityIDSource (correct!) but "ISIN" not in text. Answer format drops enum detail. |
-| FIX-06 | what tags contain security | structured_query_plan | ✅ PASS | Good — returns correct discovery list |
+| ID | Question | Method | Pass? |
+|---|---|---|---|
+| FIX-01 | what is tag 22 | structured_namespace_lookup | ✅ PASS |
+| FIX-02 | what values can tag 22 have | structured_namespace_lookup | ✅ PASS |
+| FIX-03 | what tag is exec broker | semantic | ✅ PASS |
+| FIX-04 | what tag is execution broker | semantic | ✅ PASS |
+| FIX-05 | what tag can have a value ISIN | reverse_enum_lookup | ✅ PASS |
+| FIX-06 | what tags contain security | discovery_list | ✅ PASS |
+| FIX-07 | what tags contain broker | discovery_list | ✅ PASS |
 
-**Observations:**
-- FIX-03 and FIX-04 pass only because "76" appears somewhere in the answer — the top result shown is actually RoundingDirection, not ExecBroker. These are **false passes**. Smoke test needs stricter checks.
-- FIX-01 failure is pure RET-011: correct data, wrong verbosity.
-- FIX-05 failure: the answer finds the right tag (SecurityIDSource / Tag 22) but drops the enum value detail "ISIN" from the output format.
+### BBG Smoke Test — Phase 3 (2026-06-10) **6/6 passed**
+
+| ID | Question | Method | Pass? |
+|---|---|---|---|
+| BBG-01 | what is PX_ASK | semantic | ✅ PASS |
+| BBG-02 | what is the description of ARD_OPERATING_EXP_PER_ASM_ASK | semantic | ✅ PASS |
+| BBG-03 | what type is PX_ASK | semantic | ✅ PASS |
+| BBG-04 | what fields contain ask price | discovery_list | ✅ PASS |
+| BBG-05 | what fields are in category airlines | discovery_list | ✅ PASS |
+| BBG-06 | what string fields are available | discovery_list | ✅ PASS |
+
+### Retrieval Package Smoke Test (2026-06-09) **23/23 passed**
+
+| Section | Tests | Result |
+|---|---|---|
+| Import tests | 5 | ✅ All passed |
+| Reranker unit tests | 6 | ✅ All passed |
+| Answer unit tests | 5 | ✅ All passed |
+| Router offline tests | 4 | ✅ All passed |
+| Live integration tests | 3 | ✅ All passed |

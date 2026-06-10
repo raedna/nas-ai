@@ -59,7 +59,8 @@ def build_structured_nlp_text(row, schema):
     for f in other_fields:
         val = row_n.get(str(f).lower())
         if val not in [None, ""]:
-            other_lines.append(f"{f}: {str(val).strip()}")
+            val_clean = str(val).strip().replace("/", " ").replace("\\", " ")
+            other_lines.append(f"{f}: {val_clean}")
 
     if other_lines:
         parts.append("\n".join(other_lines))

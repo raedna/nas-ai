@@ -60,69 +60,29 @@ def lexical_short_query_search(
     limit: int = 25,
 ) -> List[Dict[str, Any]]:
     """
-    Lexical search optimised for short keyword queries.
-    Returns list of dicts with identifier, primary_name, description, score, payload.
+    BM25 search optimised for short keyword queries against structured records.
+    Delegates entirely to PostgreSQL BM25 -- no Python re-scoring.
     """
     q_norm = normalize_simple_text(question)
     if not q_norm:
         return []
 
-    words = [w for w in q_norm.split() if w]
-
-    # Use BM25 to pre-filter -- much faster than full scroll
     candidates = search_bm25(
         collection_name=collection_name,
         query=q_norm,
-        limit=200,
+        doc_type="structured",
+        limit=limit,
     )
-
-    scored = []
-
-    for p in candidates:
-        payload = p.payload or {}
-
-        primary_name = str(payload.get("primary_name") or "")
-        description = str(payload.get("description") or "")
-
-        name_norm = normalize_simple_text(primary_name)
-        desc_norm = normalize_simple_text(description)
-        combined = f"{name_norm} {desc_norm}"
-
-        if len(words) == 1 and not contains_token_or_phrase(combined, words[0]):
-            continue
-
-        score = 0.0
-
-        if q_norm == name_norm:
-            score += 100.0
-        elif contains_token_or_phrase(name_norm, q_norm):
-            score += 25.0
-        elif contains_token_or_phrase(combined, q_norm):
-            score += 10.0
-
-        word_hits_name = sum(1 for w in words if contains_token_or_phrase(name_norm, w))
-        word_hits_desc = sum(1 for w in words if contains_token_or_phrase(desc_norm, w))
-
-        score += word_hits_name * 8.0
-        score += word_hits_desc * 2.0
-
-        if words and all(contains_token_or_phrase(combined, w) for w in words):
-            score += 8.0
-
-        if score > 0:
-            scored.append((score, p))
-
-    scored.sort(key=lambda x: x[0], reverse=True)
 
     return [
         {
             "identifier": p.payload.get("identifier"),
             "primary_name": p.payload.get("primary_name"),
             "description": p.payload.get("description"),
-            "score": score,
+            "score": getattr(p, "score", 0.0),
             "payload": p.payload,
         }
-        for score, p in scored[:limit]
+        for p in candidates
     ]
 
 

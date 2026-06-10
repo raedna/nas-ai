@@ -1,0 +1,75 @@
+{
+  "run_at": "2026-06-10T12:42:49.176110",
+  "collection": "bbg_fields",
+  "results": [
+    {
+      "id": "BBG-01",
+      "question": "what is PX_ASK",
+      "description": "Mnemonic lookup \u2014 returns PX_ASK with description 'Ask Price'",
+      "pass": true,
+      "failures": [],
+      "answer_preview": "Id PR004 is PX_ASK.  Description: Ask Price",
+      "method": "semantic"
+    },
+    {
+      "id": "BBG-02",
+      "question": "what is the description of ARD_OPERATING_EXP_PER_ASM_ASK",
+      "description": "Description lookup \u2014 returns ARD Operating Expense Per ASM",
+      "pass": true,
+      "failures": [],
+      "answer_preview": "Id A0356 is ARD_OPERATING_EXP_PER_ASM_ASK.  Description: ARD Operating Expense Per ASM (Ask)",
+      "method": "semantic"
+    },
+    {
+      "id": "BBG-03",
+      "question": "what type is PX_ASK",
+      "description": "Type lookup \u2014 returns DataType Double for PX_ASK",
+      "pass": false,
+      "failures": [
+        "MISSING expected term: 'Double'"
+      ],
+      "answer_preview": "Id PR045 is PX_DISC_ASK.  Description: Ask Discount Dollar Price",
+      "method": "semantic"
+    },
+    {
+      "id": "BBG-04",
+      "question": "what fields contain ask price",
+      "description": "Discovery list \u2014 returns multiple fields with ask price in name/desc",
+      "pass": false,
+      "failures": [
+        "TOO FEW results: got 2 lines, expected at least 3",
+        "WRONG METHOD: got 'structured_primary_name_lookup', expected one of ['discovery_list', 'structured_query_plan']"
+      ],
+      "answer_preview": "Id RQ004 is ASK.  Description: Ask Price - Realtime",
+      "method": "structured_primary_name_lookup"
+    },
+    {
+      "id": "BBG-05",
+      "question": "what fields are in category airlines",
+      "description": "Category discovery \u2014 returns multiple ARD airline fields",
+      "pass": false,
+      "failures": [
+        "MISSING expected term: 'ARD'",
+        "TOO FEW results: got 2 lines, expected at least 3",
+        "WRONG METHOD: got 'semantic', expected one of ['discovery_list', 'structured_query_plan']"
+      ],
+      "answer_preview": "Id M1126 is MAINLINE_ASK.  Description: Mainline Available Seat Kilometers",
+      "method": "semantic"
+    },
+    {
+      "id": "BBG-06",
+      "question": "what string fields are available",
+      "description": "Type discovery \u2014 returns multiple String type fields",
+      "pass": false,
+      "failures": [
+        "TOO FEW results: got 1 lines, expected at least 3"
+      ],
+      "answer_preview": "{\"total_matches\": 2, \"results\": [{\"score\": 20.0, \"doc_type\": \"structured\", \"identifier\": \"G0764\", \"primary_name\": \"PG_CASM_ASK\", \"source_type\": null, \"source_file\": \"BBG_FIELDS_TEST.xlsx\", \"preview\": \"PG Cost per Available Seat Mile ASK\", \"payload\": {\"text\": \"PG_CASM_ASK\\n\\nPG Cost per Available Sea",
+      "method": "discovery_list"
+    }
+  ],
+  "summary": {
+    "passed": 2,
+    "total": 6
+  }
+}

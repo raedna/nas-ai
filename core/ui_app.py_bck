@@ -23,18 +23,9 @@ from datetime import datetime
 import requests
 import streamlit as st
 from core.ingest_collection import ingest_collection
-from core.retrieval.router import (
-    route_query,
-    semantic_search,
-    debug_route_query,
-    fetch_entity_row_by_title,
-    run_query_with_method,
-    get_display_labels,
-    explain_query_routing,
-    score_point_shared,
-)
-from core.retrieval.discovery import detect_ask_intent, run_discovery_with_method
-from core.retrieval.crosslink import run_comparison_query
+from core.query_router import route_query, semantic_search, debug_route_query, fetch_entity_row_by_title, run_query_with_method, get_display_labels, explain_query_routing, score_point_shared
+from core.discovery_engine import detect_ask_intent, run_discovery_with_method
+from core.crosslink_engine import run_comparison_query
 from core.query_helpers import infer_doc_type
 from core.retrieval_debug import score_point_shared_debug
 

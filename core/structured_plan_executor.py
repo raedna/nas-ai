@@ -1,14 +1,9 @@
 from typing import Any, Dict, List, Tuple
 
-from qdrant_client import QdrantClient
-
 from core.query_helpers import infer_doc_type, normalize_simple_text
-from core.system_config import load_system_config
 from core.query_helpers import expand_terms_with_synonyms
-
-
-cfg = load_system_config()
-client = QdrantClient(url=cfg["qdrant_url"])
+from core.retrieval.db_retrieval import scroll_collection
+from typing import Any, Dict, List, Tuple
 
 
 def normalize_match_value(value: Any) -> str:
@@ -282,12 +277,7 @@ def execute_structured_plan(
             "answer": "",
         }
 
-    points, _ = client.scroll(
-        collection_name=collection,
-        limit=10000,
-        with_payload=True,
-        with_vectors=False,
-    )
+    points = scroll_collection(collection, limit=10000)
 
     scored: List[Tuple[float, Any]] = []
 
