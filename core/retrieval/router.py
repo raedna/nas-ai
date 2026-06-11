@@ -75,6 +75,8 @@ from core.retrieval.answer import (
     get_source_label,
 )
 
+from core.retrieval.db_retrieval import collection_has_enums
+
 # ---------------------------------------------------------------------------
 # Planner config helper
 # ---------------------------------------------------------------------------
@@ -322,30 +324,63 @@ def _normalise_to_points(items: List) -> List:
     return items
 
 
+def _get_bm25_queries(question: str) -> List[str]:
+    """
+    Build BM25 query variants from a question.
+    Strips noise words, expands synonyms into separate query variants.
+    """
+    from core.query_helpers import load_doc_query_hints, expand_terms_with_synonyms
+    
+    q_norm = normalize_simple_text(question)
+    hints = load_doc_query_hints()
+    noise = set(hints.get("discovery_noise_words", []))
+    noise.update(hints.get("question_words", []))
+    noise.update(hints.get("structured_namespace_terms", []))
+    noise.update(hints.get("stopwords", []))
+
+    content_words = [w for w in q_norm.split() if w and w not in noise]
+    if not content_words:
+        return [q_norm]
+
+    queries: set = set()
+    queries.add(" ".join(content_words))
+
+    for i, word in enumerate(content_words):
+        synonyms = expand_terms_with_synonyms([word])
+        for syn in synonyms:
+            if syn != word:
+                variant = content_words[:i] + [syn] + content_words[i+1:]
+                queries.add(" ".join(variant))
+
+    return list(queries)
+
+
 def _build_candidate_points(collection: str, question: str, limit: int = 25) -> List:
-    # Always try lexical first — BM25 is fast and exact matches score very high
-    raw = lexical_short_query_search(collection, question, limit=limit)
-    lex_points = _normalise_to_points(raw)
+    """
+    Build candidate set using PostgreSQL RRF (BM25 + pgvector).
+    Replaces separate BM25 + semantic merge with a single SQL query.
+    """
+    from core.retrieval.db_retrieval import search_rrf
+    from core.retrieval.semantic import embed_question
 
-    # If top lexical result is a strong exact primary_name match, return immediately
-    if lex_points:
-        top = lex_points[0]
-        top_score = float(getattr(top, "score", 0.0))
-        if top_score >= 0.05:
-            return lex_points
+    bm25_queries = _get_bm25_queries(question)
+    embedding = embed_question(question)
 
-    # Otherwise merge lexical + semantic
-    sem_points = semantic_search(collection, question, limit=limit)
+    # Detect namespace filter from question
+    q_norm = normalize_simple_text(question)
+    namespace_filter = None
+    if re.search(r'\btag\b', q_norm):
+        namespace_filter = 'tag'
+    elif re.search(r'\bcomponent\b|\bcomponentid\b', q_norm):
+        namespace_filter = 'componentid'
 
-    seen_ids: set = set()
-    points = []
-    for p in lex_points + _normalise_to_points(sem_points):
-        pid = getattr(p, "id", None) or id(p)
-        if pid not in seen_ids:
-            seen_ids.add(pid)
-            points.append(p)
-
-    return points
+    return search_rrf(
+        collection_name=collection,
+        bm25_queries=bm25_queries,
+        embedding=embedding,
+        limit=limit,
+        identifier_namespace=namespace_filter,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -382,13 +417,34 @@ def route_query(
     # Use the best point
     best = points[0]
     payload = best.payload or {}
-    payload["_question"] = question
-
-    # For chunked document payloads, enrich by merging nearby/same-section chunks
     doc_type = infer_doc_type(payload)
+
+    # For structured collections — reranker not needed, RRF already ranked correctly
+    # For chunked docs and entity rows — reranker still helps
+    if doc_type != "structured":
+        points = rerank_points(points, question)
+        best = points[0]
+        payload = best.payload or {}
+        doc_type = infer_doc_type(payload)
+
+    # Confidence check — if top RRF score is below threshold return top 5
+    from core.system_config import load_system_config
+    CONFIDENCE_THRESHOLD = load_system_config().get("retrieval_confidence_threshold", 0.105)
+    if doc_type == "structured" and getattr(best, "score", 0.0) < CONFIDENCE_THRESHOLD:
+        top5 = points[:5]
+        lines = [f"No exact match found for '{question}'. Closest results:"]
+        for p in top5:
+            pl = p.payload or {}
+            name = pl.get("primary_name") or ""
+            identifier = pl.get("identifier") or ""
+            desc = str(pl.get("description") or "")[:80]
+            lines.append(f"- {identifier}: {name} — {desc}" if desc else f"- {identifier}: {name}")
+        return "\n".join(lines)
+
+    payload["_question"] = question
+    # For chunked document payloads, enrich by merging nearby/same-section chunks
     if doc_type not in ("structured", "entity_row"):
         payload = build_fuller_doc_payload(collection, payload) or payload
-
     return synthesize_answer(payload, roles, collection)
 
 
@@ -576,17 +632,36 @@ def debug_route_query(
     limit: int = 25,
 ) -> Dict:
     """
-    Like run_query_with_method but also returns the raw candidate points
+    Like run_query_with_method but also returns raw candidate points
     and per-point scores for debugging in the UI.
     """
     query_result = run_query_with_method(collection, question, limit=limit)
 
-    # Build candidate set for debug display
-    points = _build_candidate_points(collection, question, limit=limit)
-    points = rerank_points(points, question)
+    # Lexical candidates
+    from core.retrieval.lexical import lexical_short_query_search, lexical_chunk_search
+    from core.retrieval.semantic import semantic_search
 
+    lexical_short_raw = lexical_short_query_search(collection, question, limit=limit)
+    lexical_short_items = lexical_short_raw  # already list of dicts
+
+    sem_points = semantic_search(collection, question, limit=limit)
+    lex_chunk_points = lexical_chunk_search(collection, question, limit=limit)
+
+    # Merged + reranked
+    merged = _build_candidate_points(collection, question, limit=limit)
+    ranked = rerank_points(merged, question)
+
+    query_result["lexical_short_items"] = lexical_short_items
+    query_result["semantic_points"] = sem_points
+    query_result["lexical_chunk_points"] = lex_chunk_points
+    query_result["lexical_structured_points"] = []
+    query_result["lexical_entity_points"] = []
+    query_result["merged_points"] = merged
+    query_result["ranked_points"] = ranked
+
+    # Also keep flat debug_points for any new UI code
     debug_points = []
-    for p in points[:20]:
+    for p in ranked[:20]:
         payload = p.payload or {}
         debug_points.append({
             "id": getattr(p, "id", ""),
@@ -597,8 +672,8 @@ def debug_route_query(
             "source_type": payload.get("source_type"),
             "description": str(payload.get("description") or "")[:200],
         })
-
     query_result["debug_points"] = debug_points
+
     return query_result
 
 

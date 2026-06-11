@@ -336,8 +336,9 @@ def search_bm25(
     """
     conditions = [
         "collection_name = %s",
-        "nlp_text_tsv @@ plainto_tsquery('english', %s)"
+        "nlp_text_tsv @@ websearch_to_tsquery('english', %s)"
     ]
+
     params = [collection_name, query]
 
     if doc_type:
@@ -351,7 +352,7 @@ def search_bm25(
     params.append(limit)
 
     sql = f"""
-        WITH q AS (SELECT plainto_tsquery('english', %s) AS tsq)
+        WITH q AS (SELECT websearch_to_tsquery('english', %s) AS tsq)
         SELECT c.id, c.collection_name, c.source_file, c.source_type, c.doc_type,
                c.identifier, c.identifier_field, c.identifier_namespace, c.identifier_kind,
                c.primary_name, c.description, c.nlp_text, c.payload,
@@ -411,6 +412,138 @@ def search_vector(
     rows = fetchall(sql, tuple([vector_str] + params))
     return _rows_to_points(rows, score_key="similarity")
 
+# ---------------------------------------------------------------------------
+# Hybrid RRF search
+# Combines BM25 + vector search using Reciprocal Rank Fusion
+# Eliminates score scale disparity between BM25 and semantic
+# ---------------------------------------------------------------------------
+def search_rrf(
+    collection_name: str,
+    bm25_queries: List[str],
+    embedding: List[float],
+    doc_type: str = None,
+    limit: int = 25,
+    k_bm25: int = 60,
+    k_vector: int = 60,
+    k_trgm: int = 10,
+    identifier_namespace: str = None
+) -> List[Point]:
+    """
+    Hybrid search combining BM25 + pgvector + trigram using Reciprocal Rank Fusion.
+    Three signals fused by rank position — eliminates score scale disparity.
+    k_trgm is lower (10) to give name similarity more weight.
+    """
+    tsquery_expr = " || ".join(
+        "websearch_to_tsquery('english', %s)"
+        for _ in bm25_queries
+    )
+
+    # Build GREATEST(...) expression for trigram — picks best similarity across all variants
+    trgm_expr = "GREATEST(" + ", ".join("similarity(primary_name, %s)" for _ in bm25_queries) + ")"
+
+    # Build OR condition for trigram match across all variants
+    trgm_match = " OR ".join("primary_name %% %s" for _ in bm25_queries)
+
+    doc_type_filter = "AND doc_type = %s" if doc_type else ""
+    namespace_filter_clause = "AND identifier_namespace = %s" if identifier_namespace else ""
+    vector_str = "[" + ",".join(str(x) for x in embedding) + "]"
+    rrf_limit = limit * 2
+
+    sql = f"""
+        WITH
+        bm25_search AS (
+            SELECT id,
+                   ROW_NUMBER() OVER (
+                       ORDER BY ts_rank_cd(nlp_text_tsv, {tsquery_expr}) DESC
+                   ) as rank
+            FROM chunks
+            WHERE collection_name = %s
+            {doc_type_filter}
+            {namespace_filter_clause}
+            AND nlp_text_tsv @@ ({tsquery_expr})
+            LIMIT %s
+        ),
+        vector_search AS (
+            SELECT id,
+                   ROW_NUMBER() OVER (
+                       ORDER BY embedding <=> %s::vector
+                   ) as rank
+            FROM chunks
+            WHERE collection_name = %s
+            {doc_type_filter}
+            {namespace_filter_clause}
+            AND embedding IS NOT NULL
+            LIMIT %s
+        ),
+        trigram_search AS (
+            SELECT id,
+                   ROW_NUMBER() OVER (
+                       ORDER BY {trgm_expr} DESC
+                   ) as rank
+            FROM chunks
+            WHERE collection_name = %s
+            {doc_type_filter}
+            {namespace_filter_clause}
+            AND ({trgm_match})
+            LIMIT %s
+        ),
+        fused AS (
+            SELECT
+                COALESCE(b.id, v.id, t.id) as id,
+                COALESCE(1.0 / ({k_bm25} + b.rank), 0.0) +
+                COALESCE(1.0 / ({k_vector} + v.rank), 0.0) +
+                COALESCE(1.0 / ({k_trgm} + t.rank), 0.0) as rrf_score
+            FROM bm25_search b
+            FULL OUTER JOIN vector_search v ON b.id = v.id
+            FULL OUTER JOIN trigram_search t ON COALESCE(b.id, v.id) = t.id
+        )
+        SELECT c.id, c.collection_name, c.source_file, c.source_type, c.doc_type,
+               c.identifier, c.identifier_field, c.identifier_namespace, c.identifier_kind,
+               c.primary_name, c.description, c.nlp_text, c.payload,
+               f.rrf_score AS bm25_score
+        FROM fused f
+        JOIN chunks c ON c.id = f.id
+        ORDER BY f.rrf_score DESC
+        LIMIT %s
+    """
+
+    params = []
+    # ts_rank args
+    params.extend(bm25_queries)
+    # bm25_search WHERE collection_name
+    params.append(collection_name)
+    if doc_type:
+        params.append(doc_type)
+    if identifier_namespace:
+        params.append(identifier_namespace)
+    params.extend(bm25_queries)
+    # bm25_search LIMIT
+    params.append(rrf_limit)
+    # vector ORDER BY
+    params.append(vector_str)
+    # vector WHERE collection_name
+    params.append(collection_name)
+    if doc_type:
+        params.append(doc_type)
+    if identifier_namespace:
+        params.append(identifier_namespace)
+    params.append(rrf_limit)
+    # trigram GREATEST args
+    params.extend(bm25_queries)
+    # trigram WHERE collection_name
+    params.append(collection_name)
+    if doc_type:
+        params.append(doc_type)
+    if identifier_namespace:
+        params.append(identifier_namespace)
+    params.extend(bm25_queries)
+    # trigram LIMIT
+    params.append(rrf_limit)
+    # final LIMIT
+    params.append(limit)
+
+    rows = fetchall(sql, tuple(params))
+    return _rows_to_points(rows, score_key="bm25_score")
 
 # ---------------------------------------------------------------------------
 # Enum lookup
@@ -498,20 +631,15 @@ def search_by_role_field(
 
     conditions = [
         "collection_name = %s",
-        "nlp_text_tsv @@ plainto_tsquery('english', %s)"
+        f"LOWER({col}) LIKE LOWER(%s)",
     ]
-    where_params = [collection_name, query]
+    params = [collection_name, f"%{search_text}%"]
 
     if doc_type:
         conditions.append("doc_type = %s")
-        where_params.append(doc_type)
+        params.append(doc_type)
 
-    if source_type:
-        conditions.append("source_type = %s")
-        where_params.append(source_type)
-
-    # ts_rank %s is in SELECT before WHERE — must be first param
-    params = [query] + where_params + [limit]
+    params.append(limit)
 
     sql = f"""
         SELECT id, collection_name, source_file, source_type, doc_type,

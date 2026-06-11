@@ -3,7 +3,7 @@
   "exec": ["execution", "executing"],
   "executing": ["exec", "execution"],
   
-  "quantity": ["qty", "quant"],
+  "quantity": ["qty"],
   "qty": ["quantity"],
 
   "price": ["px", "prc"],

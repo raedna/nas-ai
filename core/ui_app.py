@@ -581,8 +581,63 @@ def delete_qdrant_collection(qdrant_url: str, collection_name: str):
     r.raise_for_status()
 
 
-NLP_CONFIG_PATH = Path("config/nlp_config.json")
+# ---------------------------------------------------------------------------
+# PostgreSQL collection helpers — replace Qdrant equivalents
+# ---------------------------------------------------------------------------
 
+def get_pg_collections() -> list:
+    """Return list of collection names from PostgreSQL."""
+    try:
+        from core.retrieval.db_retrieval import fetchall
+        rows = fetchall(
+            "SELECT name FROM collections ORDER BY name",
+            ()
+        )
+        return [r["name"] for r in rows]
+    except Exception:
+        return []
+
+
+@st.cache_data(ttl=60)
+def get_all_collection_stats() -> dict:
+    """Return chunk and enum counts for all collections in one query."""
+    try:
+        from core.retrieval.db_retrieval import fetchall
+        chunks = fetchall(
+            "SELECT collection_name, COUNT(*) as n FROM chunks GROUP BY collection_name",
+            ()
+        )
+        enums = fetchall(
+            "SELECT collection_name, COUNT(*) as n FROM enum_values GROUP BY collection_name",
+            ()
+        )
+        chunk_map = {r["collection_name"]: r["n"] for r in chunks}
+        enum_map = {r["collection_name"]: r["n"] for r in enums}
+        all_names = set(chunk_map) | set(enum_map)
+        return {
+            name: {
+                "chunks": chunk_map.get(name, 0),
+                "enums": enum_map.get(name, 0),
+            }
+            for name in all_names
+        }
+    except Exception:
+        return {}
+
+
+def delete_pg_collection(collection_name: str):
+    """Delete all data for a collection from PostgreSQL."""
+    try:
+        from core.db import execute
+        execute("DELETE FROM enum_values WHERE collection_name = %s", (collection_name,))
+        execute("DELETE FROM chunks WHERE collection_name = %s", (collection_name,))
+        execute("DELETE FROM files WHERE collection_name = %s", (collection_name,))
+        execute("DELETE FROM collections WHERE name = %s", (collection_name,))
+    except Exception as e:
+        raise RuntimeError(f"Failed to delete collection {collection_name}: {e}")
+
+
+NLP_CONFIG_PATH = Path("config/nlp_config.json")
 
 def load_nlp_ui_config():
     if not NLP_CONFIG_PATH.exists():
@@ -609,7 +664,7 @@ system_cfg = load_json(SYSTEM_CONFIG_PATH, {})
 filetypes_cfg = load_json(FILETYPES_PATH, {})
 
 qdrant_url = system_cfg.get("qdrant_url", "http://localhost:6333")
-qdrant_collections = get_qdrant_collections(qdrant_url)
+qdrant_collections = get_pg_collections()
 
 st.title("NAS AI")
 
@@ -631,8 +686,7 @@ with tabs[0]:
     collections_cfg = load_json(COLLECTIONS_PATH, {})
     system_cfg = load_json(SYSTEM_CONFIG_PATH, {})
     qdrant_url = system_cfg.get("qdrant_url", "http://localhost:6333")
-    qdrant_collections = get_qdrant_collections(qdrant_url)
-
+    qdrant_collections = get_pg_collections()
     left, right = st.columns([1, 1])
 
     with left:
@@ -641,10 +695,11 @@ with tabs[0]:
         if not collections_cfg:
             st.info("No collections yet. Create one on the right.")
         else:
+            all_collection_stats = get_all_collection_stats()
             for cname, cfg in collections_cfg.items():
-                stats = get_collection_stats(qdrant_url, cname)
-                with st.expander(f"{cname} ({stats['vectors']:,} vectors)", expanded=False):
-                    st.caption(f"{stats['segments']} segments")
+                stats = all_collection_stats.get(cname, {"chunks": 0, "enums": 0})
+                with st.expander(f"{cname} ({stats['chunks']:,} chunks, {stats['enums']:,} enums)", expanded=False):
+                    st.caption(f"{stats['chunks']:,} chunks | {stats['enums']:,} enum values")
                     st.json(cfg)
 
         st.markdown("### Delete Collection Config")
@@ -884,7 +939,7 @@ with tabs[0]:
                 st.warning("Please confirm deletion.")
             else:
                 try:
-                    delete_qdrant_collection(qdrant_url, col_to_delete)
+                    delete_pg_collection(col_to_delete)
                     st.success(f"Deleted Qdrant collection: {col_to_delete}")
                     st.rerun()
                 except Exception as e:
@@ -898,7 +953,7 @@ with tabs[1]:
     collections_cfg = load_json(COLLECTIONS_PATH, {})
     system_cfg = load_json(SYSTEM_CONFIG_PATH, {})
     qdrant_url = system_cfg.get("qdrant_url", "http://localhost:6333")
-    qdrant_collections = get_qdrant_collections(qdrant_url)
+    qdrant_collections = get_pg_collections()
 
     if not collections_cfg:
         st.warning("No configured collections found.")
@@ -1261,10 +1316,10 @@ with tabs[2]:
         st.markdown("---")
         st.markdown("### Payload Inspector")
 
-        qdrant_collections_for_validation = get_qdrant_collections(qdrant_url)
+        qdrant_collections_for_validation = get_pg_collections()
 
         if not qdrant_collections_for_validation:
-            st.info("No Qdrant collections found.")
+            st.warning("No collections found in PostgreSQL.")
         else:
             validation_collection = st.selectbox(
                 "Select Qdrant collection",
@@ -1309,10 +1364,9 @@ with tabs[2]:
 
             if st.button("Inspect payloads", key="validation_inspect_payloads"):
                 try:
-                    from qdrant_client import QdrantClient
-                    from qdrant_client.models import Filter, FieldCondition, MatchValue
-
-                    qclient = QdrantClient(url=qdrant_url)
+                    from core.retrieval.db_retrieval import (
+                        get_by_identifier, scroll_collection, search_bm25
+                    )
 
                     points = []
 
@@ -1322,67 +1376,29 @@ with tabs[2]:
                         if not identifier_value:
                             st.warning("Enter an identifier, or choose Sample payloads.")
                         else:
-                            points, _ = qclient.scroll(
-                                collection_name=validation_collection,
-                                scroll_filter=Filter(
-                                    must=[
-                                        FieldCondition(
-                                            key="identifier",
-                                            match=MatchValue(value=identifier_value)
-                                        )
-                                    ]
-                                ),
-                                limit=int(inspect_limit),
-                                with_payload=True,
-                                with_vectors=False
+                            points = get_by_identifier(
+                                validation_collection,
+                                identifier_value,
+                                limit=int(inspect_limit)
                             )
 
                     elif inspect_mode == "Sample payloads":
-                        points, _ = qclient.scroll(
-                            collection_name=validation_collection,
-                            limit=int(inspect_limit),
-                            with_payload=True,
-                            with_vectors=False
+                        points = scroll_collection(
+                            validation_collection,
+                            limit=int(inspect_limit)
                         )
 
                     else:
-                        query = str(inspect_query or "").strip().lower()
+                        query = str(inspect_query or "").strip()
 
                         if not query:
                             st.warning("Enter search text, or choose Sample payloads.")
                         else:
-                            scanned_points, _ = qclient.scroll(
-                                collection_name=validation_collection,
-                                limit=5000,
-                                with_payload=True,
-                                with_vectors=False
+                            points = search_bm25(
+                                validation_collection,
+                                query=query,
+                                limit=int(inspect_limit)
                             )
-
-                            for p in scanned_points:
-                                payload = p.payload or {}
-
-                                searchable = " ".join(
-                                    str(payload.get(k) or "")
-                                    for k in [
-                                        "identifier",
-                                        "identifier_field",
-                                        "identifier_namespace",
-                                        "primary_name",
-                                        "description",
-                                        "text",
-                                        "source_file",
-                                        "file_name",
-                                        "file_path",
-                                        "doc_type",
-                                        "source_type",
-                                    ]
-                                ).lower()
-
-                                if query in searchable:
-                                    points.append(p)
-
-                                if len(points) >= int(inspect_limit):
-                                    break
 
                     rows = []
 
@@ -1427,10 +1443,10 @@ with tabs[3]:
     collections_cfg = load_json(COLLECTIONS_PATH, {})
     system_cfg = load_json(SYSTEM_CONFIG_PATH, {})
     qdrant_url = system_cfg.get("qdrant_url", "http://localhost:6333")
-    qdrant_collections = get_qdrant_collections(qdrant_url)
+    qdrant_collections = get_pg_collections()
 
     if not qdrant_collections:
-        st.warning("No Qdrant collections found.")
+        st.warning("No collections found in PostgreSQL.")
     else:
         selected_collection = st.selectbox(
             "Select collection",
@@ -1994,10 +2010,10 @@ with tabs[4]:
 
     system_cfg = load_json(SYSTEM_CONFIG_PATH, {})
     qdrant_url = system_cfg.get("qdrant_url", "http://localhost:6333")
-    qdrant_collections = get_qdrant_collections(qdrant_url)
+    qdrant_collections = get_pg_collections()
 
     if not qdrant_collections:
-        st.warning("No Qdrant collections found.")
+        st.warning("No collections found in PostgreSQL.")
     else:
         selected_collection = st.selectbox(
             "Select collection",
@@ -2016,18 +2032,9 @@ with tabs[4]:
 
         if st.button("Load Preview", key="preview_load_button"):
             try:
-                r = requests.post(
-                    f"{qdrant_url}/collections/{selected_collection}/points/scroll",
-                    json={
-                        "limit": int(sample_limit),
-                        "with_payload": True,
-                        "with_vectors": False
-                    },
-                    timeout=30
-                )
-                r.raise_for_status()
-
-                points = r.json().get("result", {}).get("points", [])
+                from core.retrieval.db_retrieval import scroll_collection
+                raw_points = scroll_collection(selected_collection, limit=int(sample_limit))
+                points = [{"payload": p.payload, "id": p.id} for p in raw_points]
 
                 if not points:
                     st.info("No points found in this collection.")
@@ -2114,8 +2121,28 @@ with tabs[4]:
                 st.error(e)
 
 with tabs[5]:
-    st.subheader("Qdrant Debug")
-    st.info("Qdrant Debug tab scaffold ready.")
+    st.subheader("SQL Inspector")
+
+    sql_collections = get_pg_collections()
+    sql_query = st.text_area(
+        "SQL Query",
+        value="SELECT primary_name, identifier, description, doc_type\nFROM chunks\nWHERE collection_name = 'xml_test'\nLIMIT 10",
+        height=150,
+        key="sql_inspector_query"
+    )
+
+    if st.button("Run Query", key="sql_run_button"):
+        try:
+            from core.retrieval.db_retrieval import fetchall
+            rows = fetchall(sql_query, ())
+            if rows:
+                import pandas as pd
+                st.dataframe(pd.DataFrame(rows), use_container_width=True)
+                st.caption(f"{len(rows)} row(s) returned.")
+            else:
+                st.info("Query returned no rows.")
+        except Exception as e:
+            st.error(f"SQL error: {e}")
 
 with tabs[6]:
     st.subheader("System Config")

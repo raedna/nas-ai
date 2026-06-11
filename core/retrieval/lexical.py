@@ -67,12 +67,43 @@ def lexical_short_query_search(
     if not q_norm:
         return []
 
-    candidates = search_bm25(
-        collection_name=collection_name,
-        query=q_norm,
-        doc_type="structured",
-        limit=limit,
-    )
+    # Strip namespace/question noise so BM25 searches content terms only
+    hints = load_doc_query_hints()
+    noise = set(hints.get("discovery_noise_words", []))
+    noise.update(hints.get("question_words", []))
+    noise.update(hints.get("structured_namespace_terms", []))
+    noise.update(hints.get("stopwords", []))
+
+    content_words = [w for w in q_norm.split() if w and w not in noise]
+
+    # Run multiple BM25 queries — one per synonym variant — and merge results
+    seen_ids: set = set()
+    candidates = []
+
+    queries_to_try: set = set()
+    queries_to_try.add(" ".join(content_words))
+
+    for i, word in enumerate(content_words):
+        synonyms = expand_terms_with_synonyms([word])
+        for syn in synonyms:
+            if syn != word:
+                variant = content_words[:i] + [syn] + content_words[i+1:]
+                queries_to_try.add(" ".join(variant))
+
+    for bm25_q in queries_to_try:
+        results = search_bm25(
+            collection_name=collection_name,
+            query=bm25_q,
+            doc_type="structured",
+            limit=limit,
+        )
+        for p in results:
+            pid = getattr(p, "id", None) or id(p)
+            if pid not in seen_ids:
+                seen_ids.add(pid)
+                candidates.append(p)
+
+    candidates.sort(key=lambda p: getattr(p, "score", 0.0), reverse=True)
 
     return [
         {
@@ -82,7 +113,7 @@ def lexical_short_query_search(
             "score": getattr(p, "score", 0.0),
             "payload": p.payload,
         }
-        for p in candidates
+        for p in candidates[:limit]
     ]
 
 

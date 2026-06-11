@@ -9,5 +9,6 @@
   },
   "embeddings_url": "http://localhost:1234/v1/embeddings",
   "embeddings_model": "text-embedding-bge-large-en-v1.5",
-  "vector_size": 1024
+  "vector_size": 1024,
+  "retrieval_confidence_threshold": 0.105
 }
