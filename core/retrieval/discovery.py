@@ -771,6 +771,14 @@ def run_discovery_with_method(
 
     discovery = discover_collection_items(collection_name, question, limit=limit)
 
+    if intent["mode"] == "discovery_count":
+        total = discovery.get("total_matches", 0)
+        return {
+            "method": intent["mode"],
+            "reason": intent["reason"],
+            "result": f"Found {total} matching records.",
+        }
+
     return {
         "method": intent["mode"],
         "reason": intent["reason"],

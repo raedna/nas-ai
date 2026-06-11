@@ -91,6 +91,16 @@ SMOKE_TESTS = [
         "min_results": 3,
         "enum_count_max": None,
     },
+    {
+        "id": "BBG-07",
+        "question": "how many fields contain ask price",
+        "description": "Count query — returns number of matching fields",
+        "must_contain": ["150"],
+        "must_not_contain": [],
+        "expected_methods": ["discovery_count"],
+        "min_results": 1,
+        "enum_count_max": None,
+    },
 ]
 
 # ---------------------------------------------------------------------------
