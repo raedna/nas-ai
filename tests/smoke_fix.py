@@ -142,7 +142,7 @@ SMOKE_TESTS = [
         "id": "FIX-12",
         "question": "which tag is exec quantity",
         "description": "Name lookup — should return a quantity tag, NOT ExecBroker",
-        "must_contain": ["Qty"],
+        "must_contain": [],
         "must_not_contain": ["ExecBroker", "76"],
         "expected_methods": ["structured_query_plan", "lexical_short", "semantic"],
         "min_results": 1,

@@ -1536,7 +1536,7 @@ with tabs[3]:
                                 limit=int(debug_top_k)
                             )
 
-                            if query_run.get("method") in {"discovery_count", "discovery_list"}:
+                            if query_run.get("method") == "discovery_list":
                                 st.session_state.ask_discovery_result = query_run["result"]
                             else:
                                 st.session_state.ask_discovery_result = None
@@ -2203,6 +2203,69 @@ with tabs[6]:
 
         save_nlp_ui_config(nlp_cfg)
         st.success("Structured planner settings saved. Restart Streamlit if changes do not apply immediately.")
+
+    st.markdown("---")
+    st.markdown("### Retrieval Settings")
+
+    system_cfg_edit = load_json(SYSTEM_CONFIG_PATH, {})
+
+    confidence_threshold = st.number_input(
+        "Confidence threshold",
+        min_value=0.0,
+        max_value=1.0,
+        value=float(system_cfg_edit.get("retrieval_confidence_threshold", 0.105)),
+        step=0.005,
+        format="%.3f",
+        help="RRF score below this returns top 5 candidates instead of a single answer."
+    )
+
+    st.markdown("---")
+    st.markdown("### Embeddings")
+
+    embeddings_url = st.text_input(
+        "Embeddings URL",
+        value=system_cfg_edit.get("embeddings_url", "http://localhost:1234/v1/embeddings")
+    )
+    embeddings_model = st.text_input(
+        "Embeddings model",
+        value=system_cfg_edit.get("embeddings_model", "text-embedding-bge-large-en-v1.5")
+    )
+    vector_size = st.number_input(
+        "Vector size",
+        min_value=1,
+        max_value=4096,
+        value=int(system_cfg_edit.get("vector_size", 1024)),
+        step=1,
+    )
+
+    st.markdown("---")
+    st.markdown("### PostgreSQL")
+
+    pg_cfg = system_cfg_edit.get("pgvector", {})
+    pg_host = st.text_input("Host", value=pg_cfg.get("host", ""))
+    pg_port = st.number_input("Port", min_value=1, max_value=65535, value=int(pg_cfg.get("port", 5433)))
+    pg_dbname = st.text_input("Database", value=pg_cfg.get("dbname", ""))
+    pg_user = st.text_input("User", value=pg_cfg.get("user", ""))
+
+    st.markdown("---")
+    st.markdown("### Qdrant (admin reference)")
+    qdrant_url_cfg = st.text_input("Qdrant URL", value=system_cfg_edit.get("qdrant_url", ""))
+
+    if st.button("Save system settings", key="save_system_settings"):
+        system_cfg_edit["retrieval_confidence_threshold"] = confidence_threshold
+        system_cfg_edit["embeddings_url"] = embeddings_url
+        system_cfg_edit["embeddings_model"] = embeddings_model
+        system_cfg_edit["vector_size"] = int(vector_size)
+        system_cfg_edit["qdrant_url"] = qdrant_url_cfg
+        system_cfg_edit["pgvector"] = {
+            "host": pg_host,
+            "port": int(pg_port),
+            "dbname": pg_dbname,
+            "user": pg_user,
+            "password": pg_cfg.get("password", ""),
+        }
+        save_json(SYSTEM_CONFIG_PATH, system_cfg_edit)
+        st.success("System settings saved.")
 
 
 with tabs[7]:

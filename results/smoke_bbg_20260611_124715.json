@@ -1,0 +1,75 @@
+{
+  "run_at": "2026-06-11T12:47:59.511877",
+  "collection": "bbg_fields",
+  "results": [
+    {
+      "id": "BBG-01",
+      "question": "what is PX_ASK",
+      "description": "Mnemonic lookup \u2014 returns PX_ASK with description 'Ask Price'",
+      "pass": true,
+      "failures": [],
+      "answer_preview": "Id PR004 is PX_ASK.  Description: Ask Price  Type: Double",
+      "method": "semantic"
+    },
+    {
+      "id": "BBG-02",
+      "question": "what is the description of ARD_OPERATING_EXP_PER_ASM_ASK",
+      "description": "Description lookup \u2014 returns ARD Operating Expense Per ASM",
+      "pass": true,
+      "failures": [],
+      "answer_preview": "Id A0356 is ARD_OPERATING_EXP_PER_ASM_ASK.  Description: ARD Operating Expense Per ASM (Ask)  Type: Double",
+      "method": "semantic"
+    },
+    {
+      "id": "BBG-03",
+      "question": "what type is PX_ASK",
+      "description": "Type lookup \u2014 returns DataType Double for PX_ASK",
+      "pass": true,
+      "failures": [],
+      "answer_preview": "Id PR004 is PX_ASK.  Description: Ask Price  Type: Double",
+      "method": "semantic"
+    },
+    {
+      "id": "BBG-04",
+      "question": "what fields contain ask price",
+      "description": "Discovery list \u2014 returns multiple fields with ask price in name/desc",
+      "pass": true,
+      "failures": [],
+      "answer_preview": "25 match(es) found. - PROXY_PRICE_ASK_PRICE: Proxy Price Ask Price [Double] - NOMINAL_PRICE_ASK: Nominal Price Ask [Double] - IMPLIED_ASK_PRICE: Implied Ask Price [Double] - PAYUP_ASK_PRICE: Payup Ask Price [Double] - VALUATION_ASK_PRICE: Valuation Ask Price [Double] - DERIVED_ASK_PRICE: Derived Ask",
+      "method": "discovery_list"
+    },
+    {
+      "id": "BBG-05",
+      "question": "what fields are in category airlines",
+      "description": "Category discovery \u2014 returns multiple ARD airline fields",
+      "pass": true,
+      "failures": [],
+      "answer_preview": "23 match(es) found. - OPEX_NET_PER_ASK_CONSOLIDATED: Operating Expense Net per ASK Consolidated [Double] - MAINLINE_COST_ASK: Mainline Cost per Available Seat Kilometer [Double] - REGIONAL_COST_ASK: Regional Cost per Available Seat Kilometer [Double] - CONSOLIDATED_CASK_EX_FUEL: Consolidated CASK Ex",
+      "method": "discovery_list"
+    },
+    {
+      "id": "BBG-06",
+      "question": "what string fields are available",
+      "description": "Type discovery \u2014 returns multiple String type fields",
+      "pass": true,
+      "failures": [],
+      "answer_preview": "2 match(es) found. - PG_CASM_ASK: PG Cost per Available Seat Mile ASK [String] - PG_CASM_ASK_NAME: PG Cost per Available Seat Mile ASK Name [String]",
+      "method": "discovery_list"
+    },
+    {
+      "id": "BBG-07",
+      "question": "how many fields contain ask price",
+      "description": "Count query \u2014 returns number of matching fields",
+      "pass": false,
+      "failures": [
+        "MISSING expected term: '150'"
+      ],
+      "answer_preview": "Found 25 matching records.",
+      "method": "discovery_count"
+    }
+  ],
+  "summary": {
+    "passed": 6,
+    "total": 7
+  }
+}

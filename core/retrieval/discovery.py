@@ -409,6 +409,14 @@ def discover_collection_items(
         limit=500,
     )
 
+    # Get accurate total from PostgreSQL — not filtered by Python scoring
+    from core.retrieval.db_retrieval import fetchall
+    count_rows = fetchall(
+        "SELECT COUNT(*) as n FROM chunks WHERE collection_name = %s AND nlp_text_tsv @@ websearch_to_tsquery('english', %s)",
+        (collection_name, search_query)
+    )
+    bm25_total = count_rows[0]["n"] if count_rows else 0
+
     scored = []
     for p in bm25_results:
         payload = p.payload or {}
@@ -436,7 +444,8 @@ def discover_collection_items(
     for i, item in enumerate(results, start=1):
         item["rank"] = i
 
-    return {"total_matches": len(results), "results": results}
+    #return {"total_matches": len(results), "results": results}
+    return {"total_matches": bm25_total, "results": results}
 
 
 # ---------------------------------------------------------------------------
