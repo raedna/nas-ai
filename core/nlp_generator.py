@@ -1,3 +1,5 @@
+DEBUG = False
+
 # =========================================================
 # GENERIC HELPERS
 # =========================================================
@@ -21,6 +23,8 @@ def _all_values(row_norm, fields):
             values.append(str(val).strip())
     return values
 
+if DEBUG:
+    print("[NLP_GENERATOR LOADED FROM]", __file__)
 
 # =========================================================
 # STRUCTURED NLP TEXT
@@ -41,32 +45,25 @@ def build_structured_nlp_text(row, schema):
     aliases = _all_values(row_n, alias_fields)
     type_value = _first_value(row_n, type_fields)
 
+    other_fields = schema.get("other", [])
+    alias_fields = schema.get("aliases", [])
+
+    other_values = _all_values(row_n, other_fields)
+    alias_values = _all_values(row_n, alias_fields)
+
     parts = []
 
     if primary_name:
         parts.append(primary_name)
-    elif identifier:
-        parts.append(identifier)
 
-    if description:
-        parts.append(description)
+    if description_values:
+        parts.append("\n\n".join(description_values))
 
-    if type_value:
-        parts.append(f"Type: {type_value}")
+    if other_values:
+        parts.append("\n".join(str(v) for v in other_values if v))
 
-    # optional useful "other" fields such as category
-    other_lines = []
-    for f in other_fields:
-        val = row_n.get(str(f).lower())
-        if val not in [None, ""]:
-            val_clean = str(val).strip().replace("/", " ").replace("\\", " ")
-            other_lines.append(f"{f}: {val_clean}")
-
-    if other_lines:
-        parts.append("\n".join(other_lines))
-
-    if aliases:
-        parts.append(f"Also known as: {', '.join(aliases)}")
+    if alias_values:
+        parts.append("Also known as: " + ", ".join(alias_values))
 
     return "\n\n".join([p for p in parts if p]).strip()
 
@@ -76,12 +73,20 @@ def build_structured_nlp_text(row, schema):
 # =========================================================
 def build_entity_row_nlp_text(row, schema):
     row_n = _row_norm(row)
-
     name_fields = schema.get("primary_name", [])
     desc_fields = schema.get("description", [])
+    other_fields = schema.get("other", [])
+    alias_fields = schema.get("aliases", [])
 
     primary_name = _first_value(row_n, name_fields)
     description_values = _all_values(row_n, desc_fields)
+    other_values = _all_values(row_n, other_fields)
+    alias_values = _all_values(row_n, alias_fields)
+
+    
+    if DEBUG:
+        if '21R2 Weekend' in str(row_n.get('abstract', '')):
+            print(f"[NLP DEBUG] row keys={list(row_n.keys())[:5]} other_values={_all_values(row_n, schema.get('other', []))}")
 
     parts = []
 
@@ -90,6 +95,18 @@ def build_entity_row_nlp_text(row, schema):
 
     if description_values:
         parts.append("\n\n".join(description_values))
+
+    if other_values:
+        # Only include short non-HTML values (tags, categories) — skip HTML blobs
+        clean_others = [
+            str(v) for v in other_values
+            if v and len(str(v)) < 200 and '<' not in str(v)
+        ]
+        if clean_others:
+            parts.append("\n".join(clean_others))
+
+    if alias_values:
+        parts.append("Also known as: " + ", ".join(alias_values))
 
     return "\n\n".join([p for p in parts if p]).strip()
 

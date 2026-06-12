@@ -713,9 +713,13 @@ with tabs[0]:
         if st.button("Delete config", disabled=(del_name == "")):
             collections_cfg.pop(del_name, None)
             save_json(COLLECTIONS_PATH, collections_cfg)
+            try:
+                delete_pg_collection(del_name)
+            except Exception as e:
+                st.warning(f"Config deleted but PostgreSQL cleanup failed: {e}")
             st.success(f"Deleted config: {del_name}")
             st.rerun()
-
+            
     with right:
         st.markdown("### Create / Edit Collection")
 
@@ -916,6 +920,29 @@ with tabs[0]:
             }
 
             save_json(COLLECTIONS_PATH, collections_cfg)
+
+            # Upsert into PostgreSQL collections table
+            try:
+                from core.db import execute
+                import json as _json
+                execute("""
+                    INSERT INTO collections (name, path, allowed_filetypes, source_label, filters)
+                    VALUES (%s, %s, %s::jsonb, %s, %s::jsonb)
+                    ON CONFLICT (name) DO UPDATE SET
+                        path = EXCLUDED.path,
+                        allowed_filetypes = EXCLUDED.allowed_filetypes,
+                        source_label = EXCLUDED.source_label,
+                        filters = EXCLUDED.filters
+                """, (
+                    cname_clean,
+                    path_value.strip(),
+                    _json.dumps(allowed_filetypes),
+                    source_label.strip(),
+                    _json.dumps({"field_filters": field_filters}),
+                ))
+            except Exception as e:
+                st.warning(f"Saved to config but PostgreSQL update failed: {e}")
+
             st.success(f"Collection '{cname_clean}' saved.")
             st.rerun()
 
@@ -2251,6 +2278,50 @@ with tabs[6]:
     st.markdown("### Qdrant (admin reference)")
     qdrant_url_cfg = st.text_input("Qdrant URL", value=system_cfg_edit.get("qdrant_url", ""))
 
+    st.markdown("---")
+    st.markdown("### Language Model (LLM)")
+
+    nlp_cfg_edit = load_nlp_ui_config()
+    llm_cfg_edit = nlp_cfg_edit.get("local_llm", {})
+
+    llm_model = st.text_input(
+        "LLM model name",
+        value=llm_cfg_edit.get("model", "meta-llama-3.1-8b-instruct"),
+        help="Must match exactly the model identifier in LM Studio"
+    )
+    llm_base_url = st.text_input(
+        "LLM base URL",
+        value=llm_cfg_edit.get("base_url", "http://localhost:1234"),
+    )
+    llm_timeout = st.number_input(
+        "LLM timeout (seconds)",
+        min_value=10, max_value=300,
+        value=int(llm_cfg_edit.get("timeout", 60)),
+        step=10,
+        key="llm_timeout_input"
+    )
+
+    st.markdown("---")
+    st.markdown("### Cross-Encoder Reranker")
+
+    ce_cfg_ui = system_cfg_edit.get("cross_encoder", {})
+    ce_enabled = st.checkbox(
+        "Enable cross-encoder reranking",
+        value=bool(ce_cfg_ui.get("enabled", False)),
+        help="Uses MiniLM to rerank top-K results for entity_row and docs"
+    )
+    ce_model = st.text_input(
+        "Cross-encoder model",
+        value=ce_cfg_ui.get("model", "cross-encoder/ms-marco-MiniLM-L-6-v2"),
+    )
+    ce_top_k = st.number_input(
+        "Top-K candidates to rerank",
+        min_value=3, max_value=20,
+        value=int(ce_cfg_ui.get("top_k", 10)),
+        step=1,
+        key="ce_top_k_input"
+    )
+
     if st.button("Save system settings", key="save_system_settings"):
         system_cfg_edit["retrieval_confidence_threshold"] = confidence_threshold
         system_cfg_edit["embeddings_url"] = embeddings_url
@@ -2264,6 +2335,18 @@ with tabs[6]:
             "user": pg_user,
             "password": pg_cfg.get("password", ""),
         }
+        system_cfg_edit["cross_encoder"] = {
+            "enabled": ce_enabled,
+            "model": ce_model,
+            "apply_to_doc_types": ["entity_row", "procedural", "reference", "mixed"],
+            "top_k": int(ce_top_k),
+        }
+        nlp_cfg_edit["local_llm"] = {
+            "base_url": llm_base_url,
+            "model": llm_model,
+            "timeout": int(llm_timeout),
+        }
+        save_nlp_ui_config(nlp_cfg_edit)
         save_json(SYSTEM_CONFIG_PATH, system_cfg_edit)
         st.success("System settings saved.")
 

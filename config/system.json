@@ -10,5 +10,11 @@
   "embeddings_url": "http://localhost:1234/v1/embeddings",
   "embeddings_model": "text-embedding-bge-large-en-v1.5",
   "vector_size": 1024,
-  "retrieval_confidence_threshold": 0.105
+  "retrieval_confidence_threshold": 0.105,
+  "cross_encoder": {
+    "enabled": false,
+    "model": "cross-encoder/ms-marco-MiniLM-L-6-v2",
+    "apply_to_doc_types": ["entity_row", "procedural", "reference", "mixed"],
+    "top_k": 3
+  }
 }

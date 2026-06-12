@@ -422,7 +422,16 @@ def route_query(
     # For structured collections — reranker not needed, RRF already ranked correctly
     # For chunked docs and entity rows — reranker still helps
     if doc_type != "structured":
-        points = rerank_points(points, question)
+        from core.system_config import load_system_config
+        ce_cfg = load_system_config().get("cross_encoder", {})
+        ce_enabled = ce_cfg.get("enabled", False)
+        ce_doc_types = ce_cfg.get("apply_to_doc_types", ["entity_row"])
+        if ce_enabled and doc_type in ce_doc_types:
+            from core.retrieval.reranker import cross_encoder_rerank
+            top_k = ce_cfg.get("top_k", 10)
+            points = cross_encoder_rerank(points[:top_k], question)
+        else:
+            points = rerank_points(points, question)
         best = points[0]
         payload = best.payload or {}
         doc_type = infer_doc_type(payload)

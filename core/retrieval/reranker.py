@@ -35,6 +35,60 @@ _QUERY_TERMS_PATH = Path(__file__).resolve().parents[2] / "config" / "query_term
 _query_terms_cache: Dict | None = None
 
 
+# ---------------------------------------------------------------------------
+# Cross-encoder reranker using sentence-transformers MiniLM
+# ---------------------------------------------------------------------------
+
+_cross_encoder_cache = None
+
+
+def get_cross_encoder():
+    """Load and cache the cross-encoder model (loads once, stays in memory)."""
+    global _cross_encoder_cache
+    if _cross_encoder_cache is not None:
+        return _cross_encoder_cache
+    try:
+        from sentence_transformers import CrossEncoder
+        from core.system_config import load_system_config
+        cfg = load_system_config()
+        model_name = cfg.get("cross_encoder", {}).get(
+            "model", "cross-encoder/ms-marco-MiniLM-L-6-v2"
+        )
+        _cross_encoder_cache = CrossEncoder(model_name)
+        return _cross_encoder_cache
+    except Exception as e:
+        return None
+
+
+def cross_encoder_rerank(points: List, question: str) -> List:
+    """
+    Rerank points using MiniLM cross-encoder.
+    Falls back to original order if cross-encoder unavailable.
+    """
+    if not points:
+        return points
+
+    model = get_cross_encoder()
+    if model is None:
+        return points
+
+    try:
+        pairs = []
+        for p in points:
+            payload = p.payload or {}
+            text = (
+                str(payload.get("primary_name") or "") + " " +
+                str(payload.get("description") or payload.get("text") or "")
+            ).strip()[:512]
+            pairs.append((question, text))
+
+        scores = model.predict(pairs)
+        scored = sorted(zip(scores, points), key=lambda x: x[0], reverse=True)
+        return [p for _, p in scored]
+
+    except Exception as e:
+        return points
+        
 def load_query_terms() -> Dict:
     global _query_terms_cache
     if _query_terms_cache is None:

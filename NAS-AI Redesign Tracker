@@ -39,6 +39,8 @@
 | CODE-011 | schema_loader.py | Schema files stored on disk — should migrate to PostgreSQL schemas table. | ⏳ Pending |
 | CODE-012 | ui_app.py | Ask/Chat tabs need a "Clear cache" button | ⏳ Pending |
 | CODE-013 | ui_app.py | BM25/lexical candidates not shown in debug panel | ⏳ Pending |
+| CODE-014 | ui_app.py | System Config tab shows embeddings model but not LLM model — add LLM model + base_url + timeout fields writing to nlp_config.json | ⏳ Pending |
+| CODE-015 | db schema | files table missing last_ingested column — needed for tracking when files were last processed | ⏳ Pending |
 
 **Retired issues (resolved):**
 - RET-011 — FIX-01 enum suppression: fixed in Phase 1
@@ -182,3 +184,40 @@
 | BBG-04 | what fields contain ask price | discovery_list | ✅ |
 | BBG-05 | what fields are in category airlines | discovery_list | ✅ |
 | BBG-06 | what string fields are available | discovery_list | ✅ |
+
+---
+
+## Phase 5 Addition — Model Routing
+
+### Concept
+Route different query types and doc types to different LLM/embedding models loaded in LM Studio. Improves answer quality without changing the retrieval architecture.
+
+### Proposed Model Assignments
+
+| Query/Doc Type | Recommended Model | Reason |
+|---|---|---|
+| structured (FIX, BBG) | LLaMA 3.1 8B or smaller | Simple lookup, no deep reasoning needed |
+| entity_row (KB, Obsidian) | Qwen3-32B | Longer text, needs reasoning to extract right answer |
+| procedural/reference (docs, PDF) | Qwen3-32B | Multi-paragraph reasoning, section navigation |
+| image | Qwen2-VL or LLaVA | Vision model for OCR, image description |
+| astro (FITS) | Qwen3-32B | Metadata reasoning |
+| structured query planner | Qwen3-32B | Complex NLP plan generation |
+| chat tab | Qwen3-32B | Multi-turn reasoning |
+
+### Implementation Steps (Phase 5)
+
+| Step | Description | Status |
+|---|---|---|
+| 5.M1 | Add model config to system.json — map doc_type/query_type to model name + endpoint | ⏳ Pending |
+| 5.M2 | Update System Config UI tab — allow defining loaded models, assign per doc_type | ⏳ Pending |
+| 5.M3 | Update local_llm_client.py — accept model parameter, route to correct LM Studio endpoint | ⏳ Pending |
+| 5.M4 | Update router.py — pass doc_type to LLM calls | ⏳ Pending |
+| 5.M5 | Load Qwen3-32B in LM Studio alongside BGE embeddings | ⏳ Pending |
+| 5.M6 | Smoke test model routing — verify correct model used per query type | ⏳ Pending |
+| 5.M7 | Vision model integration for image ingestion (Qwen2-VL or LLaVA) | ⏳ Pending |
+
+### Notes
+- BGE embeddings (text-embedding-bge-large-en-v1.5, 1024 dims) stay unchanged — proven for RAG, re-ingestion cost too high
+- LM Studio supports multiple models loaded simultaneously — endpoint per model
+- Config UI needs a "Models" section showing loaded models and their doc_type assignments
+- Model routing is transparent to the user — same query interface, better answers

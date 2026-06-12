@@ -61,5 +61,8 @@
   "pb": ["prime broker", "prime brokerage", "primebroker"],
   "citi": ["citibank", "citigroup", "citi pb"],
   "contact": ["contacts", "contact info", "contact information"],
-  "contacts": ["contact", "contact info", "contact information", "email", "distribution list", "dl"]
+  "contacts": ["contact", "contact info", "contact information", "email", "distribution list", "dl"],
+
+  "1mad": ["one madison", "madison"],
+  "one madison": ["1mad"]
 }

@@ -10,7 +10,7 @@ from core.collection_merger import merge_collection_docs
 from core.pg_client import update_file_state_pg as update_file_state, should_skip_file_with_hash as should_skip_file # the import for pgvector
 
 
-DEBUG = True
+DEBUG = False
 DEBUG1 = False
 
 # ----------------------------
@@ -208,7 +208,10 @@ class IngestionOrchestrator:
             collection_name=task.collection_name,
         )
 
-        if DEBUG1:
+        if debug:
+            for _item in (items or []):
+                if "21R2" in str(_item.get("primary_name", "")):
+                    print(f"[POST-SERIAL DEBUG] name={_item.get('primary_name')} text length={len(_item.get('text',''))} has_tag={'Weekly Restart' in _item.get('text','')}")
             print("DEBUG items type:", type(items))
             print("DEBUG first item:", items[0] if items else None)
 
@@ -241,11 +244,20 @@ class IngestionOrchestrator:
                     metadata={"reason": "serializer_returned_no_items"},
                 )
 
+        print(f"[PRE-MERGE] items count={len(items) if items else 0}")
+        items_before = {i.get('primary_name'): len(i.get('text','')) for i in (items or []) if '21R2' in str(i.get('primary_name',''))}
+        print(f"[PRE-MERGE] 21R2 items: {items_before}")
         items = merge_collection_docs(items)
+        print(f"[POST-MERGE] items count={len(items) if items else 0}")
+        items_after = {i.get('primary_name'): len(i.get('text','')) for i in (items or []) if '21R2' in str(i.get('primary_name',''))}
+        print(f"[POST-MERGE] 21R2 items: {items_after}")
 
         if DEBUG:
             print("POST-MERGE FIRST ITEM:", items[0] if items else None)
-
+            for _item in items:
+                if _item.get("primary_name") == "Automated 21R2 Weekend Restart":
+                    print(f"[POST-MERGE DEBUG] text length={len(_item.get('text',''))} has_tag={'Weekly Restart' in _item.get('text','')}")
+                    break
         texts = []
         payloads = []
 
@@ -253,7 +265,8 @@ class IngestionOrchestrator:
             text = item.get("text", "").strip()
             if not text:
                 continue
-
+            if item.get("primary_name") == "Automated 21R2 Weekend Restart":
+                print(f"[ORCH DEBUG] item text length={len(item.get('text',''))} has_tag={'Weekly Restart' in item.get('text','')}")
             texts.append(text)
             payloads.append(item)
 

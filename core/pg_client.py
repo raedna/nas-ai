@@ -19,6 +19,7 @@ import json
 import logging
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
+from datetime import datetime
 
 from core.db import (
     execute,
@@ -28,6 +29,8 @@ from core.db import (
     upsert_file_state,
     should_skip_file_pg,
 )
+
+DEBUG = False
 
 logger = logging.getLogger(__name__)
 
@@ -263,6 +266,10 @@ def upsert_vectors(
             "embedded_at": None,
             "payload": payload,
         }
+
+        if DEBUG:
+            if payload.get("primary_name") == "Automated 21R2 Weekend Restart":
+                print(f"DEBUG WRITE: nlp_text length={len(chunk['nlp_text'])} ends_with={repr(chunk['nlp_text'][-50:])}")
 
         upsert_chunk(chunk)
 

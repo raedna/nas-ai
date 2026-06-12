@@ -166,5 +166,20 @@
     "filters": {
       "field_filters": []
     }
+  },
+  "recon_assist_file": {
+    "path": "/Volumes/raedsync/Documents/OmniVista/Support Desk/RECON/RECON_Moore-PB Mapping_100225.xlsx",
+    "allowed_filetypes": [
+      "tables"
+    ],
+    "allowed_extensions": [],
+    "exclude_dirs": [],
+    "exclude_extensions": [],
+    "asset_search_roots": [],
+    "source_label": "",
+    "notes": "",
+    "filters": {
+      "field_filters": []
+    }
   }
 }

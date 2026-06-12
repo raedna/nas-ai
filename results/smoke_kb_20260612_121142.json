@@ -1,0 +1,105 @@
+{
+  "run_at": "2026-06-12T12:13:17.949661",
+  "collection": "kb_docs",
+  "results": [
+    {
+      "id": "KB-01",
+      "question": "what is tidal",
+      "description": "Topic lookup \u2014 returns introduction to Tidal article",
+      "pass": true,
+      "failures": [],
+      "answer_preview": "Source: Kb Docs  0 - Introduction to Tidal  This document provides an overview of Tidal\u2019s role in Moore\u2019s business and covers Tidal conventions and best practices. Troubleshooting instructions will assume that you know the contents of this document, so please read carefully!\r \r Troubleshooting instr",
+      "method": "semantic"
+    },
+    {
+      "id": "KB-02",
+      "question": "how to troubleshoot tidal",
+      "description": "Troubleshooting lookup \u2014 returns Tidal job alert troubleshooting article",
+      "pass": true,
+      "failures": [],
+      "answer_preview": "Source: Kb Docs  0 - Introduction to Tidal  This document provides an overview of Tidal\u2019s role in Moore\u2019s business and covers Tidal conventions and best practices. Troubleshooting instructions will assume that you know the contents of this document, so please read carefully!\r \r Troubleshooting instr",
+      "method": "semantic"
+    },
+    {
+      "id": "KB-03",
+      "question": "steps for the moore weekend checks",
+      "description": "Process lookup \u2014 returns automated 21r2 weekend restart article",
+      "pass": false,
+      "failures": [
+        "MISSING expected term: '21R2'",
+        "MISSING expected term: 'Weekend Restart'"
+      ],
+      "answer_preview": "Source: Kb Docs  06 - 23R3 DEV Weekend Health Check  To execute 23R3 DEV weekend health checks, follow the steps below:\r Check that we receive the success/failure email for the weekly restart job group. These emails should be sent to charlesriversupport@moorecap.com. The email to be received is sent",
+      "method": "semantic"
+    },
+    {
+      "id": "KB-04",
+      "question": "steps for the moore weekend archive",
+      "description": "Process lookup \u2014 returns automated 21r2 PROD Archive article",
+      "pass": false,
+      "failures": [
+        "MISSING expected term: 'PROD Archive'"
+      ],
+      "answer_preview": "Source: Kb Docs  Automated 21R2 Weekend Restart  Every Sunday, we initiate a restart of the Moore CRD servers for three environments: QA, UAT, and PROD. This process occurs at 12:30 am EST, which corresponds to 8:30 AM Dubai time, facilitated by Tidal jobs. The jobs are expected to conclude by 12:50",
+      "method": "semantic"
+    },
+    {
+      "id": "KB-05",
+      "question": "one madison failed file loading",
+      "description": "Incident lookup \u2014 returns one madison daily file load failure article",
+      "pass": true,
+      "failures": [],
+      "answer_preview": "Source: Kb Docs  One Madison Daily File Load Failure \u2013 Error Format Correction & Reload to Snowflake  Each day around 7 AM EST (3 PM Dubai Time), we receive automated emails via Halo regarding the One Madison file load status. If the status indicates:\r \u201cOverall Status: Successful, no additional acti",
+      "method": "semantic"
+    },
+    {
+      "id": "KB-06",
+      "question": "how to check recon files on sftp",
+      "description": "Process lookup \u2014 returns logging in to sftp & checking log files article",
+      "pass": true,
+      "failures": [],
+      "answer_preview": "Source: Kb Docs  2.3 TIDAL Recon - Bad Dates - Step 3: Logging in to sFTP & Checking Log Files (DRAFT)  In this step, we will log in to the appropriate sFTP to check if the files are present where they are expected to be. This step is usually carried out after the files couldn't be located in the in",
+      "method": "semantic"
+    },
+    {
+      "id": "KB-07",
+      "question": "how to check recon files in pb folders on server",
+      "description": "Process lookup \u2014 returns Checking files on us1-proc server article",
+      "pass": true,
+      "failures": [],
+      "answer_preview": "Source: Kb Docs  2.2 - TIDAL Recon - Bad Dates - Step 2: Checking Files on US1-Proc02 Server (DRAFT)  In this step, we will be manually checking if the impacted Prime Broker's folder contain the expected files, meaning they were properly pulled from sFTP, with the expected name and correct dates. (E",
+      "method": "semantic"
+    },
+    {
+      "id": "KB-08",
+      "question": "error for 1mad s3 buckets",
+      "description": "Abbreviation lookup \u2014 1mad S3 buckets \u2192 One Madison S3 article",
+      "pass": true,
+      "failures": [],
+      "answer_preview": "Source: Kb Docs  One Madison Group - Data Load Status - No files Found in S3 Bucket  We receive the 1MAD data load email around 7 AM EST.  The file comes in with a success or failure, and contains a body:\r \r Please note that there should be no files during the US holidays. If we receive an email reg",
+      "method": "semantic"
+    },
+    {
+      "id": "KB-09",
+      "question": "where is the operator release in tidal",
+      "description": "Navigation lookup \u2014 returns Tidal Operator release article",
+      "pass": true,
+      "failures": [],
+      "answer_preview": "Source: Kb Docs  TIDAL > Operator Release  Operator Release: \r it means that the job will not run automatically, even if all its scheduling conditions and dependencies are met. Instead, it enters a \"Held\" or \"Waiting for Operator Release\" state, and must be manually released by an operator to execut",
+      "method": "semantic"
+    },
+    {
+      "id": "KB-10",
+      "question": "FX files not sent issue",
+      "description": "Incident lookup \u2014 returns Tidal Traiana outbound files article",
+      "pass": true,
+      "failures": [],
+      "answer_preview": "Source: Kb Docs  4.0 - TIDAL TRAIANA Outbound Files  If we get a request or issue to check the FX files not sent to a PB, then we can with high confidence look for the TRAIANA TIDAL jobs.  FX PB issues raised by Christina Stallone, Michael Carney, or another FX individual through CRFX support is usu",
+      "method": "semantic"
+    }
+  ],
+  "summary": {
+    "passed": 8,
+    "total": 10
+  }
+}
