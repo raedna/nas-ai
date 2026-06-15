@@ -96,7 +96,8 @@ def _build_structured_doc(row, schema, source_file):
         link_keys.append(f"{identifier_namespace}:{identifier}")
 
     primary_name = _first_value(row_n, name_fields)
-    description = _first_value(row_n, desc_fields)
+    description_values = _all_values(row_n, desc_fields)
+    description = "\n\n".join(description_values) if description_values else None
     aliases = _all_values(row_n, alias_fields)
     type_value = _first_value(row_n, type_fields)
 

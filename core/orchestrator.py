@@ -208,7 +208,7 @@ class IngestionOrchestrator:
             collection_name=task.collection_name,
         )
 
-        if debug:
+        if DEBUG:
             for _item in (items or []):
                 if "21R2" in str(_item.get("primary_name", "")):
                     print(f"[POST-SERIAL DEBUG] name={_item.get('primary_name')} text length={len(_item.get('text',''))} has_tag={'Weekly Restart' in _item.get('text','')}")

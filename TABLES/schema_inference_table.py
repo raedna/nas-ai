@@ -26,6 +26,16 @@ def infer_table_schema(rows, collection_name=None, source_file=None):
         print(schema)
 
     if collection_name and source_file:
-        save_schema(schema, source_file, SCHEMAS_DIR, collection_name)
+        from pathlib import Path as _Path
+        source_stem = _Path(source_file).stem
+        schema_path = SCHEMAS_DIR / f"{collection_name}_{source_stem}_schema.json"
+        print(f"[SCHEMA] checking path: {schema_path} exists: {schema_path.exists()}")
+        if not schema_path.exists():
+            save_schema(schema, source_file, SCHEMAS_DIR, collection_name)
+        else:
+            import json
+            with open(schema_path, 'r', encoding='utf-8') as f:
+                schema = json.load(f)
+            print(f"[SCHEMA] loaded existing schema, identifier={schema.get('identifier')}")
 
     return schema

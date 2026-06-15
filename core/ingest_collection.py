@@ -112,11 +112,17 @@ def _build_tasks(
         filetype_template_config = ft_cfg.get("template_config", {}) or {}
         collection_template_config = collection_cfg.get("template_config", {}) or {}
 
+        # Extract sheet_name from filters if present (stored there for PostgreSQL compatibility)
+        filters_cfg = collection_cfg.get("filters", {})
+        sheet_name_from_filters = filters_cfg.get("sheet_name")
+
         base_template_config = {
             **filetype_template_config,
             **collection_template_config,
-            "filters": collection_cfg.get("filters", {}),
+            "filters": filters_cfg,
         }
+        if sheet_name_from_filters and "sheet_name" not in base_template_config:
+            base_template_config["sheet_name"] = sheet_name_from_filters
 
         if base_template_config.get("batch_finalize"):
             base_template_config["expected_files"] = filetype_counts.get(filetype_name, 1)

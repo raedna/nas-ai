@@ -143,8 +143,11 @@ def parse_table(file_path, template_config=None):
         )
 
     elif ext in [".xlsx", ".xls"]:
+        sheet_name = (template_config or {}).get("sheet_name", 0)
+        print("[TABLE PARSER] Using sheet:", repr(sheet_name)),
         raw_df = pd.read_excel(
             path,
+            sheet_name=sheet_name,
             dtype=str,
             header=None
         )

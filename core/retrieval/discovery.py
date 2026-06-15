@@ -69,6 +69,41 @@ def _matches_any_phrase(q: str, phrases: List[str]) -> bool:
             return True
     return False
 
+def llm_detect_intent(question: str) -> Dict[str, str]:
+    """
+    Use LLaMA 8B to classify query intent.
+    Much more accurate than rule-based detection for natural language queries.
+    Falls back to detect_ask_intent if LLM unavailable.
+    """
+    try:
+        from core.local_llm_client import call_local_llm_json
+
+        system_prompt = (
+            "You are a query intent classifier for a knowledge retrieval system. "
+            "Classify the user query into exactly one of these intents:\n"
+            "- 'answer': single record lookup, specific question, procedural question, OR incident/error question (e.g. 'what is tag 22', 'sftp folder for gsact.txt', 'what is tidal', 'how to troubleshoot X', 'steps for X', 'how to do X', 'error for X', 'X failed', 'issue with X', 'problem with X')\n"
+            "- 'discovery_list': queries expecting MULTIPLE DIFFERENT records as results (e.g. 'what files does Goldman send', 'all sftp folders', 'what tags contain price', 'what fields contain ask price', 'what fields are in category X', 'list all goldman files', 'what tags contain broker'). Use this when the answer would be a LIST of items. NOT for procedural/how-to/error/incident questions.\n"
+            "- 'discovery_count': counting query (e.g. 'how many files does Goldman have', 'how many tags contain price')\n"
+            "- 'comparison': comparing two or more items\n"
+            "Return only JSON: {\"mode\": \"answer|discovery_list|discovery_count|comparison\", \"reason\": \"brief reason\"}"
+        )
+
+        result = call_local_llm_json(system_prompt, question, temperature=0.0)
+
+        if isinstance(result, dict) and "mode" in result:
+            mode = result["mode"]
+            if mode in {"answer", "discovery_list", "discovery_count", "comparison"}:
+                return {
+                    "mode": mode,
+                    "reason": result.get("reason", "llm classification")
+                }
+
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning(f"LLM intent detection failed: {e}")
+
+    # Fallback to rule-based
+    return detect_ask_intent(question)
 
 # ---------------------------------------------------------------------------
 # Intent detection
@@ -374,6 +409,39 @@ def dedupe_discovery_results(results: List[Dict]) -> List[Dict]:
 # Replaces: scroll(limit=5000) + Python scoring
 # New: BM25 pre-filter + Python scoring on smaller set
 # ---------------------------------------------------------------------------
+
+def llm_extract_search_terms(question: str) -> str:
+    """
+    Use LLaMA 8B to extract the key search terms from a discovery query.
+    E.g. 'what recon files does Goldman send' -> 'Goldman'
+    Falls back to basic normalization if LLM unavailable.
+    """
+    try:
+        from core.local_llm_client import call_local_llm_json
+        system_prompt = (
+            "Extract ONLY the most specific entity name or topic from the user query. "
+            "Remove ALL of: question words, verbs, generic nouns (fields, files, tags, records, data, recon, list). "
+            "Keep ONLY: company names, identifiers, specific topics, abbreviations. "
+            "Return a single short phrase, not a list, not comma-separated. "
+            "Examples: 'what recon files does Goldman send' -> 'Goldman'. "
+            "'what fields contain ask price' -> 'ask price'. "
+            "'what tags contain broker' -> 'broker'. "
+            "'what fields are in category airlines' -> 'airlines'. "
+            "Return JSON: {\"terms\": \"single short phrase\"}"
+        )
+        result = call_local_llm_json(system_prompt, question, temperature=0.0)
+        if isinstance(result, dict) and "terms" in result:
+            terms = result["terms"]
+            if isinstance(terms, list):
+                terms = terms[0] if terms else ""
+            # Take first term if comma-separated
+            terms = str(terms).split(",")[0].strip()
+            return terms
+            
+    except Exception:
+        pass
+    return normalize_simple_text(question)
+
 def discover_collection_items(
     collection_name: str,
     question: str,
@@ -388,20 +456,7 @@ def discover_collection_items(
     hints = load_doc_query_hints()
     stopwords = set(hints.get("stopwords", []))
 
-    # Strip discovery verbs and noise so BM25 searches content terms only
-    discovery_noise = set(hints.get("discovery_noise_words", []))
-    discovery_verbs = {"list", "show", "find", "contain", "contains",
-                       "include", "includes", "mention", "mentions",
-                       "have", "has", "with", "tags", "fields", "records"}
-
-    words = [
-        w for w in q_norm.split()
-        if w and w not in stopwords
-        and w not in discovery_noise
-        and w not in discovery_verbs
-    ]
-
-    search_query = " ".join(words) if words else q_norm
+    search_query = llm_extract_search_terms(question)
 
     bm25_results = search_bm25(
         collection_name=collection_name,
@@ -716,7 +771,7 @@ def run_discovery_with_method(
     Run discovery query and return results with method info.
     Entry point called from router.py.
     """
-    intent = detect_ask_intent(question)
+    intent = llm_detect_intent(question)
     field_maps = load_field_maps()
     q_norm = normalize_simple_text(question)
 

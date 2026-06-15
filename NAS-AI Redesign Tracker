@@ -137,6 +137,7 @@
 - Schema files migrated to PostgreSQL (CODE-011)
 - `ts_rank_cd` weights array tuning (`{0.1, 0.2, 0.4, 1.0}`) for position-based boosting
 - Query expansion via LLM before search
+| 5.S1 | LLM-driven schema inference — replace structured_roles.json pattern matching with LLaMA 8B semantic role assignment for new collections | ⏳ Pending |
 
 ---
 

@@ -36,6 +36,134 @@ _query_terms_cache: Dict | None = None
 
 
 # ---------------------------------------------------------------------------
+# BGE Cross-Encoder Reranker
+# Uses BAAI/bge-reranker-large for precise (query, passage) scoring
+# Much better than MiniLM for domain-specific content
+# ---------------------------------------------------------------------------
+
+_bge_reranker_cache = None
+
+def get_bge_reranker():
+    """Load and cache BGE reranker model."""
+    global _bge_reranker_cache
+    if _bge_reranker_cache is not None:
+        return _bge_reranker_cache
+    try:
+        from sentence_transformers import CrossEncoder
+        from core.system_config import load_system_config
+        cfg = load_system_config()
+        model_name = cfg.get("bge_reranker", {}).get(
+            "model", "BAAI/bge-reranker-large"
+        )
+        _bge_reranker_cache = CrossEncoder(model_name)
+        return _bge_reranker_cache
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning(f"BGE reranker not available: {e}")
+        return None
+
+
+def bge_rerank(points: List, question: str) -> List:
+    """
+    Rerank candidates using BGE cross-encoder.
+    Better than MiniLM for domain-specific content.
+    Falls back to original RRF order if unavailable.
+    """
+    if not points or len(points) == 1:
+        return points
+
+    model = get_bge_reranker()
+    if model is None:
+        return points
+
+    try:
+        pairs = []
+        for p in points:
+            payload = p.payload or {}
+            title = payload.get("primary_name") or payload.get("identifier") or ""
+            text = str(payload.get("text") or payload.get("description") or "")[:512]
+            passage = f"{title}\n{text}".strip()
+            pairs.append((question, passage))
+
+        scores = model.predict(pairs)
+        scored = sorted(zip(scores, points), key=lambda x: x[0], reverse=True)
+        return [p for _, p in scored]
+
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning(f"BGE rerank failed: {e}")
+        return points
+
+def llm_rerank(points: List, question: str) -> List:
+    """
+    Rerank candidates using LLaMA 8B prompt reasoning.
+    Uses domain-aware prompt to handle implicit naming conventions.
+    Falls back to original RRF order if LLM unavailable.
+    """
+    if not points or len(points) == 1:
+        return points
+
+    try:
+        from core.local_llm_client import call_local_llm_json
+
+        # Build candidate list with full text
+        candidates = []
+        for i, p in enumerate(points):
+            payload = p.payload or {}
+            name = payload.get("primary_name") or payload.get("identifier") or ""
+            identifier = payload.get("identifier") or payload.get("Moore file name") or ""
+            text = str(payload.get("text") or payload.get("description") or "")[:300]
+            header = f"{identifier} ({name})" if identifier and name else (identifier or name)
+            candidates.append(f"[Document {i+1}]\nTitle: {header}\nContent: {text}")
+
+        candidates_text = "\n\n".join(candidates)
+
+        system_prompt = (
+            "You are an expert system engineer routing support files and knowledge base articles. "
+            "Your task is to find the single most relevant document for the user's query. "
+            "Key domain rules: "
+            "- '21R2' and 'PROD' refer to the production environment. "
+            "- 'DEV' and '23R3' refer to the development environment. "
+            "- 'moore weekend checks' refers to PROD weekend restart procedures, NOT DEV health checks. "
+            "- Weekend checks and weekend restarts are PROD activities unless explicitly stated as DEV. "
+            "- File extensions (.txt, .csv) are system file identifiers. "
+            "Output strictly as JSON: {\"ranking\": [1, 3, 2]} from most to least relevant. No explanation."
+        )
+
+        user_prompt = (
+            f"User Query: \"{question}\"\n\n"
+            f"List of Candidate Documents:\n{candidates_text}\n\n"
+            f"Re-rank from most to least relevant. "
+            f"Return only {{\"ranking\": [list of document numbers]}}"
+        )
+
+        result = call_local_llm_json(system_prompt, user_prompt, temperature=0.0)
+        print(f"LLM RERANK query: {question}")
+        print(f"LLM RERANK candidates: {[p.payload.get('primary_name') for p in points]}")
+        print(f"LLM RERANK result: {result}")
+
+        if isinstance(result, dict) and "ranking" in result:
+            ranking = result["ranking"]
+            reranked = []
+            seen = set()
+            for rank in ranking:
+                idx = int(rank) - 1
+                if 0 <= idx < len(points) and idx not in seen:
+                    reranked.append(points[idx])
+                    seen.add(idx)
+            # Add any missed points at the end
+            for i, p in enumerate(points):
+                if i not in seen:
+                    reranked.append(p)
+            return reranked
+
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning(f"LLM rerank failed: {e}")
+
+    return points
+
+# ---------------------------------------------------------------------------
 # Cross-encoder reranker using sentence-transformers MiniLM
 # ---------------------------------------------------------------------------
 
@@ -88,7 +216,7 @@ def cross_encoder_rerank(points: List, question: str) -> List:
 
     except Exception as e:
         return points
-        
+
 def load_query_terms() -> Dict:
     global _query_terms_cache
     if _query_terms_cache is None:

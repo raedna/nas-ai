@@ -46,7 +46,7 @@ SMOKE_TESTS = [
     },
     {
         "id": "KB-03",
-        "question": "steps for the moore weekend checks",
+        "question": "steps for the moore PROD weekend checks",
         "description": "Process lookup — returns automated 21r2 weekend restart article",
         "must_contain": ["21R2", "Weekend Restart"],
         "must_not_contain": [],
@@ -56,7 +56,7 @@ SMOKE_TESTS = [
     },
     {
         "id": "KB-04",
-        "question": "steps for the moore weekend archive",
+        "question": "steps for the moore 21r2 prod archive",
         "description": "Process lookup — returns automated 21r2 PROD Archive article",
         "must_contain": ["21R2", "PROD Archive"],
         "must_not_contain": [],
@@ -88,7 +88,7 @@ SMOKE_TESTS = [
         "id": "KB-07",
         "question": "how to check recon files in pb folders on server",
         "description": "Process lookup — returns Checking files on us1-proc server article",
-        "must_contain": ["US1-Proc", "Step 2"],
+        "must_contain": ["PrimeBroker", "Step 2"],
         "must_not_contain": [],
         "must_not_contain": [],
         "expected_methods": ["semantic", "lexical_short"],

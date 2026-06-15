@@ -411,47 +411,55 @@ def route_query(
     if not points:
         return "No answer found."
 
-    # Rerank
-    points = rerank_points(points, question)
-
-    # Use the best point
+    # Use the best point — check doc_type before reranking
     best = points[0]
     payload = best.payload or {}
     doc_type = infer_doc_type(payload)
 
-    # For structured collections — reranker not needed, RRF already ranked correctly
-    # For chunked docs and entity rows — reranker still helps
-    if doc_type != "structured":
-        from core.system_config import load_system_config
-        ce_cfg = load_system_config().get("cross_encoder", {})
-        ce_enabled = ce_cfg.get("enabled", False)
-        ce_doc_types = ce_cfg.get("apply_to_doc_types", ["entity_row"])
-        if ce_enabled and doc_type in ce_doc_types:
-            from core.retrieval.reranker import cross_encoder_rerank
-            top_k = ce_cfg.get("top_k", 10)
-            points = cross_encoder_rerank(points[:top_k], question)
-        else:
-            points = rerank_points(points, question)
+   # DISABLED RERANKER USING MINILM AFTER CHANGING RERANKING PROCESS TO NOT RELY ON RRF SCORE
+
+   ## Confidence check — if top RRF score is below threshold return top 5
+   #from core.system_config import load_system_config
+   #CONFIDENCE_THRESHOLD = load_system_config().get("retrieval_confidence_threshold", 0.105)
+   #if doc_type == "structured" and getattr(best, "score", 0.0) < CONFIDENCE_THRESHOLD:
+   #    top5 = points[:5]
+   #    lines = [f"No exact match found for '{question}'. Closest results:"]
+   #    for p in top5:
+   #        pl = p.payload or {}
+   #        name = pl.get("primary_name") or ""
+   #        identifier = pl.get("identifier") or ""
+   #        desc = str(pl.get("description") or "")[:80]
+   #        lines.append(f"- {identifier}: {name} — {desc}" if desc else f"- {identifier}: {name}")
+   #    return "\n".join(lines)
+
+
+   # Stage 2: LLM reranker for structured and entity_row
+    # Replaces MiniLM and confidence threshold gate
+    from core.system_config import load_system_config
+    llm_rerank_cfg = load_system_config().get("llm_reranker", {})
+    llm_rerank_enabled = llm_rerank_cfg.get("enabled", False)
+    llm_rerank_doc_types = llm_rerank_cfg.get("apply_to_doc_types", ["structured", "entity_row"])
+    llm_rerank_top_k = llm_rerank_cfg.get("top_k", 10)
+
+    # Stage 2: BGE reranker (primary) with LLM reranker as fallback
+    bge_cfg = load_system_config().get("bge_reranker", {})
+    bge_enabled = bge_cfg.get("enabled", False)
+    bge_doc_types = bge_cfg.get("apply_to_doc_types", ["entity_row"])
+    bge_top_k = bge_cfg.get("top_k", 25)
+
+    if bge_enabled and doc_type in bge_doc_types:
+        from core.retrieval.reranker import bge_rerank
+        points = bge_rerank(points[:bge_top_k], question)
         best = points[0]
         payload = best.payload or {}
-        doc_type = infer_doc_type(payload)
-
-    # Confidence check — if top RRF score is below threshold return top 5
-    from core.system_config import load_system_config
-    CONFIDENCE_THRESHOLD = load_system_config().get("retrieval_confidence_threshold", 0.105)
-    if doc_type == "structured" and getattr(best, "score", 0.0) < CONFIDENCE_THRESHOLD:
-        top5 = points[:5]
-        lines = [f"No exact match found for '{question}'. Closest results:"]
-        for p in top5:
-            pl = p.payload or {}
-            name = pl.get("primary_name") or ""
-            identifier = pl.get("identifier") or ""
-            desc = str(pl.get("description") or "")[:80]
-            lines.append(f"- {identifier}: {name} — {desc}" if desc else f"- {identifier}: {name}")
-        return "\n".join(lines)
+    elif llm_rerank_enabled and doc_type in llm_rerank_doc_types:
+        from core.retrieval.reranker import llm_rerank
+        points = llm_rerank(points[:llm_rerank_top_k], question)
+        best = points[0]
+        payload = best.payload or {}
 
     payload["_question"] = question
-    # For chunked document payloads, enrich by merging nearby/same-section chunks
+    ## For chunked document payloads, enrich by merging nearby/same-section chunks
     if doc_type not in ("structured", "entity_row"):
         payload = build_fuller_doc_payload(collection, payload) or payload
     return synthesize_answer(payload, roles, collection)
@@ -476,7 +484,25 @@ def run_query_with_method(
     Optional extra keys depending on method:
       namespace_debug, plan, executor_debug_items, structured_plan_dry_run
     """
-    intent = detect_ask_intent(question)
+    # Pre-normalization filename detection — before normalize_simple_text strips dots
+    import re
+    _filename_matches = re.findall(r'\b([a-zA-Z0-9_\-]+\.[a-zA-Z0-9]{2,5})\b', question)
+    if _filename_matches:
+        from core.retrieval.db_retrieval import get_by_identifier
+        for _fname in _filename_matches:
+            _pts = get_by_identifier(collection, _fname)
+            if _pts:
+                _payload = _pts[0].payload or {}
+                _payload["_question"] = question
+                _roles = _detect_requested_roles(question, {})
+                return {
+                    "method": "identifier_lookup",
+                    "reason": f"filename identifier detected: {_fname}",
+                    "result": synthesize_answer(_payload, _roles, collection),
+                }
+
+    from core.retrieval.discovery import llm_detect_intent
+    intent = llm_detect_intent(question)
 
     # ------------------------------------------------------------------
     # 1. Relationship queries (before plain namespace lookup)
@@ -688,7 +714,8 @@ def debug_route_query(
 
 def explain_query_routing(collection: str, question: str) -> Dict:
     """Debug helper — show how a question would be routed without running it."""
-    intent = detect_ask_intent(question)
+    from core.retrieval.discovery import llm_detect_intent
+    intent = llm_detect_intent(question)
     namespace, identifier = extract_explicit_identifier_namespace(question)
 
     enum_lookup_query = looks_like_reverse_enum_query(question, collection)

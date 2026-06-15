@@ -41,7 +41,8 @@ def build_structured_nlp_text(row, schema):
 
     identifier = _first_value(row_n, id_fields)
     primary_name = _first_value(row_n, name_fields)
-    description = _first_value(row_n, desc_fields)
+    description_values = _all_values(row_n, desc_fields)
+    description = "\n".join(str(v) for v in description_values if v)
     aliases = _all_values(row_n, alias_fields)
     type_value = _first_value(row_n, type_fields)
 
@@ -53,11 +54,14 @@ def build_structured_nlp_text(row, schema):
 
     parts = []
 
+    if identifier:
+        parts.append(str(identifier))
+
     if primary_name:
         parts.append(primary_name)
 
-    if description_values:
-        parts.append("\n\n".join(description_values))
+    if description:
+        parts.append(description)
 
     if other_values:
         parts.append("\n".join(str(v) for v in other_values if v))

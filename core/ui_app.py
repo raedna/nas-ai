@@ -719,7 +719,7 @@ with tabs[0]:
                 st.warning(f"Config deleted but PostgreSQL cleanup failed: {e}")
             st.success(f"Deleted config: {del_name}")
             st.rerun()
-            
+
     with right:
         st.markdown("### Create / Edit Collection")
 
@@ -783,6 +783,51 @@ with tabs[0]:
             "Path (file or folder)",
             key="collection_path_input"
         )
+
+        # Excel sheet detection
+        sheet_name = None
+        if path_value.strip() and path_value.strip().endswith(('.xlsx', '.xls')):
+            try:
+                import pandas as pd
+                xl = pd.ExcelFile(path_value.strip())
+                sheet_names = xl.sheet_names
+                if len(sheet_names) > 1:
+                    sheet_name = st.selectbox(
+                        "Select sheet to ingest",
+                        sheet_names,
+                        key="collection_sheet_name"
+                    )
+                else:
+                    sheet_name = sheet_names[0]
+                    st.caption(f"Sheet: {sheet_name}")
+
+                # Show column headers from selected sheet
+                if sheet_name:
+                    preview_df = pd.read_excel(path_value.strip(), sheet_name=sheet_name, nrows=5, header=None, dtype=str)
+                    preview_df = preview_df.fillna("")
+
+                    # Detect header row — find first row with mostly non-empty, non-title values
+                    from TABLES.table_parser import detect_header_row
+                    header_row_idx = detect_header_row(preview_df)
+                    headers = [str(v) for v in preview_df.iloc[header_row_idx].tolist() if str(v).strip() not in ['', 'nan']]
+                    st.caption(f"Detected columns ({len(headers)}): {', '.join(headers[:10])}" + (" ..." if len(headers) > 10 else ""))
+
+                    # Auto-infer schema using rows after header
+                    from TABLES.schema_inference_table import infer_table_schema
+                    data_rows = preview_df.iloc[header_row_idx + 1:].copy()
+                    data_rows.columns = [str(v) for v in preview_df.iloc[header_row_idx].tolist()]
+                    rows_dict = data_rows.to_dict(orient='records')
+                    source_file = Path(path_value.strip()).name
+                    inferred = infer_table_schema(rows_dict, collection_name="preview", source_file=source_file)
+
+                    with st.expander("Auto-inferred schema (click to review)", expanded=False):
+                        for role in ['identifier', 'primary_name', 'description', 'type', 'aliases', 'other']:
+                            cols = inferred.get(role, [])
+                            if cols:
+                                st.markdown(f"**{role}:** {', '.join(cols)}")
+
+            except Exception as e:
+                st.caption(f"Could not read Excel file: {e}")
 
         all_filetypes = sorted(filetypes_cfg.keys()) if isinstance(filetypes_cfg, dict) else []
 
@@ -916,7 +961,10 @@ with tabs[0]:
                 "notes": notes.strip(),
                 "filters": {
                     "field_filters": field_filters
-                }
+                },
+                "template_config": {
+                    "sheet_name": sheet_name,
+                } if sheet_name is not None else {}
             }
 
             save_json(COLLECTIONS_PATH, collections_cfg)
@@ -925,6 +973,10 @@ with tabs[0]:
             try:
                 from core.db import execute
                 import json as _json
+                filters_payload = {"field_filters": field_filters}
+                if sheet_name is not None:
+                    filters_payload["sheet_name"] = sheet_name
+
                 execute("""
                     INSERT INTO collections (name, path, allowed_filetypes, source_label, filters)
                     VALUES (%s, %s, %s::jsonb, %s, %s::jsonb)
@@ -938,7 +990,7 @@ with tabs[0]:
                     path_value.strip(),
                     _json.dumps(allowed_filetypes),
                     source_label.strip(),
-                    _json.dumps({"field_filters": field_filters}),
+                    _json.dumps(filters_payload),
                 ))
             except Exception as e:
                 st.warning(f"Saved to config but PostgreSQL update failed: {e}")
@@ -1004,6 +1056,21 @@ with tabs[1]:
 
         selected_collection = display_map[selected_label]
         collection_cfg = collections_cfg.get(selected_collection, {})
+        # Merge PostgreSQL filters (includes sheet_name) into collection_cfg
+        try:
+            from core.db import fetchall as _fetchall
+            pg_rows = _fetchall(
+                "SELECT filters FROM collections WHERE name = %s",
+                (selected_collection,)
+            )
+            if pg_rows and pg_rows[0].get("filters"):
+                pg_filters = pg_rows[0]["filters"]
+                # Merge — PostgreSQL filters take precedence
+                existing_filters = collection_cfg.get("filters", {})
+                existing_filters.update(pg_filters)
+                collection_cfg["filters"] = existing_filters
+        except Exception:
+            pass
 
         st.markdown("### Collection Config")
         st.json(collection_cfg)
@@ -1545,7 +1612,8 @@ with tabs[3]:
                     st.session_state.ask_discovery_result = None
                     st.session_state["ask_discovery_selected_items"] = []
 
-                    intent = detect_ask_intent(question)
+                    from core.retrieval.discovery import llm_detect_intent
+                    intent = llm_detect_intent(question)
 
                     with st.spinner("Running query..."):
                         if intent["mode"] == "comparison":
