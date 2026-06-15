@@ -165,7 +165,13 @@ def synthesize_answer(payload: Dict, roles: List[str], collection_name: str) -> 
             lines.append(f"{identifier_field} {identifier_value}.")
 
         if description:
-            lines.append(f"\nDescription: {description}")
+            description_fields = payload.get("description_fields") or {}
+            if isinstance(description_fields, dict) and description_fields:
+                lines.append("")
+                for field_name, field_value in description_fields.items():
+                    lines.append(f"{field_name}: {field_value}")
+            else:
+                lines.append(f"\nDescription: {description}")
             type_value = payload.get("type")
             if type_value and type_value != "structured":
                 lines.append(f"\nType: {type_value}")

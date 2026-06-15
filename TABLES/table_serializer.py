@@ -32,6 +32,16 @@ def _all_values(row_norm, fields):
             values.append(str(val).strip())
     return values
 
+def _labeled_values(row_norm, fields):
+    """Return {original_field_name: value} for each non-empty field, preserving order."""
+    labeled = {}
+    for f in fields:
+        val = row_norm.get(str(f).lower())
+        if val not in [None, ""]:
+            labeled[str(f)] = str(val).strip()
+    return labeled
+
+
 def _namespace_from_field(field):
     field = str(field or "").strip().lower()
     return "".join(ch for ch in field if ch.isalnum() or ch == "_")
@@ -98,6 +108,7 @@ def _build_structured_doc(row, schema, source_file):
     primary_name = _first_value(row_n, name_fields)
     description_values = _all_values(row_n, desc_fields)
     description = "\n\n".join(description_values) if description_values else None
+    description_fields = _labeled_values(row_n, desc_fields)
     aliases = _all_values(row_n, alias_fields)
     type_value = _first_value(row_n, type_fields)
 
@@ -114,6 +125,7 @@ def _build_structured_doc(row, schema, source_file):
         "identifier_kind": "canonical",
         "primary_name": primary_name or None,
         "description": description or None,
+        "description_fields": description_fields or None,
         "enum_values": [],
         "link_keys": link_keys,
         "related_link_keys": [],

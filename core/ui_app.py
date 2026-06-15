@@ -37,6 +37,7 @@ from core.retrieval.discovery import detect_ask_intent, run_discovery_with_metho
 from core.retrieval.crosslink import run_comparison_query
 from core.query_helpers import infer_doc_type
 from core.retrieval_debug import score_point_shared_debug
+from core.schema_loader import load_collection_schemas
 
 # =========================================================
 # PATHS / CONFIG
@@ -1707,14 +1708,35 @@ with tabs[3]:
                 )
                 st.session_state.ask_discovery_preview_count = int(preview_count)
 
+                # Derive a human-friendly header for the aliases column from the
+                # collection schema (e.g. "Prime Broker file name"), falling back
+                # to the generic role name. No hardcoding of collection specifics.
+                _alias_label = "aliases"
+                try:
+                    _schemas = load_collection_schemas(selected_collection)
+                    for _sch in _schemas.values():
+                        _alias_fields = _sch.get("aliases") or []
+                        if _alias_fields:
+                            _alias_label = str(_alias_fields[0])
+                            break
+                except Exception:
+                    pass
+
                 preview_rows = []
                 for item in results[:int(preview_count)]:
+                    _payload = item.get("payload") or {}
+                    _aliases = _payload.get("aliases") or []
+                    if isinstance(_aliases, list):
+                        _aliases_str = ", ".join(str(a) for a in _aliases if a)
+                    else:
+                        _aliases_str = str(_aliases)
                     preview_rows.append({
                         "rank": item.get("rank"),
                         "score": item.get("score"),
                         "doc_type": item.get("doc_type"),
                         "identifier": item.get("identifier"),
                         "primary_name": item.get("primary_name"),
+                        _alias_label: _aliases_str,
                         "source_type": item.get("source_type"),
                         "source_file": item.get("source_file"),
                         "preview": item.get("preview")
