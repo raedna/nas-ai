@@ -41,6 +41,7 @@
 | CODE-013 | ui_app.py | BM25/lexical candidates not shown in debug panel | ⏳ Pending |
 | CODE-014 | ui_app.py | System Config tab shows embeddings model but not LLM model — add LLM model + base_url + timeout fields writing to nlp_config.json | ⏳ Pending |
 | CODE-015 | db schema | files table missing last_ingested column — needed for tracking when files were last processed | ⏳ Pending |
+- **DISPLAY-001 (deferred):** Two-tier table header (role name on row 1, source column names grouped beneath, multi-mapped roles like primary_name spanning sub-columns) is NOT supported by st.dataframe — needs HTML render or AgGrid. Deferred until final UI is pinned, then implement at the right place. Single-mapped role relabeling (identifier→Moore file name, aliases→Prime Broker file name) already works in the ranked table.
 
 **Retired issues (resolved):**
 - RET-011 — FIX-01 enum suppression: fixed in Phase 1
@@ -49,6 +50,17 @@
 - CODE-003 — Qdrant client at import time: eliminated
 - CODE-004 — `run_query_with_method` / `route_query` overlap: resolved in router.py
 - CODE-007 — collection state JSON: eliminated — state now in PostgreSQL `files` table
+
+- **DISCOVERY-001:** "How many Moore notes" returns a count ("39 matching records") but does NOT list the matched records. Discovery path computes count but doesn't render the result list. Likely discovery_count vs discovery_list routing/rendering. UI/pipeline, not a data issue.
+- **DISCOVERY-002:** Discovery count undercounts vs category ground truth — pipeline reported 39 Moore notes, but COUNT(DISTINCT source_file) WHERE category='Moore' returns 41. Pipeline's counting method (lexical/semantic match) differs from the category field. Reconcile counting method. Likely related to DISCOVERY-001.
+- **STAGE0-001:** Bare category query "Moore" in Ask tab routes to single-note lookup ("Moore login") instead of discovery/multi-result, despite 15+ Moore notes being lexically matchable. Contrast: "what are the goldman files" correctly triggered discovery table. Stage 0 intent detection treats bare entity terms as specific lookups. Category queries are exactly the retrieval-help use case folder-as-category was built for, so worth fixing.
+
+- **psycopg2 percent-escaping in fetchall queries:** `%` in `ILIKE '%term%'` collides with psycopg2 parameter substitution, raising "IndexError: tuple index out of range". Must double to `%%` (e.g. `ILIKE '%%term%%'`) in fetchall one-liners with params=(). Cost real debugging time today (compounded by `2>/dev/null` hiding the error). Lesson: don't suppress stderr when diagnosing failing queries.
+
+- **PENDING — cross-link testing (recon_assist_file ↔ kb_docs):** Cross-links between these collections were planned but never tested. When picking up: define known-correct expectation first (which recon record links to which kb_doc, by what key), then test against it. Lesson from 2026-06-16: start from known ground truth, not "does it look right."
+- **OBSERVED — Obsidian over-chunking:** NAS AI RAG Creation with Github 20260426.md (44KB) produced 246 chunks. Worth understanding chunking density; may be fine, may need tuning. Low priority.
+
+- **CLEANUP — legacy collection_state/*.json files:** Qdrant-era, now superseded by PostgreSQL files/chunks tables (see retired CODE-007). The stale files still on disk caused confusion mid-session (implied they govern skip/re-ingest when they don't). Recommend removing or ignoring them on disk so they stop misleading.
 
 ---
 
@@ -126,6 +138,10 @@
 | Step | Description | Status |
 |---|---|---|
 | 4.1–4.5 | Design + implement + smoke test MCP server (local + online modes) | ⏳ Pending |
+**MCP has two distinct potential roles — disambiguate before building:**
+- MCP as **ingestion source** — server pulls from Halo / Confluence / Snowflake and feeds rows into the existing ingestion pipeline (plugs in at the ingestion-adapter boundary alongside file parsers).
+- MCP as **query interface** — exposes NAS-AI retrieval as an MCP server so external tools / Claude can query the knowledge base.
+These are separate pieces of work; may want both, but build/scope one at a time.
 
 ---
 
@@ -152,7 +168,11 @@
 | 2026-06-10 | 3.1–3.7 | BBG ingest + routing fixes | `core/retrieval/router.py`, `discovery.py`, `answer.py`, `lexical.py`, `reranker.py`, `db_retrieval.py`, `nlp_generator.py`, `config/query_terms.json` | FIX 7/7, BBG 6/6 |
 | 2026-06-10 | 3.8 | RRF hybrid search + trigram + ts_rank_cd + confidence threshold | `core/retrieval/db_retrieval.py`, `core/retrieval/router.py`, `core/retrieval/lexical.py`, `config/synonyms.json`, `config/system.json` | FIX 13/13, BBG 6/6 |
 | 2026-06-10 | UI | Partial ui_app.py migration to PostgreSQL | `core/ui_app.py` | Collections/Ask/Preview/Validation tabs use PostgreSQL |
+- **2026-06-15** — RECON structured-record answer formatting. `_build_structured_doc` (TABLES/table_serializer.py) now stores original description field names in `payload["description_fields"]` and the type field name in `payload["type_field"]`; `synthesize_answer` (core/retrieval/answer.py) renders labeled key-value pairs (e.g. `sFTP Folder: /outgoing`) and uses the schema field name as the type label (e.g. `Prime Broker: Goldman`) instead of generic "Description"/"Type". UI ranked table (core/ui_app.py) now shows the aliases column under its real schema header (e.g. "Prime Broker file name") via schema-derived relabeling — no hardcoding. Required re-ingest of recon_assist_file for serializer changes; UI relabel needs no re-ingest. Smoke tests still green: FIX 13/13, BBG 7/7, KB 10/10.
 
+- **2026-06-16** — Obsidian collection: investigation + folder-as-category feature.
+  - VERIFIED WORKING (objective ground-truth tests): Obsidian embedded-image resolution + OCR survived the Postgres migration. Confirmed on Mosaic Workflow.md (5/5 images resolved to Media/) and NAS AI RAG Creation 20260321.md (10/10 resolved to x_Media/). Earlier "unresolved" appearance was a misread — image names appear in related_titles independently (via _extract_markdown_related_titles), which is unrelated to actual resolution in embedded_image_paths. No image bug existed.
+  - NEW FEATURE — folder-as-category: doc_serializer._make_chunk now derives `category` (top-level folder, e.g. "Moore") and `folder_path` (full relative path, e.g. "Moore/CRD") from file_path + collection_root. `category` is folded into searchable nlp_text ("Category: <name>"); `folder_path` is stored-only. ingest_collection.py threads collection_cfg["path"] into template_config as "collection_root". Verified: capture correct (EOD→Moore/Moore/CRD, Mosaic→Astro Workflows, rsync→Personal Notes), present in nlp_text, lexically matchable (ts_rank returns ranked Moore notes), 41 notes correctly tagged Moore.
 ---
 
 ## Smoke Test Results
@@ -222,3 +242,25 @@ Route different query types and doc types to different LLM/embedding models load
 - LM Studio supports multiple models loaded simultaneously — endpoint per model
 - Config UI needs a "Models" section showing loaded models and their doc_type assignments
 - Model routing is transparent to the user — same query interface, better answers
+
+
+---
+
+## Phase 4 Architecture Decisions — Deployment & Data Sources (open, captured 2026-06-15)
+
+Recorded for when the system is proven and ready for blind testing. None of these block current work — NAS remains always-available dev/fallback environment.
+
+### Deployment / hosting
+- Target users: multiple people, each on their own machine, working within Azure Virtual Desktop (AVD) sessions, same company tenant.
+- **Data-AVD and login-AVD are likely DISTINCT** (same Azure tenant, different AVDs). So the app stays a remote-DB client — same pattern as today (Mac → NAS over Tailscale), just different host/credentials/network path (Azure internal networking / private endpoint).
+- AVD-hosting largely dissolves the "standalone compiled installer" concern: provision-once in a controlled image rather than distribute native binaries to varied machines. Users open the app in-session; nobody installs anything.
+- **Open topology question:** does Streamlit app run per login-AVD session (one instance each) or on the data-AVD (one shared instance)? Different setup + concurrency implications. Decide later.
+- UI framework: staying on Streamlit is reinforced by AVD-hosting (server-viewed-in-browser fits AVD model). Switching shelved unless a concrete limitation bites. HTML-in-Streamlit is the pragmatic path for richer views and transfers to any future framework.
+
+### Data sources
+- Current: file ingestion (XML, XLSX, CSV) — narrow coverage so far (1 XML, 2 XLSX, 1 CSV); broadening format test coverage is the near-term priority (under-tested area).
+- Future: Halo + Confluence (API access confirmed available — testable when we get there), and Snowflake cloud DB (possibly the primary/only external source).
+- **Key architectural principle:** keep the ingestion-source boundary clean so a Snowflake/API/MCP source plugs in as an adapter alongside file parsers, handing rows-with-schema to the existing pipeline. Retrieval/role/serializer layers stay source-agnostic — already the case, must be preserved.
+
+### Guardrail
+- Protect the core/UI separation religiously. Business logic (retrieval, schema, serialization) must never leak into ui_app.py. This is the insurance that keeps an eventual UI/framework swap a config-level change, not a rewrite.
