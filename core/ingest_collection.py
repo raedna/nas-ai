@@ -136,6 +136,9 @@ def _build_tasks(
             if key in collection_cfg:
                 base_template_config[key] = collection_cfg[key]
 
+        if "path" in collection_cfg:
+            base_template_config["collection_root"] = collection_cfg["path"]
+
         tasks.append(
             FileTask(
                 path=file_path,

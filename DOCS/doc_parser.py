@@ -234,8 +234,8 @@ def _enrich_blocks_with_embedded_images(blocks, doc_path, template_config=None):
             })
             next_block_id += 1
 
-        except Exception:
-            # keep existing behavior unchanged on failure
+        except Exception as e:
+            print(f">>> DEBUG image enrich FAILED for {target}: {type(e).__name__}: {e}")
             continue
 
     return enriched

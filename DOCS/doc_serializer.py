@@ -17,6 +17,7 @@ def _make_chunk(
     file_tags,
     related_titles=None,
     file_path=None,
+    collection_root=None,
 ):
 
     if not blocks:
@@ -95,6 +96,24 @@ def _make_chunk(
     identifier_kind = "generated"
     link_keys = [f"{identifier_namespace}:{identifier}"]
 
+    # Derive folder category (top-level) and full relative folder path
+    category = None
+    folder_path = None
+    if file_path:
+        try:
+            fp = Path(file_path)
+            if collection_root:
+                rel = fp.relative_to(Path(collection_root))
+                parts = list(rel.parts[:-1])  # drop the filename
+            else:
+                parts = [fp.parent.name] if fp.parent.name else []
+            if parts:
+                category = parts[0]
+                folder_path = "/".join(parts)
+        except Exception:
+            category = None
+            folder_path = None
+
     payload = {
         "chunk_id": chunk_id,
         "identifier": identifier,
@@ -120,11 +139,15 @@ def _make_chunk(
         "file_name": source_file,
         "related_titles": related_titles,
         "note_title": source_stem if is_markdown else None,
+        "category": category,
+        "folder_path": folder_path,
         **file_tags
     }
 
-    full_text = f"Title: {source_stem}\n\n{text}" if is_markdown else text
-
+    _title_line = f"Title: {source_stem}\n\n" if is_markdown else ""
+    _cat_line = f"Category: {category}\n\n" if category else ""
+    full_text = f"{_title_line}{_cat_line}{text}"
+    
     return {
         "text": full_text,
         **payload
@@ -174,6 +197,7 @@ def doc_serializer(parsed, file_path, template_config, file_tags, collection_nam
             file_tags,
             related_titles,
             file_path=source_path,
+            collection_root=template_config.get("collection_root"),
         )
 
         if chunk:
@@ -223,6 +247,7 @@ def doc_serializer(parsed, file_path, template_config, file_tags, collection_nam
                     file_tags,
                     related_titles,
                     file_path=source_path,
+                    collection_root=template_config.get("collection_root"),
                 )
                 if chunk:
                     items.append(chunk)
