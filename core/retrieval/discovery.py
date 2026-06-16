@@ -71,8 +71,8 @@ def _matches_any_phrase(q: str, phrases: List[str]) -> bool:
 
 def llm_detect_intent(question: str) -> Dict[str, str]:
     """
-    Use LLaMA 8B to classify query intent.
-    Much more accurate than rule-based detection for natural language queries.
+    Use LLaMA 8B to classify query intent and extract role/target.
+    Replaces field_maps.json keyword matching for role detection.
     Falls back to detect_ask_intent if LLM unavailable.
     """
     try:
@@ -80,12 +80,47 @@ def llm_detect_intent(question: str) -> Dict[str, str]:
 
         system_prompt = (
             "You are a query intent classifier for a knowledge retrieval system. "
-            "Classify the user query into exactly one of these intents:\n"
-            "- 'answer': single record lookup, specific question, procedural question, OR incident/error question (e.g. 'what is tag 22', 'sftp folder for gsact.txt', 'what is tidal', 'how to troubleshoot X', 'steps for X', 'how to do X', 'error for X', 'X failed', 'issue with X', 'problem with X')\n"
-            "- 'discovery_list': queries expecting MULTIPLE DIFFERENT records as results (e.g. 'what files does Goldman send', 'all sftp folders', 'what tags contain price', 'what fields contain ask price', 'what fields are in category X', 'list all goldman files', 'what tags contain broker', 'what are the Moore notes', 'which notes are about X', 'show me notes in category Y', 'what notes relate to Z', 'list documents about X', 'show me all notes about Moore', 'show me all notes about X', 'show all X', 'give me all notes on Y'). Use this when the answer would be a LIST of items. Cues that mean discovery_list: a plural subject ('what ARE the X', 'which notes/files/records...'), the word 'all', or 'show me'/'list'/'give me' followed by a category or topic. These ask to enumerate items, NOT a single answer. NOT for procedural/how-to/error/incident questions.\n"
-            "- 'discovery_count': counting query (e.g. 'how many files does Goldman have', 'how many tags contain price', 'how many notes are in X')\n"
-            "- 'comparison': comparing two or more items\n"
-            "Return only JSON: {\"mode\": \"answer|discovery_list|discovery_count|comparison\", \"reason\": \"brief reason\"}"
+            "Classify the user query and extract structured search intent.\n\n"
+            "Return only JSON with these fields:\n"
+            "- mode: one of 'answer', 'discovery_list', 'discovery_count', 'comparison'\n"
+            "- reason: brief reason for the mode\n"
+            "- role: the payload field to search — one of 'primary_name', 'description', "
+            "'identifier', 'type', 'enum_value', 'aliases', or null if not applicable\n"
+            "- target: the specific value or substring to search for within that role field, "
+            "or null if not applicable\n\n"
+            "Intent modes:\n"
+            "- 'answer': single record lookup, specific question, procedural/how-to question, "
+            "OR incident/error question (e.g. 'what is tag 22', 'what tag is exec broker', "
+            "'what tag is order quantity', 'which tag is X', 'sftp folder for gsact.txt', "
+            "'what is tidal', 'how to troubleshoot X', 'steps for X', 'how to do X', "
+            "'how does X work', 'error for X', 'X failed', 'issue with X', 'problem with X'). "
+            "NOTE: singular 'tag' or 'field' = answer (one record). Plural 'tags'/'fields' = discovery_list. "
+            "'steps for X', 'how to X', 'how does X work' are ALWAYS answer, never discovery_list.\n"
+            "- 'discovery_list': queries expecting MULTIPLE DIFFERENT records "
+            "(e.g. 'what files does Goldman send', 'all sftp folders', 'what tags contain price', "
+            "'what fields contain ask price', 'what fields are in category X', "
+            "'list all goldman files', 'what tags contain broker', "
+            "'what are the Moore notes', 'which notes are about X', "
+            "'show me notes in category Y', 'what notes relate to Z', "
+            "'show me all notes about Moore', 'show all X', 'give me all notes on Y', "
+            "'which tags have order in their name', 'which tags have ID in their name'). "
+            "Cues: plural subject, the word 'all', or 'show me'/'list'/'give me' + topic. "
+            "NOT for procedural/how-to/steps/error/incident questions.\n"
+            "- 'discovery_count': counting query "
+            "(e.g. 'how many files does Goldman have', 'how many tags contain price', "
+            "'how many notes are in X')\n"
+            "- 'comparison': comparing two or more items\n\n"
+            "Role/target extraction examples:\n"
+            "- 'which tags have order in their name' -> role: primary_name, target: order\n"
+            "- 'which tags have ID in their name' -> role: primary_name, target: ID\n"
+            "- 'what tags contain price' -> role: primary_name, target: price\n"
+            "- 'what fields are in category airlines' -> role: type, target: airlines\n"
+            "- 'what string fields are available' -> role: type, target: string\n"
+            "- 'what values can tag 22 have' -> role: enum_value, target: 22\n"
+            "- 'what is tag 22' -> role: null, target: null\n"
+            "- 'show me all notes about Moore' -> role: null, target: null\n"
+            "- 'steps for manual file loading in recon' -> role: null, target: null\n\n"
+            "Return only JSON, no other text."
         )
 
         result = call_local_llm_json(system_prompt, question, temperature=0.0)
@@ -95,7 +130,9 @@ def llm_detect_intent(question: str) -> Dict[str, str]:
             if mode in {"answer", "discovery_list", "discovery_count", "comparison"}:
                 return {
                     "mode": mode,
-                    "reason": result.get("reason", "llm classification")
+                    "reason": result.get("reason", "llm classification"),
+                    "role": result.get("role") or None,
+                    "target": result.get("target") or None,
                 }
 
     except Exception as e:
@@ -245,11 +282,13 @@ def score_discovery_payload(payload: Dict, question: str) -> float:
     description = str(payload.get("description") or payload.get("text") or "")
     identifier = str(payload.get("identifier") or "")
     source_file = str(payload.get("source_file") or "")
+    type_value = str(payload.get("type") or "")
 
     name_norm = normalize_simple_text(primary_name)
     desc_norm = normalize_simple_text(description)
     file_norm = normalize_simple_text(source_file)
     id_norm = normalize_simple_text(identifier)
+    type_norm = normalize_simple_text(type_value)
 
     score = 0.0
 
@@ -268,6 +307,7 @@ def score_discovery_payload(payload: Dict, question: str) -> float:
     score += sum(2.0 for w in words if w in desc_norm)
     score += sum(1.5 for w in words if w in file_norm)
     score += sum(3.0 for w in words if w == id_norm)
+    score += sum(6.0 for w in words if w in type_norm)
     score += sum(2.0 for w in expanded_words if w in name_norm)
     score += sum(0.5 for w in expanded_words if w in desc_norm)
 
@@ -780,20 +820,13 @@ def run_discovery_with_method(
     """
     Run discovery query and return results with method info.
     Entry point called from router.py.
+    Role/target now extracted by LLM — no field_maps.json keyword matching.
     """
     intent = llm_detect_intent(question)
-    field_maps = load_field_maps()
     q_norm = normalize_simple_text(question)
 
-    requested_role = None
-    for role, keywords in field_maps.items():
-        for kw in keywords:
-            kw_norm = normalize_simple_text(kw)
-            if kw_norm and kw_norm in q_norm:
-                requested_role = role
-                break
-        if requested_role:
-            break
+    requested_role = intent.get("role") or None
+    target_text = intent.get("target") or None
 
     hints = load_doc_query_hints()
     distinct_value_query = (
@@ -802,7 +835,7 @@ def run_discovery_with_method(
     )
 
     if requested_role:
-        if intent["mode"] == "discovery_list" and distinct_value_query:
+        if intent["mode"] == "discovery_list" and distinct_value_query and requested_role == "enum_value":
             distinct_discovery = discover_structured_role_distinct_values(
                 collection_name=collection_name,
                 requested_role=requested_role,
@@ -815,8 +848,8 @@ def run_discovery_with_method(
                     "result": distinct_discovery,
                 }
 
-        target_text = extract_role_target_text(question, requested_role, field_maps)
-        if target_text:
+        if target_text and requested_role == "primary_name" and len(target_text.split()) <= 2:
+            field_maps = load_field_maps()
             structured_discovery = discover_structured_role_matches(
                 collection_name=collection_name,
                 question=question,
@@ -830,7 +863,7 @@ def run_discovery_with_method(
                     "reason": f"{intent['reason']} using structured field match",
                     "result": structured_discovery,
                 }
-            elif structured_discovery is not None and not structured_discovery.get("results") and target_text:
+            elif structured_discovery is not None and not structured_discovery.get("results"):
                 from core.retrieval.db_retrieval import fetchall
                 fallback_rows = fetchall(
                     """SELECT payload FROM chunks
@@ -862,17 +895,31 @@ def run_discovery_with_method(
                         "result": {"total_matches": len(fallback_results), "results": fallback_results},
                     }
 
-        distinct_discovery = discover_structured_role_distinct_values(
-            collection_name=collection_name,
-            requested_role=requested_role,
-            limit=limit,
-        )
-        if distinct_discovery is not None:
-            return {
-                "method": intent["mode"],
-                "reason": f"{intent['reason']} using structured distinct values",
-                "result": distinct_discovery,
-            }
+        if distinct_value_query and requested_role == "enum_value":
+            distinct_discovery = discover_structured_role_distinct_values(
+                collection_name=collection_name,
+                requested_role=requested_role,
+                limit=limit,
+            )
+            if distinct_discovery is not None:
+                return {
+                    "method": intent["mode"],
+                    "reason": f"{intent['reason']} using structured distinct values",
+                    "result": distinct_discovery,
+                }
+
+        if requested_role == "enum_value":
+            distinct_discovery = discover_structured_role_distinct_values(
+                collection_name=collection_name,
+                requested_role=requested_role,
+                limit=limit,
+            )
+            if distinct_discovery is not None:
+                return {
+                    "method": intent["mode"],
+                    "reason": f"{intent['reason']} using structured distinct values",
+                    "result": distinct_discovery,
+                }
 
     discovery = discover_collection_items(collection_name, question, limit=limit)
 
