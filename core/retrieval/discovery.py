@@ -82,8 +82,8 @@ def llm_detect_intent(question: str) -> Dict[str, str]:
             "You are a query intent classifier for a knowledge retrieval system. "
             "Classify the user query into exactly one of these intents:\n"
             "- 'answer': single record lookup, specific question, procedural question, OR incident/error question (e.g. 'what is tag 22', 'sftp folder for gsact.txt', 'what is tidal', 'how to troubleshoot X', 'steps for X', 'how to do X', 'error for X', 'X failed', 'issue with X', 'problem with X')\n"
-            "- 'discovery_list': queries expecting MULTIPLE DIFFERENT records as results (e.g. 'what files does Goldman send', 'all sftp folders', 'what tags contain price', 'what fields contain ask price', 'what fields are in category X', 'list all goldman files', 'what tags contain broker'). Use this when the answer would be a LIST of items. NOT for procedural/how-to/error/incident questions.\n"
-            "- 'discovery_count': counting query (e.g. 'how many files does Goldman have', 'how many tags contain price')\n"
+            "- 'discovery_list': queries expecting MULTIPLE DIFFERENT records as results (e.g. 'what files does Goldman send', 'all sftp folders', 'what tags contain price', 'what fields contain ask price', 'what fields are in category X', 'list all goldman files', 'what tags contain broker', 'what are the Moore notes', 'which notes are about X', 'show me notes in category Y', 'what notes relate to Z', 'list documents about X', 'show me all notes about Moore', 'show me all notes about X', 'show all X', 'give me all notes on Y'). Use this when the answer would be a LIST of items. Cues that mean discovery_list: a plural subject ('what ARE the X', 'which notes/files/records...'), the word 'all', or 'show me'/'list'/'give me' followed by a category or topic. These ask to enumerate items, NOT a single answer. NOT for procedural/how-to/error/incident questions.\n"
+            "- 'discovery_count': counting query (e.g. 'how many files does Goldman have', 'how many tags contain price', 'how many notes are in X')\n"
             "- 'comparison': comparing two or more items\n"
             "Return only JSON: {\"mode\": \"answer|discovery_list|discovery_count|comparison\", \"reason\": \"brief reason\"}"
         )
@@ -387,8 +387,15 @@ def dedupe_discovery_results(results: List[Dict]) -> List[Dict]:
         identifier = str(item.get("identifier") or "").strip()
         primary_name = normalize_simple_text(item.get("primary_name") or "")
         source_file = str(item.get("source_file") or "").strip()
+        source_type = str(item.get("source_type") or "").strip().lower()
 
-        if identifier:
+        # Document/note results: the real entity is the note (source_file), not the
+        # per-chunk synthetic identifier. Dedupe by note so one row per note.
+        is_doc = source_type == "doc" or doc_type in {"narrative", "mixed", "procedural", "entity_row"}
+
+        if is_doc and source_file:
+            key = f"doc|file:{source_file}"
+        elif identifier:
             key = f"{doc_type}|id:{identifier}"
         elif primary_name:
             key = f"{doc_type}|name:{primary_name}|file:{source_file}"
@@ -498,6 +505,9 @@ def discover_collection_items(
 
     for i, item in enumerate(results, start=1):
         item["rank"] = i
+
+    print(">>> DEBUG discover: bm25_total=", bm25_total, "| results=", len(results))
+    return {"total_matches": bm25_total, "results": results}
 
     #return {"total_matches": len(results), "results": results}
     return {"total_matches": bm25_total, "results": results}
@@ -814,12 +824,43 @@ def run_discovery_with_method(
                 target_text=target_text,
                 limit=limit,
             )
-            if structured_discovery is not None:
+            if structured_discovery is not None and structured_discovery.get("results"):
                 return {
                     "method": intent["mode"],
                     "reason": f"{intent['reason']} using structured field match",
                     "result": structured_discovery,
                 }
+            elif structured_discovery is not None and not structured_discovery.get("results") and target_text:
+                from core.retrieval.db_retrieval import fetchall
+                fallback_rows = fetchall(
+                    """SELECT payload FROM chunks
+                       WHERE collection_name = %s
+                       AND payload->>'primary_name' ILIKE %s
+                       LIMIT %s""",
+                    (collection_name, f"%{target_text}%", limit)
+                )
+                if fallback_rows:
+                    fallback_results = []
+                    for row in fallback_rows:
+                        payload = row.get("payload") or {}
+                        fallback_results.append({
+                            "score": 10.0,
+                            "doc_type": infer_doc_type(payload),
+                            "identifier": payload.get("identifier"),
+                            "primary_name": payload.get("primary_name"),
+                            "source_type": payload.get("source_type"),
+                            "source_file": payload.get("source_file"),
+                            "preview": preview_text_for_payload(payload),
+                            "payload": payload,
+                        })
+                    fallback_results = dedupe_discovery_results(fallback_results)
+                    for i, item in enumerate(fallback_results, start=1):
+                        item["rank"] = i
+                    return {
+                        "method": intent["mode"],
+                        "reason": f"{intent['reason']} using name substring match",
+                        "result": {"total_matches": len(fallback_results), "results": fallback_results},
+                    }
 
         distinct_discovery = discover_structured_role_distinct_values(
             collection_name=collection_name,
