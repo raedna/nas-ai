@@ -66,6 +66,9 @@ def build_structured_nlp_text(row, schema):
     if other_values:
         parts.append("\n".join(str(v) for v in other_values if v))
 
+    if type_value:
+        parts.append(f"Type: {type_value}")
+
     if alias_values:
         parts.append("Also known as: " + ", ".join(alias_values))
 

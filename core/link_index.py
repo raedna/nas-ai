@@ -150,6 +150,7 @@ def build_link_index(all_rows, schema_map):
                         "identifier_field": identifier_field,
                         "identifier_namespace": identifier_namespace,
                         "primary_name": None,
+                        "primary_name_field": (name_fields[0] if name_fields else None),
                         "aliases": [],
                         "description": None,
                         "enum_values": [],

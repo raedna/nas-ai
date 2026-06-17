@@ -145,6 +145,7 @@ def xml_finalize(file_path, collection_name, file_tags):
             "identifier_namespace": doc.get("identifier_namespace"),
             "identifier": doc.get("identifier"),
             "primary_name": doc.get("primary_name"),
+            "primary_name_field": doc.get("primary_name_field"),
             "description": doc.get("description"),
             "enum_values": doc.get("enum_values"),
             "type": doc.get("type"),

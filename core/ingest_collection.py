@@ -208,7 +208,7 @@ def ingest_collection(
 
     if force_reingest:
         if DEBUG:
-            print(f"🔥 Force re-ingest: recreating Qdrant collection: {collection_name}")
+            print(f"🔥 Force re-ingest: clearing PostgreSQL data for: {collection_name}")
 
         recreate_collection(collection_name)
 

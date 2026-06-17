@@ -1000,32 +1000,33 @@ with tabs[0]:
             st.rerun()
 
     st.markdown("---")
-    st.subheader("Delete Collection Data (Qdrant)")
+    st.subheader("Delete Collection Data")
 
-    if qdrant_collections:
+    pg_collections = get_pg_collections()
+    if pg_collections:
         col_to_delete = st.selectbox(
-            "Select Qdrant collection",
-            qdrant_collections,
-            key="delete_qdrant_collection"
+            "Select collection to delete",
+            pg_collections,
+            key="delete_pg_collection_select"
         )
 
         confirm_delete = st.checkbox(
-            "Confirm permanent deletion",
-            key=f"confirm_qdrant_delete_{col_to_delete}"
+            "Confirm permanent deletion — removes all chunks, files and enum values",
+            key=f"confirm_pg_delete_{col_to_delete}"
         )
 
-        if st.button("Delete collection data"):
+        if st.button("Delete collection data", key="delete_pg_collection_btn"):
             if not confirm_delete:
-                st.warning("Please confirm deletion.")
+                st.warning("Please confirm deletion before proceeding.")
             else:
                 try:
                     delete_pg_collection(col_to_delete)
-                    st.success(f"Deleted Qdrant collection: {col_to_delete}")
+                    st.success(f"✅ Deleted collection: {col_to_delete}")
                     st.rerun()
                 except Exception as e:
                     st.error(str(e))
     else:
-        st.info("No Qdrant collections found.")
+        st.info("No collections found in PostgreSQL.")
 
 with tabs[1]:
     st.subheader("Ingestion")
@@ -1722,20 +1723,35 @@ with tabs[3]:
                 except Exception:
                     pass
 
+                # Derive column labels from payload fields — no schema lookup needed
+                _id_label = "identifier"
+                _name_label = "primary_name"
+                _alias_label = "aliases"
+                try:
+                    _first_payload = (results[0].get("payload") or {}) if results else {}
+                    if _first_payload.get("identifier_field"):
+                        _id_label = str(_first_payload["identifier_field"])
+                    if _first_payload.get("primary_name_field"):
+                        _name_label = str(_first_payload["primary_name_field"])
+                    _schemas = load_collection_schemas(selected_collection)
+                    for _sch in _schemas.values():
+                        if _sch.get("aliases"):
+                            _alias_label = str(_sch["aliases"][0])
+                        break
+                except Exception:
+                    pass
+
                 preview_rows = []
                 for item in results[:int(preview_count)]:
                     _payload = item.get("payload") or {}
                     _aliases = _payload.get("aliases") or []
-                    if isinstance(_aliases, list):
-                        _aliases_str = ", ".join(str(a) for a in _aliases if a)
-                    else:
-                        _aliases_str = str(_aliases)
+                    _aliases_str = ", ".join(str(a) for a in _aliases if a) if isinstance(_aliases, list) else str(_aliases)
                     preview_rows.append({
                         "rank": item.get("rank"),
                         "score": item.get("score"),
                         "doc_type": item.get("doc_type"),
-                        "identifier": item.get("identifier"),
-                        "primary_name": item.get("primary_name"),
+                        _id_label: item.get("identifier"),
+                        _name_label: item.get("primary_name"),
                         _alias_label: _aliases_str,
                         "source_type": item.get("source_type"),
                         "source_file": item.get("source_file"),
