@@ -119,4 +119,7 @@ def serialize_image(
         "collection_name": collection_name,
     }
 
+    from core.payload_utils import enrich_payload_with_common_fields
+    enrich_payload_with_common_fields(doc, source_path, template_config)
+
     return [doc]

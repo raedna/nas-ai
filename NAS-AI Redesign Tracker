@@ -19,12 +19,12 @@
 | Qdrant (NAS) | Running at `100.123.16.57:6333` — admin UI only |
 | ai-pgvector (NAS) | Running at port 5433, db=nasai — PRIMARY STORE |
 | ai-redis (NAS) | Installed, not used |
-| Streamlit UI | Working — partially migrated to PostgreSQL |
-| FIX collection (`xml_test`) | 1168 chunks + 1791 enum values — 13/13 smoke tests passing |
-| BBG collection (`bbg_fields`) | 730 rows (test subset) — 6/6 smoke tests passing |
-| KB docs (`kb_docs`) | Ingested, not yet reliably tested |
-| Obsidian (`obsidian`) | 837 chunks — folder-as-category verified, image OCR verified |
-| recon_assist_file | 89 chunks — structured record formatting complete |
+| Streamlit UI | Working — PostgreSQL-native; Qdrant references removed from delete UI |
+| FIX collection (`xml_test`) | Re-ingested 2026-06-17 — 13/13 smoke tests passing |
+| BBG collection (`bbg_fields`) | Re-ingested 2026-06-17 — 7/7 smoke tests passing |
+| KB docs (`kb_docs`) | Re-ingested 2026-06-17 — 10/10 smoke tests passing |
+| Obsidian (`obsidian`) | 837 chunks — folder-as-category verified, image OCR verified, 10/10 smoke tests passing |
+| recon_assist_file | Re-ingested 2026-06-17 — 10/10 smoke tests passing |
 
 ---
 
@@ -34,20 +34,22 @@
 |---|---|---|---|
 | RET-010 | Structured planner | Ranking balance for phrases like "executing broker" in long descriptions. | Mitigated via synonyms.json |
 | CODE-005 | xml_serializer.py | Function-level state (`_all_rows`, `_files_seen`) for cross-file buffering — corrupts silently on crash. | ⏳ Pending |
-| CODE-008 | ui_app.py | Collection management UI still uses Qdrant REST API for stats/delete. Needs migration to PostgreSQL. | ⏳ Phase 3 follow-up |
-| CODE-009 | ui_app.py | Force re-ingest does not always delete existing DB rows before re-inserting. Confirmed 2026-06-16: clean re-ingest = DELETE FROM chunks + DELETE FROM files WHERE collection_name=X, then re-ingest. | ⏳ Pending |
+| CODE-008 | ui_app.py | Collection management UI delete was using Qdrant REST API. | ✅ Resolved 2026-06-17 — Delete Collection UI now uses PostgreSQL directly via delete_pg_collection(). |
+| CODE-009 | ui_app.py | Force re-ingest does not always delete existing DB rows. | ✅ Resolved 2026-06-17 — recreate_collection() already correctly clears files + chunks in Postgres. Log message updated. |
 | CODE-010 | ingestion | Collection name mismatch between UI and PostgreSQL collections table causes ForeignKeyViolation. | ⏳ Pending |
 | CODE-011 | schema_loader.py | Schema files stored on disk — should migrate to PostgreSQL schemas table. | ⏳ Pending |
 | CODE-012 | ui_app.py | Ask/Chat tabs need a "Clear cache" button | ⏳ Pending |
 | CODE-013 | ui_app.py | BM25/lexical candidates not shown in debug panel | ⏳ Pending |
 | CODE-014 | ui_app.py | System Config tab shows embeddings model but not LLM model — add LLM model + base_url + timeout fields writing to nlp_config.json | ⏳ Pending |
 | CODE-015 | db schema | files table missing last_ingested column — needed for tracking when files were last processed | ⏳ Pending |
-| DISPLAY-001 | ui_app.py | Two-tier table header (role name row 1, source column names grouped beneath) NOT supported by st.dataframe — needs HTML render or AgGrid. Deferred until final UI pinned. Single-mapped role relabeling (identifier→Moore file name, aliases→Prime Broker file name) already works in ranked table. | ⏳ Deferred |
-| DISCOVERY-001 | discovery.py | discovery_count returns correct count but no record list. Root cause confirmed 2026-06-16: count (bm25_total) uses chunk-level tsquery COUNT; results list filtered by score_discovery_payload which ignores category field — so category-matched notes score 0 and drop out. Fix: add category to score_discovery_payload. Needs validation against recon discovery_list queries before implementing. | ⏳ Pending |
-| DISCOVERY-002 | discovery.py | Discovery count undercounts vs category ground truth (pipeline: 39, DB: 41). Different counting methods: bm25_total counts matching chunks via tsquery; ground truth counts DISTINCT source_file WHERE category='Moore'. Will partially resolve when metadata query path is built. | ⏳ Pending |
-| STAGE0-001 | discovery.py | Bare entity query "Moore" routes to answer (single note) instead of discovery_list. Confirmed: "what are the Moore notes" also misroutes to answer. Root cause: discovery_list results come from BM25 body scoring, not category field — so category-matched notes don't surface. Real fix: metadata query path (see Phase 4). | ⏳ Pending — blocked on metadata query path |
-| OBS-001 | doc_serializer.py | Obsidian over-chunking: NAS AI RAG Creation with Github 20260426.md (44KB) → 246 chunks. Worth understanding chunking density; may be fine, may need tuning. | ⏳ Low priority |
-| PENDING-001 | retrieval | Cross-link testing: recon_assist_file ↔ kb_docs cross-links planned but never tested. When picking up: define known-correct expectation first (which recon record links to which kb_doc, by what key), then test against it. Lesson: start from known ground truth. | ⏳ Pending |
+| DISPLAY-001 | ui_app.py | Two-tier table header (role name row 1, source column names grouped beneath) NOT supported by st.dataframe — needs HTML render or AgGrid. Deferred until final UI pinned. Single-mapped role relabeling (identifier→real field name, aliases→Prime Broker file name) now works via payload fields. | ⏳ Deferred |
+| DISCOVERY-001 | discovery.py | discovery_count returns correct count but no record list. Root cause: BM25 body scoring doesn't surface category-matched notes well. Real fix: metadata query path (Phase 4.6). | ⏳ Pending — blocked on metadata query path |
+| DISCOVERY-002 | discovery.py | Discovery count (39) vs DB ground truth (41) — different counting methods. Will resolve with metadata query path. | ⏳ Pending |
+| STAGE0-001 | discovery.py | Bare category query "Moore" routes to answer instead of discovery. Real fix: metadata query path (Phase 4.6). | ⏳ Pending — blocked on metadata query path |
+| OBS-001 | doc_serializer.py | Obsidian over-chunking: NAS AI RAG Creation with Github 20260426.md (44KB) → 246 chunks. Low priority. | ⏳ Low priority |
+| PENDING-001 | retrieval | Cross-link testing: recon_assist_file ↔ kb_docs — planned but never tested. Define known-correct expectation first. | ⏳ Pending — next major focus |
+| DB-001 | PostgreSQL trigger | chunks_tsv_update trigger: slash-delimited category paths (e.g. "Industry/Airlines") tokenize as compound token — "airlines" not searchable. | ✅ Resolved 2026-06-17 — trigger updated to replace / with space before tsvector build. All collections rebuilt. |
+| DB-002 | nlp_generator.py | type_value not included in build_structured_nlp_text — type-based queries (e.g. "what string fields") return 0 BM25 matches. | ✅ Resolved 2026-06-17 — type_value now added to parts in build_structured_nlp_text. |
 
 **Retired issues (resolved):**
 - RET-011 — FIX-01 enum suppression: fixed in Phase 1
@@ -58,9 +60,12 @@
 - CODE-007 — collection state JSON: eliminated — state now in PostgreSQL `files` table. Legacy `collection_state/*.json` files on disk are Qdrant-era and should be ignored/removed to avoid confusion.
 
 **Key learnings (debugging):**
-- **psycopg2 percent-escaping:** `%` in `ILIKE '%term%'` collides with psycopg2 parameter substitution → "IndexError: tuple index out of range". Must use `%%` (e.g. `ILIKE '%%term%%'`) in fetchall one-liners with params=(). Compounded by `2>/dev/null` hiding the error. Lesson: never suppress stderr when diagnosing failing queries.
-- **Objective testing discipline:** always define known-correct ground truth before testing. "Does this look right?" wastes sessions. "I know X should produce Y, does it?" finds real bugs fast. Applied successfully to Obsidian image OCR verification (5/5 and 10/10 images).
-- **`detect_ask_intent` vs `llm_detect_intent`:** hardcoded `detect_ask_intent` is a fallback only — all live call sites use `llm_detect_intent`. The two return different shapes (`terms_key` present in rule-based, absent in LLM path) — downstream code may assume rule-based shape.
+- **psycopg2 percent-escaping:** `%` in `ILIKE '%term%'` collides with psycopg2 parameter substitution → "IndexError: tuple index out of range". Must use `%%`. Never suppress stderr when diagnosing queries.
+- **Objective testing discipline:** always define known-correct ground truth before testing.
+- **`detect_ask_intent` vs `llm_detect_intent`:** hardcoded version is fallback only — all live call sites use LLM version.
+- **Smoke test hardcoded values are fragile:** BBG-07 had hardcoded count "150" that broke on re-ingest. Use "match" / "0 match" pattern instead.
+- **tsvector tokenization:** slash-delimited strings (e.g. "Category/Subcategory") tokenize as compound tokens — individual words not matchable. Always preprocess to replace / with space before building tsvector.
+- **nlp_text completeness:** if a payload field isn't in nlp_text, BM25 can't find it. Verify all searchable fields are included in nlp_generator.py output.
 
 ---
 
@@ -76,6 +81,7 @@
 |---|---|---|
 | 1b.1 | Add `fix_version` field to XML serializer payload | ⏳ Pending |
 | 1b.2–1b.4 | Version-aware smoke test + answers + comparison queries | ⏳ Pending |
+| Note | FIX has 4.2 and 4.4 files; version in source_file name. Stage 0 to extract version; retrieval to filter by source_file ILIKE '%FIX44%'. Generalizes to BBG versioned exports. | — |
 
 ---
 
@@ -96,7 +102,7 @@
 | `lexical.py` | BM25 search with synonym expansion |
 | `semantic.py` | pgvector similarity search |
 | `crosslink.py` | Relationships, enum lookups, doc chunk enrichment |
-| `discovery.py` | Count / list queries |
+| `discovery.py` | Count / list queries + LLM intent classification |
 | `reranker.py` | Scoring (used for non-structured doc types only) |
 | `answer.py` | Answer synthesis, display labels |
 | `router.py` | Entry point — RRF-based retrieval, confidence threshold |
@@ -117,17 +123,27 @@
 | 3.8.5 | Confidence threshold (config-driven) — top 5 fallback | ✅ Done |
 | 3.8.6 | `collection_has_enums` — skip reverse enum for BBG | ✅ Done |
 | 3.9 | Extended FIX smoke tests — 13/13 passed | ✅ Done |
-| 3.10 | Fix force re-ingest (CODE-009) | ⏳ Pending |
+| 3.10 | Fix force re-ingest (CODE-009) | ✅ Resolved — recreate_collection() correct |
 | 3.11 | Fix collection name mismatch (CODE-010) | ⏳ Pending |
 | 3.12 | Ingest full BBG dataset | ⏳ Pending |
 | 3.13 | Re-run BBG smoke tests against full dataset | ⏳ Pending |
-| 3.14 | ui_app.py — migrate collection management to PostgreSQL (CODE-008) | ⏳ Pending |
-| 3.15 | Obsidian: folder-as-category capture + searchable nlp_text | ✅ Done 2026-06-16 |
-| 3.16 | Obsidian: LLM intent prompt — discovery_list for note/doc phrasings | ✅ Done 2026-06-16 |
-| 3.17 | Obsidian: per-note dedup in discovery results | ✅ Done 2026-06-16 |
-| 3.18 | RECON: structured record answer formatting (labeled key-value pairs) | ✅ Done 2026-06-15 |
-| 3.19 | RECON: schema-driven alias column header in ranked table | ✅ Done 2026-06-15 |
-| 3.20 | Cross-link testing: recon_assist_file ↔ kb_docs (PENDING-001) | ⏳ Pending |
+| 3.14 | ui_app.py — migrate collection management to PostgreSQL (CODE-008) | ✅ Resolved 2026-06-17 |
+| 3.15 | Obsidian folder-as-category (category + folder_path, searchable) | ✅ Done 2026-06-16 |
+| 3.16 | LLM intent prompt — discovery_list for note/doc phrasings | ✅ Done 2026-06-16 |
+| 3.17 | Per-note dedup in discovery results | ✅ Done 2026-06-16 |
+| 3.18 | RECON structured record answer formatting (labeled key-value pairs) | ✅ Done 2026-06-15 |
+| 3.19 | RECON schema-driven alias column header in ranked table | ✅ Done 2026-06-15 |
+| 3.20 | Cross-link testing: recon_assist_file ↔ kb_docs (PENDING-001) | ⏳ Pending — next major focus |
+| 3.21 | Replace field_maps.json role detection with LLM intent extraction | ✅ Done 2026-06-16 |
+| 3.22 | Retire query_terms.json intent_routing patterns | ✅ Done 2026-06-16 |
+| 3.23 | Schema-driven discovery table headers (identifier_field, primary_name_field) | ✅ Done 2026-06-17 |
+| 3.24 | primary_name_field threaded through XML pipeline (link_index→normalizer→xml_serializer) | ✅ Done 2026-06-17 |
+| 3.25 | type_field added to all table_serializer builders | ✅ Done 2026-06-17 |
+| 3.26 | type_value added to build_structured_nlp_text (BM25-searchable) | ✅ Done 2026-06-17 |
+| 3.27 | PostgreSQL tsvector trigger: slash→space preprocessing for category paths | ✅ Done 2026-06-17 |
+| 3.28 | Obsidian inline images + expandable OCR display | ⏳ Pending — next major focus |
+| 3.29 | Discovery ILIKE name fallback for short/uppercase tokens | ✅ Done 2026-06-16 |
+| 3.30 | Word-boundary keyword matching in role detection | ✅ Done 2026-06-16 (superseded by 3.21) |
 
 **Key architectural decisions made in Phase 3:**
 - RRF (Reciprocal Rank Fusion) replaces separate BM25+semantic merge — single PostgreSQL query
@@ -137,8 +153,13 @@
 - Confidence threshold (default 0.105, in `system.json`) — below threshold returns top 5 with "no exact match" message
 - Python reranker skipped for structured collections — RRF handles ranking
 - `quant` removed from synonyms.json (was breaking BM25 queries)
-- Docs have no schema files (unlike XML/tables) — doc collections use folder structure as category instead of role-mapped schema fields
-- Discovery list/count are correct for content queries (e.g. "show all files by Goldman") — these are content-driven and stay on BM25/RRF path. Vault analytics queries ("how many Moore notes") need a separate metadata path.
+- Docs have no schema files (unlike XML/tables) — doc collections use folder structure as category
+- Discovery list/count correct for content queries — vault analytics need metadata query path (Phase 4.6)
+- LLM intent now returns role + target — replaces field_maps.json keyword matching
+- LLM intent prompt: singular "tag"/"field" = answer; plural "tags"/"fields" = discovery_list
+- Discovery table headers: derived from payload fields (identifier_field, primary_name_field) — no hardcoding
+- All structured serializers store primary_name_field and type_field in payload
+- tsvector trigger preprocesses slashes to spaces for correct tokenization
 
 ---
 
@@ -155,33 +176,26 @@
 - These are separate pieces of work; may want both, but build/scope one at a time.
 
 **Metadata query path (4.6) — design agreed 2026-06-16:**
-- Vault analytics queries ("how many Moore notes", "which notes are in Moore", "what collections exist") should NOT go through the BM25/RAG pipeline — they need direct Postgres queries against metadata fields (category, source_file, collection_name, created_at).
+- Vault analytics queries ("how many Moore notes", "which notes are in Moore") should NOT go through BM25/RAG — need direct Postgres queries against metadata fields.
 - Stage 0 LLM adds a `metadata_query: true/false` flag. If true + discovery → route to direct Postgres metadata query. If false → existing BM25/RRF path unchanged.
-- Content queries ("show all files by Goldman", "what tags contain price") always `metadata_query: false` — they need to read record content, not just metadata. Recon discovery_list behavior is unaffected.
-- Metadata path is generic — works for any collection, any format, any doc type — because it queries standard fields every ingested record has.
-- **Needs validation:** confirm "show all files by Goldman" on recon stays on BM25 path and returns correct results after metadata path is added. Define test cases before implementing.
-- Validation test suite (pre-implementation): (1) "show all files by Goldman" → must stay content-discovery, return broker file list; (2) "how many Moore notes" → must return exact Postgres count (41); (3) "which notes are in Moore" → must return distinct note list from metadata; (4) "how many tags contain price" on FIX → must stay existing discovery_count path.
+- Content queries ("show all files by Goldman", "what tags contain price") always `metadata_query: false`.
+- Validation test suite (pre-implementation): (1) "show all files by Goldman" stays content-discovery; (2) "how many Moore notes" returns exact count (41); (3) "which notes are in Moore" returns distinct note list; (4) "how many tags contain price" stays existing path.
 
 **Open WebUI evaluation (4.7) — design discussion 2026-06-16:**
-- Open WebUI is a local web app that sits on top of local LLMs — connects to LM Studio via OpenAI-compatible API, no external AI, no cloud. Fully compatible with NAS-AI's "local only" requirement.
-- If NAS-AI exposes an MCP server (query-interface role), Open WebUI can connect to it and provide a polished conversational interface without requiring custom Streamlit UI maintenance.
-- Potential AVD deployment model: Open WebUI deployed once on data-AVD, all users access via browser — no Python environment needed on individual machines.
-- Open WebUI MCP support is relatively new — verify maturity before committing.
-- Decision point: evaluate when NAS-AI MCP server is ready. Until then, continue with Streamlit.
+- Fully local — connects to LM Studio via OpenAI-compatible API, no external AI.
+- If NAS-AI exposes MCP server, Open WebUI can connect and provide polished chat interface.
+- Decision point: evaluate when NAS-AI MCP server is ready.
 - **Standing constraint: NAS-AI is fully local. No external AI or cloud model connections, ever.**
 
 **Deployment / hosting (agreed 2026-06-15, refined 2026-06-16):**
-- Target users: multiple people on Azure Virtual Desktop (AVD) sessions, same company tenant.
-- Data-AVD and login-AVD are likely DISTINCT — app stays a remote-DB client (same pattern as today: Mac → NAS over Tailscale).
-- AVD-hosting dissolves the "compiled installer" concern — provision-once, users open in browser.
-- Open topology question: Streamlit/Open WebUI app per login-AVD session or shared on data-AVD? Decide at deployment time.
-- NAS remains always-available dev/fallback environment regardless of AVD decisions.
+- Target: multiple users on Azure Virtual Desktop (AVD), same tenant. Data-AVD and login-AVD likely DISTINCT.
+- AVD-hosting dissolves "compiled installer" concern — provision-once, users open in browser.
+- NAS remains always-available dev/fallback environment.
 
-**Data sources (open, 2026-06-15):**
-- Current: file ingestion (XML, XLSX, CSV, Markdown) — narrow coverage; broadening format testing is near-term priority.
-- Future: Halo + Confluence (API access confirmed, testable when ready) + Snowflake cloud DB (possibly primary external source).
-- Ingestion-source boundary must stay clean: new sources plug in as adapters alongside file parsers. Retrieval/role/serializer layers stay source-agnostic.
-- Once ingested via MCP source adapters, Halo/Confluence/Snowflake data uses same Postgres schema — metadata query path covers it for free.
+**Data sources:**
+- Current: file ingestion (XML, XLSX, CSV, Markdown).
+- Future: Halo + Confluence (API access confirmed) + Snowflake.
+- Keep ingestion-source boundary clean — new sources plug in as adapters.
 
 ---
 
@@ -191,10 +205,11 @@
 - Adaptive ingestion (no pre-defined schema required)
 - Cross-collection retrieval
 - Schema files migrated to PostgreSQL (CODE-011)
-- `ts_rank_cd` weights array tuning (`{0.1, 0.2, 0.4, 1.0}`) for position-based boosting
+- `ts_rank_cd` weights array tuning for position-based boosting
 - Query expansion via LLM before search
-- Folder/category-scoped discovery for doc collections (search by Moore/CRD subfolder) — Option A: fold folder_path parts into nlp_text; Option B: structured filter WHERE folder_path LIKE 'Moore/CRD%'. Option B preferred (precise, no text pollution) but needs filter support in query path. Deferred until metadata query path (4.6) is validated.
-| 5.S1 | LLM-driven schema inference — replace structured_roles.json pattern matching with LLaMA 8B semantic role assignment for new collections | ⏳ Pending |
+- FIX version-aware queries (Phase 1b) — version in source_file name; Stage 0 extracts version; filter by source_file ILIKE '%FIX44%'
+- Folder/category-scoped discovery (search by Moore/CRD subfolder) — Option B preferred (structured filter WHERE folder_path LIKE 'Moore/CRD%'). Deferred until metadata query path (4.6) validated.
+| 5.S1 | LLM-driven schema inference — replace structured_roles.json with LLaMA 8B semantic role assignment | ⏳ Pending |
 
 ---
 
@@ -209,14 +224,22 @@
 | 2026-06-10 | 3.1–3.7 | BBG ingest + routing fixes | `core/retrieval/router.py`, `discovery.py`, `answer.py`, `lexical.py`, `reranker.py`, `db_retrieval.py`, `nlp_generator.py`, `config/query_terms.json` | FIX 7/7, BBG 6/6 |
 | 2026-06-10 | 3.8 | RRF hybrid search + trigram + ts_rank_cd + confidence threshold | `core/retrieval/db_retrieval.py`, `core/retrieval/router.py`, `core/retrieval/lexical.py`, `config/synonyms.json`, `config/system.json` | FIX 13/13, BBG 6/6 |
 | 2026-06-10 | UI | Partial ui_app.py migration to PostgreSQL | `core/ui_app.py` | Collections/Ask/Preview/Validation tabs use PostgreSQL |
-| 2026-06-15 | 3.18–3.19 | RECON structured-record answer formatting. `_build_structured_doc` stores original description field names in `payload["description_fields"]` and type field name in `payload["type_field"]`; `synthesize_answer` renders labeled key-value pairs; ranked table shows alias column under real schema header via schema-derived relabeling. | `TABLES/table_serializer.py`, `core/retrieval/answer.py`, `core/ui_app.py` | FIX 13/13, BBG 7/7, KB 10/10. Re-ingest of recon_assist_file required. |
-| 2026-06-16 | 3.15 | Obsidian folder-as-category. `_make_chunk` derives `category` (top-level folder) and `folder_path` (full relative path); category folded into searchable nlp_text; `ingest_collection.py` threads `collection_root` into template_config. | `DOCS/doc_serializer.py`, `core/ingest_collection.py` | Verified: EOD→Moore/Moore/CRD, Mosaic→Astro Workflows, rsync→Personal Notes. 41 Moore notes tagged. Re-ingest of obsidian required. |
-| 2026-06-16 | 3.16 | LLM intent prompt — discovery_list for note/doc phrasings. Added examples ("what are the Moore notes", "show me all notes about X", "show all X", "give me all notes on Y") and explicit cue rules (plural subject, "all", "show me/list/give me" + topic). | `core/retrieval/discovery.py` | discovery_list now correctly routes note enumeration queries. Smoke tests pending re-run. |
-| 2026-06-16 | 3.17 | Per-note dedup in discovery results. `dedupe_discovery_results` now dedupes doc-type results by source_file (note) instead of per-chunk synthetic identifier. Structured collections unchanged (still dedup by identifier). | `core/retrieval/discovery.py` | One row per note in discovery list. Smoke tests pending re-run. |
+| 2026-06-15 | 3.18–3.19 | RECON structured-record answer formatting + schema-driven alias header | `TABLES/table_serializer.py`, `core/retrieval/answer.py`, `core/ui_app.py` | FIX 13/13, BBG 7/7, KB 10/10 |
+| 2026-06-16 | 3.15–3.17 | Obsidian folder-as-category + LLM intent prompt + per-note dedup | `DOCS/doc_serializer.py`, `core/ingest_collection.py`, `core/retrieval/discovery.py` | All suites green |
+| 2026-06-16 | 3.21–3.22 | Replace field_maps.json role detection with LLM; retire query_terms intent_routing | `core/retrieval/discovery.py`, `config/query_terms.json` | FIX 13/13, BBG 7/7, KB 10/10, RECON 10/10, OBS 10/10 |
+| 2026-06-17 | 3.23–3.27 | Schema-driven table headers; primary_name_field + type_field in all serializers; type_value in nlp_text; tsvector slash fix | `core/ui_app.py`, `TABLES/table_serializer.py`, `core/link_index.py`, `core/normalizer.py`, `XML/xml_serializer.py`, `core/nlp_generator.py`, PostgreSQL trigger | FIX 13/13, BBG 7/7, KB 10/10, RECON 10/10, OBS 10/10 |
+| 2026-06-17 | 3.14/CODE-008 | Delete Collection UI migrated to PostgreSQL; force re-ingest log updated | `core/ui_app.py` | delete_pg_collection() confirmed working |
 
 ---
 
 ## Smoke Test Results
+
+### All suites — 2026-06-17 **ALL PASSING**
+- FIX: 13/13
+- BBG: 7/7 (BBG-07 count check changed from hardcoded "150" to "match"/"0 match" pattern)
+- KB: 10/10
+- RECON: 10/10 (smoke_recon.py expected_methods corrected to identifier_lookup)
+- OBS: 10/10
 
 ### FIX Smoke Test (2026-06-10) **13/13 passed**
 
@@ -236,7 +259,7 @@
 | FIX-12 | which tag is exec quantity | semantic | ✅ (no ExecQty in FIX — returns "no exact match") |
 | FIX-13 | which tag is targetcompid | semantic | ✅ |
 
-### BBG Smoke Test (2026-06-10) **6/6 passed**
+### BBG Smoke Test **7/7 passed**
 
 | ID | Question | Method | Pass? |
 |---|---|---|---|
@@ -246,13 +269,14 @@
 | BBG-04 | what fields contain ask price | discovery_list | ✅ |
 | BBG-05 | what fields are in category airlines | discovery_list | ✅ |
 | BBG-06 | what string fields are available | discovery_list | ✅ |
+| BBG-07 | how many fields contain ask price | discovery_count | ✅ |
 
 ---
 
 ## Phase 5 Addition — Model Routing
 
 ### Concept
-Route different query types and doc types to different LLM/embedding models loaded in LM Studio. Improves answer quality without changing the retrieval architecture.
+Route different query types and doc types to different LLM/embedding models loaded in LM Studio.
 
 ### Proposed Model Assignments
 
@@ -279,31 +303,29 @@ Route different query types and doc types to different LLM/embedding models load
 | 5.M7 | Vision model integration for image ingestion (Qwen2-VL or LLaVA) | ⏳ Pending |
 
 ### Notes
-- BGE embeddings (text-embedding-bge-large-en-v1.5, 1024 dims) stay unchanged — proven for RAG, re-ingestion cost too high
+- BGE embeddings (text-embedding-bge-large-en-v1.5, 1024 dims) stay unchanged
 - LM Studio supports multiple models loaded simultaneously — endpoint per model
-- Config UI needs a "Models" section showing loaded models and their doc_type assignments
 - Model routing is transparent to the user — same query interface, better answers
 
 ---
 
 ## Phase 4 Architecture Decisions — Deployment & Data Sources (open, captured 2026-06-15, refined 2026-06-16)
 
-Recorded for when the system is proven and ready for blind testing. None of these block current work — NAS remains always-available dev/fallback environment.
+Recorded for when the system is proven and ready for blind testing. NAS remains always-available dev/fallback environment.
 
 ### Deployment / hosting
-- Target users: multiple people, each on their own machine, working within Azure Virtual Desktop (AVD) sessions, same company tenant.
-- **Data-AVD and login-AVD are likely DISTINCT** (same Azure tenant, different AVDs). So the app stays a remote-DB client — same pattern as today (Mac → NAS over Tailscale), just different host/credentials/network path (Azure internal networking / private endpoint).
-- AVD-hosting largely dissolves the "standalone compiled installer" concern: provision-once in a controlled image rather than distribute native binaries to varied machines. Users open the app in-session; nobody installs anything.
-- **Open topology question:** does Streamlit/Open WebUI app run per login-AVD session (one instance each) or on the data-AVD (one shared instance)? Different setup + concurrency implications. Decide later.
-- UI framework: staying on Streamlit is reinforced by AVD-hosting (server-viewed-in-browser fits AVD model). Open WebUI is a candidate replacement — evaluate when MCP server is ready (see Phase 4, step 4.7).
-- HTML-in-Streamlit is the pragmatic path for richer views and transfers to any future framework.
+- Target users: multiple people on Azure Virtual Desktop (AVD) sessions, same company tenant.
+- **Data-AVD and login-AVD are likely DISTINCT** — app stays a remote-DB client.
+- AVD-hosting dissolves "compiled installer" concern — provision-once, users open in browser.
+- UI framework: Streamlit stays; Open WebUI candidate when MCP server ready (Phase 4.7).
+- HTML-in-Streamlit pragmatic path for richer views.
 
 ### Data sources
-- Current: file ingestion (XML, XLSX, CSV, Markdown) — narrow coverage so far; broadening format test coverage is the near-term priority (under-tested area).
-- Future: Halo + Confluence (API access confirmed available — testable when we get there), and Snowflake cloud DB (possibly the primary/only external source).
-- **Key architectural principle:** keep the ingestion-source boundary clean so a Snowflake/API/MCP source plugs in as an adapter alongside file parsers, handing rows-with-schema to the existing pipeline. Retrieval/role/serializer layers stay source-agnostic — already the case, must be preserved.
-- Once ingested via MCP adapters, external-source data uses same Postgres schema — metadata query path covers it for free, no special treatment.
+- Current: file ingestion (XML, XLSX, CSV, Markdown).
+- Future: Halo + Confluence (API access confirmed) + Snowflake.
+- Keep ingestion-source boundary clean — new sources plug in as adapters.
+- Once ingested via MCP adapters, data uses same Postgres schema — metadata query path covers it for free.
 
 ### Guardrail
-- Protect the core/UI separation religiously. Business logic (retrieval, schema, serialization) must never leak into ui_app.py. This is the insurance that keeps an eventual UI/framework swap a config-level change, not a rewrite.
-- **NAS-AI is fully local. No external AI or cloud model connections, ever.** Open WebUI connects to LM Studio locally; MCP servers connect to local NAS-AI only.
+- Protect the core/UI separation religiously.
+- **NAS-AI is fully local. No external AI or cloud model connections, ever.**

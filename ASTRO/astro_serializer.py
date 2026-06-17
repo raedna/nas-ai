@@ -77,4 +77,7 @@ def astro_serializer(parsed, file_path, template_config, file_tags, collection_n
         print(f"[ASTRO SERIALIZER] {source_file} -> 1 item")
         print(f"[ASTRO SERIALIZER] primary_name: {primary_name}")
 
+    from core.payload_utils import enrich_payload_with_common_fields
+    enrich_payload_with_common_fields(item, source_path, template_config)
+
     return [item]

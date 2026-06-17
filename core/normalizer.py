@@ -178,10 +178,12 @@ def normalize_rows(rows, schema):
         doc = {
             "identifier": identifier,
             "primary_name": primary_name,
+            "primary_name_field": (name_fields[0] if name_fields else None),
             "description": description,
             "aliases": aliases,
             "enum_values": [],   # not applicable for KB
             "type": doc_type,
+            "type_field": (type_fields[0] if type_fields else None),
             "raw": row
         }
 

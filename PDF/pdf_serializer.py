@@ -253,4 +253,8 @@ def pdf_serializer(parsed, file_path, template_config, file_tags, collection_nam
         if items:
             print(f"[PDF SERIALIZER] First chunk: {items[0]['text'][:200]}")
 
+    from core.payload_utils import enrich_payload_with_common_fields
+    for item in items:
+        enrich_payload_with_common_fields(item, source_path, template_config)
+
     return items
