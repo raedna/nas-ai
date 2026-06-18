@@ -20,11 +20,16 @@
 | ai-pgvector (NAS) | Running at port 5433, db=nasai — PRIMARY STORE |
 | ai-redis (NAS) | Installed, not used |
 | Streamlit UI | Working — PostgreSQL-native; Qdrant references removed from delete UI |
-| FIX collection (`xml_test`) | Re-ingested 2026-06-17 — 13/13 smoke tests passing |
-| BBG collection (`bbg_fields`) | Re-ingested 2026-06-17 — 7/7 smoke tests passing |
-| KB docs (`kb_docs`) | Re-ingested 2026-06-17 — 10/10 smoke tests passing |
-| Obsidian (`obsidian`) | 837 chunks — folder-as-category verified, image OCR verified, 10/10 smoke tests passing |
-| recon_assist_file | Re-ingested 2026-06-17 — 10/10 smoke tests passing |
+| FIX collection (`xml_test`) | Re-ingested 2026-06-18 — 13/13 smoke tests passing |
+| BBG collection (`bbg_fields`) | Re-ingested 2026-06-18 — 7/7 smoke tests passing |
+| KB docs (`kb_docs`) | Re-ingested 2026-06-18 — 10/10 smoke tests passing |
+| Obsidian (`obsidian`) | Re-ingested 2026-06-18 — 10/10 smoke tests passing |
+| recon_assist_file | Re-ingested 2026-06-18 — 10/10 smoke tests passing |
+| PDF (`pdf_test`) | Ingested 2026-06-18 — 66 chunks (63 readable + 3 OCR). Parsers verified. |
+| Images (`image_test`) | Ingested 2026-06-18 — 3 chunks. OCR working (pytesseract). Auto doc_type detection working. |
+| DOCX (`docx_test`) | Ingested 2026-06-18 — 11 chunks. Section headings preserved as primary_name. |
+| Astro (`astro_test`) | Ingested 2026-06-18 — 3 chunks (2 FITS + 1 XISF). RA/Dec/camera/exposure extracted from FITS headers. XISF has image geometry only — no astrometric metadata. |
+| Astro catalog (`astro_catalog`) | Ingested 2026-06-18 — 13,336 chunks. OpenNGC + Messier merged via Data Prep tab. Schema: identifier=ngc_id, primary_name=comments, aliases=messier_id, type=type. |
 
 ---
 
@@ -47,7 +52,10 @@
 | DISCOVERY-002 | discovery.py | Discovery count (39) vs DB ground truth (41) — different counting methods. Will resolve with metadata query path. | ⏳ Pending |
 | STAGE0-001 | discovery.py | Bare category query "Moore" routes to answer instead of discovery. Real fix: metadata query path (Phase 4.6). | ⏳ Pending — blocked on metadata query path |
 | OBS-001 | doc_serializer.py | Obsidian over-chunking: NAS AI RAG Creation with Github 20260426.md (44KB) → 246 chunks. Low priority. | ⏳ Low priority |
-| PENDING-001 | retrieval | Cross-link testing: recon_assist_file ↔ kb_docs — planned but never tested. Define known-correct expectation first. | ⏳ Pending — next major focus |
+| ASTRO-001 | astro_parser.py | Filename parser misreads target when frame type prefix absent (M42_2.0s → target=2.0s instead of M42). Fix: add alternate filename pattern with target at position 0. | ⏳ Pending — Phase 3.6.6 |
+| ASTRO-002 | astro_parser.py | XISF (PixInsight processed files) have image geometry only — no astrometric metadata (no RA/Dec/Object). target extracted from filename only. | ⏳ Low priority — XISF naming convention to be standardized |
+| ASTRO-003 | astro_serializer.py | primary_name for astro files without FITS OBJECT keyword falls back to filename-parsed target, which may be wrong (see ASTRO-001). Fix after ASTRO-001. | ⏳ Pending |
+| PENDING-001 | retrieval | Cross-link testing: recon_assist_file ↔ kb_docs — architecture designed (Phase 3.5), NER-based tagging at ingest time. Build after full dataset ingestion complete. | ⏳ Pending — Phase 3.5 |
 | DB-001 | PostgreSQL trigger | chunks_tsv_update trigger: slash-delimited category paths (e.g. "Industry/Airlines") tokenize as compound token — "airlines" not searchable. | ✅ Resolved 2026-06-17 — trigger updated to replace / with space before tsvector build. All collections rebuilt. |
 | DB-002 | nlp_generator.py | type_value not included in build_structured_nlp_text — type-based queries (e.g. "what string fields") return 0 BM25 matches. | ✅ Resolved 2026-06-17 — type_value now added to parts in build_structured_nlp_text. |
 
@@ -66,6 +74,9 @@
 - **Smoke test hardcoded values are fragile:** BBG-07 had hardcoded count "150" that broke on re-ingest. Use "match" / "0 match" pattern instead.
 - **tsvector tokenization:** slash-delimited strings (e.g. "Category/Subcategory") tokenize as compound tokens — individual words not matchable. Always preprocess to replace / with space before building tsvector.
 - **nlp_text completeness:** if a payload field isn't in nlp_text, BM25 can't find it. Verify all searchable fields are included in nlp_generator.py output.
+- **XISF vs FITS metadata:** FITS capture files have rich astrometric headers (RA, Dec, OBJECT, camera, exposure). XISF processed files (PixInsight output) typically have image geometry only. Don't assume astro metadata is present — always check format first.
+- **Astro filename conventions vary:** Different capture software uses different filename patterns. Always prioritize FITS header fields over filename parsing. Filename parsing is a fallback only.
+- **Catalog joins need normalization before fuzzy:** For structured IDs (NGC numbers), normalize first (strip spaces, lowercase, add prefix) before comparing. True fuzzy matching (rapidfuzz) reserved for name/description fields where spelling variation is genuine.
 
 ---
 
@@ -144,6 +155,25 @@
 | 3.28 | Obsidian inline images + expandable OCR display | ⏳ Pending — next major focus |
 | 3.29 | Discovery ILIKE name fallback for short/uppercase tokens | ✅ Done 2026-06-16 |
 | 3.30 | Word-boundary keyword matching in role detection | ✅ Done 2026-06-16 (superseded by 3.21) |
+| 3.31 | Shared payload enrichment utility (core/payload_utils.py) | ✅ Done 2026-06-18 |
+| 3.32 | type_field added to XML pipeline (link_index→normalizer→xml_serializer) | ✅ Done 2026-06-18 |
+| 3.33 | enrich_payload_with_common_fields() called in PDF, image, astro serializers | ✅ Done 2026-06-18 |
+| 3.34 | PDF parser + serializer verified (readable + OCR modes) | ✅ Done 2026-06-18 |
+| 3.35 | Image parser + serializer verified (OCR via pytesseract) | ✅ Done 2026-06-18 |
+| 3.36 | Astro parser + serializer verified (FITS/XISF metadata extraction) | ✅ Done 2026-06-18 |
+| 3.37 | Ingest full PDF collection — verify payload fields + smoke test | ⏳ Pending |
+| 3.38 | Ingest full image collection — verify payload fields + smoke test | ⏳ Pending |
+| 3.39 | Ingest full astro collection — verify payload fields + smoke test | ⏳ Pending |
+| 3.40 | Inline images in Obsidian/docs Ask tab answer (with expandable OCR) | ⏳ Pending |
+| 3.41 | Data Prep tab (Phase 3.6) — build UI for file merge/clean before ingest | ⏳ Pending — next session |
+| 3.42 | Astro catalog ingest (OpenNGC + Messier merged via Data Prep tab) | ⏳ Pending |
+| 3.43 | Astro cross-link tagger — RA/Dec proximity + name/alias matching | ⏳ Pending |
+| 3.44 | LLM schema inference: add column population count to prompt (fix identifier vs aliases confusion) | ⏳ Pending |
+| 3.45 | Cross-link builder: Option C (manual trigger button in Collections tab) | ⏳ Pending |
+| 3.46 | Cross-link builder: Option B (background thread triggered after each ingest) | ⏳ Pending |
+| 3.47 | Inline images in Ask tab with expandable OCR (Obsidian + docs) | ⏳ Pending |
+| 3.48 | Run full smoke test suite after today's changes | ⏳ Pending |
+| 3.49 | schemas/ folder retired — all schemas now in PostgreSQL | ✅ Done 2026-06-18 |
 
 **Key architectural decisions made in Phase 3:**
 - RRF (Reciprocal Rank Fusion) replaces separate BM25+semantic merge — single PostgreSQL query
@@ -160,6 +190,94 @@
 - Discovery table headers: derived from payload fields (identifier_field, primary_name_field) — no hardcoding
 - All structured serializers store primary_name_field and type_field in payload
 - tsvector trigger preprocesses slashes to spaces for correct tokenization
+- Shared payload enrichment (payload_utils.py) adds category, folder_path, primary_name_field, type_field to all serializer outputs — foundation for cross-linking
+- Discovery table headers derived from payload fields (identifier_field, primary_name_field) — no hardcoding; works for all collections
+- Schema storage: PostgreSQL schemas table is primary store; disk JSON files are legacy backup only; LLM inference runs when no schema exists anywhere
+- Link index skipped for tables > 2,000 rows — O(n²) cross-referencing only appropriate for small structured reference datasets (FIX, RECON)
+- Cross-link builder: Option C (manual trigger) then Option B (background thread after ingest) — not synchronous during ingestion
+- Batch embedding: batch_size=32 for LM Studio stability with BGE-large
+- PDF/image/astro parsers all functional; ingest verified against test files
+
+---
+
+### Phase 3.5 — Cross-Collection Linking (NER-based)
+
+Design agreed 2026-06-18. Build after full dataset ingestion and all file types verified.
+
+**Architecture:**
+- Tag chunks with shared entity references at ingest time (not query time)
+- NER approach: pattern matching + keyword scan against live Postgres entity dictionary (self-building)
+- Validated against actual collection values — no hardcoding of specific names
+- Tags stored in chunk payload permanently (e.g. `recon_refs`, `fix_tag_refs`)
+- Query time: O(1) payload lookup → fetch linked records → Stage 3 unified synthesis
+
+**Entity types to recognize:**
+- Recon filenames (`gsact.txt` etc.) → validated against `recon_assist_file.identifier`
+- PB filenames → validated against `recon_assist_file.aliases`
+- Client/broker names (Goldman etc.) → validated against `recon_assist_file.type` + `primary_name`
+- Tidal job names → validated against `recon_assist_file.primary_name`
+- FIX tags → validated against `xml_test.identifier`
+
+**Config:** `config/cross_links.json` — defines source/target collection pairs, ref_field name,
+and match_fields (pattern-based or keyword-based). `keyword:true` entries build entity dictionary
+from live Postgres values at ingest time — self-building, always current.
+
+**Also in this phase — FIX message interpretation (text input):**
+User pastes raw FIX message text → system parses tag=value pairs, looks up each tag in xml_test,
+composes plain English summary ("This is an Execution Report, qty=500, price=102.50...").
+Text input version buildable now. Image input needs vision model (Phase 5.M7).
+
+**Also in this phase — Missing file check:**
+User pastes list of filenames that arrived OK; system returns files in recon collection NOT in
+the list, with key details. Implement in Chat tab (not Streamlit widget). Uses Postgres NOT IN
+query against identifier + aliases fields.
+
+**Prerequisites before building:**
+- Full dataset ingestion complete (all file types, all collections)
+- All smoke tests passing on full datasets
+
+| Step | Description | Status |
+|---|---|---|
+| 3.5.1 | `config/cross_links.json` — KB↔recon link definition with all match fields | ⏳ Pending |
+| 3.5.2 | `core/cross_link_tagger.py` — NER tagger, builds entity dict from Postgres at ingest | ⏳ Pending |
+| 3.5.3 | `doc_serializer.py` — hook tagger into chunking pipeline post-chunk | ⏳ Pending |
+| 3.5.4 | `router.py` — query-time ref tag lookup + linked record fetch | ⏳ Pending |
+| 3.5.5 | Stage 3 synthesis — unified LLM answer from multi-source context | ⏳ Pending |
+| 3.5.6 | Re-ingest kb_docs + obsidian with NER tagging active | ⏳ Pending |
+| 3.5.7 | Ground-truth test: KB article + Goldman recon records surface together | ⏳ Pending |
+| 3.5.8 | Extend to FIX cross-links (KB articles referencing FIX tags) | ⏳ Pending |
+| 3.5.9 | FIX message interpretation — text input → plain English summary | ⏳ Pending |
+| 3.5.10 | Missing file check — Chat tab, Postgres NOT IN query | ⏳ Pending |
+
+---
+
+### Phase 3.6 — Data Preparation Tab
+
+New UI tab in Streamlit for file preparation before ingestion. CSV-first; XLSX with sheet selection as follow-up if needed.
+
+**Capabilities:**
+- Load 1-2 CSV files, preview first 20 rows, show column names + sample values
+- Column operations: rename, derive (expression-based e.g. prefix+column), drop columns, filter rows
+- Two-file join: select key columns from each file, join type (left/inner/outer)
+- Key normalization before join: strip spaces, lowercase, add/remove prefix (handles "NGC 1976" vs "1976" vs "ngc1976")
+- Fuzzy matching via `rapidfuzz` for name/description columns — configurable threshold slider (70-100%)
+- Preview merged result (first 50 rows)
+- Export cleaned CSV — download or save to path for direct ingestion
+
+**First use case:** Merge Messier CSV + OpenNGC CSV on ngc_id → unified `astro_catalog` ready for ingestion, then cross-link to astro image files via RA/Dec proximity and name matching.
+
+**Dependencies:** pandas (existing), rapidfuzz (`pip install rapidfuzz`)
+
+| Step | Description | Status |
+|---|---|---|
+| 3.6.1 | Data Prep tab UI — file upload, preview, column ops | ⏳ Pending |
+| 3.6.2 | Two-file join with key normalization | ⏳ Pending |
+| 3.6.3 | Fuzzy matching (rapidfuzz) with threshold slider | ⏳ Pending |
+| 3.6.4 | Export cleaned CSV | ⏳ Pending |
+| 3.6.5 | Merge Messier + OpenNGC → ingest as `astro_catalog` | ⏳ Pending |
+| 3.6.6 | Astro filename parser fix — target extraction without frame type prefix | ⏳ Pending |
+| 3.6.7 | RA/Dec cross-link tagger — match astro files to catalog within 0.5° tolerance | ⏳ Pending |
+| 3.6.8 | Name/alias cross-link — match filename tokens against catalog common names | ⏳ Pending |
 
 ---
 
@@ -229,16 +347,29 @@
 | 2026-06-16 | 3.21–3.22 | Replace field_maps.json role detection with LLM; retire query_terms intent_routing | `core/retrieval/discovery.py`, `config/query_terms.json` | FIX 13/13, BBG 7/7, KB 10/10, RECON 10/10, OBS 10/10 |
 | 2026-06-17 | 3.23–3.27 | Schema-driven table headers; primary_name_field + type_field in all serializers; type_value in nlp_text; tsvector slash fix | `core/ui_app.py`, `TABLES/table_serializer.py`, `core/link_index.py`, `core/normalizer.py`, `XML/xml_serializer.py`, `core/nlp_generator.py`, PostgreSQL trigger | FIX 13/13, BBG 7/7, KB 10/10, RECON 10/10, OBS 10/10 |
 | 2026-06-17 | 3.14/CODE-008 | Delete Collection UI migrated to PostgreSQL; force re-ingest log updated | `core/ui_app.py` | delete_pg_collection() confirmed working |
+| 2026-06-18 | 3.23 (cont) | Schema-driven table headers: identifier_field + primary_name_field read from payload; alias label from schema. Discovery table shows real column names for all collections. | `core/ui_app.py` | FIX shows Tag/Name headers correctly |
+| 2026-06-18 | 3.31–3.33 | Shared payload enrichment utility; type_field in XML pipeline; enrich called in PDF/image/astro serializers | `core/payload_utils.py` (new), `core/normalizer.py`, `XML/xml_serializer.py`, `PDF/pdf_serializer.py`, `IMAGES/image_serializer.py`, `ASTRO/astro_serializer.py` | All compile; category/folder_path verified on nested paths |
+| 2026-06-18 | 3.34–3.36 | PDF, image, astro parsers + serializers verified against real test files | — | Readable PDF: 63 chunks; OCR PDF: 3 chunks; Image OCR: working; FITS: 34 metadata fields |
+| 2026-06-18 | 3.41 | Data Prep tab built — CSV load, column ops, two-file join, key normalization, fuzzy matching, post-join coalesce, export | `core/ui_data_prep.py` (new), `core/ui_app.py` | Messier + OpenNGC merged and exported |
+| 2026-06-18 | 3.42 | Astro catalog ingested (OpenNGC + Messier, 13,336 chunks) | `astro_catalog` collection | Schema fixed: ngc_id=identifier, comments=primary_name, messier_id=aliases |
+| 2026-06-18 | LLM schema | LLM-driven schema inference built — 3-tier: PostgreSQL → disk → LLM → heuristic | `core/schema_inference.py`, `TABLES/schema_inference_table.py`, `core/schema_loader.py` | LLM now infers schema on first ingest; schemas stored in PostgreSQL; schemas/ folder retired |
+| 2026-06-18 | PERF-001 | build_link_index skipped for tables > 2,000 rows — fixes O(n²) hang on large catalogs | `TABLES/table_serializer.py` | Astro catalog serialization now completes in seconds |
+| 2026-06-18 | EMBED-001 | Batch embedding batch_size reduced 64→32 for LM Studio stability | `core/embedder.py` | — |
+| 2026-06-18 | Schemas | All schemas migrated from disk JSON files to PostgreSQL schemas table | `core/schema_inference.py`, `core/schema_loader.py`, `core/ui_app.py` | schemas/ folder can be deleted; delete button added to Validation tab |
+| 2026-06-18 | 3.37–3.39 | PDF, image (JPG/PNG), DOCX, FITS, XISF all ingested via Streamlit UI | pdf_test, image_test, docx_test, astro_test collections | All file types ingesting correctly. Astro filename parsing gaps logged (ASTRO-001/002/003). |
+| 2026-06-18 | Design | Cross-linking architecture agreed (Phase 3.5): NER-based tagging at ingest, entity dict from Postgres, config-driven collection pairs, no hardcoding | — | Design complete; build after full dataset ingest |
+| 2026-06-18 | Design | Data Prep tab agreed (Phase 3.6): CSV join/merge/clean UI with key normalization + fuzzy matching (rapidfuzz). First use: merge Messier + OpenNGC CSVs for astro_catalog | — | Design complete; build next session |
 
 ---
 
 ## Smoke Test Results
 
-### All suites — 2026-06-17 **ALL PASSING**
+### All suites — 2026-06-18 **ALL PASSING** (verified after full re-ingest + new file type additions)
+⚠️  Re-verification needed after today's changes (schema inference, embedder, table_serializer, ui_data_prep)
 - FIX: 13/13
-- BBG: 7/7 (BBG-07 count check changed from hardcoded "150" to "match"/"0 match" pattern)
+- BBG: 7/7
 - KB: 10/10
-- RECON: 10/10 (smoke_recon.py expected_methods corrected to identifier_lookup)
+- RECON: 10/10
 - OBS: 10/10
 
 ### FIX Smoke Test (2026-06-10) **13/13 passed**

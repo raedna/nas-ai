@@ -1,0 +1,27 @@
+{
+  "identifier": [
+    "ComponentID",
+    "CategoryID",
+    "SectionID"
+  ],
+  "primary_name": [
+    "Name",
+    "AbbrName"
+  ],
+  "aliases": [
+    "AbbrName"
+  ],
+  "description": [
+    "Description"
+  ],
+  "type": [
+    "MsgType"
+  ],
+  "enum_value": [],
+  "enum_name": [],
+  "reference_identifier": [],
+  "other": [
+    "added",
+    "NotReqXML"
+  ]
+}

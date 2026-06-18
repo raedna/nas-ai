@@ -52,6 +52,11 @@ def _apply_link_index_to_docs(docs, rows, schema, source_file):
     if not docs:
         return docs
 
+    # Skip link index for large tables — O(n²) cross-referencing is too slow
+    # Link index only makes sense for small structured reference datasets (FIX, RECON)
+    if len(rows) > 2000:
+        return docs
+
     # Only canonical structured docs should get identifier-based related links.
     # Source/generated identifiers are traceability IDs, not user-facing reference IDs.
     canonical_docs = [
@@ -124,7 +129,6 @@ def _build_structured_doc(row, schema, source_file):
         "identifier_namespace": identifier_namespace or None,
         "identifier_kind": "canonical",
         "primary_name": primary_name or None,
-        "primary_name_field": (name_fields[0] if name_fields else None),
         "description": description or None,
         "description_fields": description_fields or None,
         "enum_values": [],
@@ -174,13 +178,11 @@ def _build_entity_row_doc(row, schema, source_file):
         "identifier_namespace": identifier_namespace or None,
         "identifier_kind": "source",
         "primary_name": primary_name or None,
-        "primary_name_field": (name_fields[0] if name_fields else None),
         "description": "\n\n".join(description_values) if description_values else None,
         "enum_values": [],
         "link_keys": link_keys,
         "related_link_keys": [],
         "type": type_value or "entity_row",
-        "type_field": (type_fields[0] if type_fields else None),
         "source_file": str(source_file),
         "doc_type": "entity_row",
         "aliases": aliases
@@ -220,13 +222,11 @@ def _build_procedural_doc(row, schema, source_file, row_index):
         "identifier_namespace": identifier_namespace or None,
         "identifier_kind": "generated",
         "primary_name": primary_name or None,
-        "primary_name_field": (name_fields[0] if name_fields else None),
         "description": "\n\n".join(description_values) if description_values else None,
         "enum_values": [],
         "link_keys": link_keys,
         "related_link_keys": [],
         "type": "procedural",
-        "type_field": None,
         "source_file": str(source_file),
         "doc_type": "procedural"
     }

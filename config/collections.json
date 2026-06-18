@@ -71,17 +71,6 @@
       "field_filters": []
     }
   },
-  "M42": {
-    "path": "/Volumes/raedsync/From4TBDisk/astrophoto info/Targets/orion",
-    "allowed_filetypes": [
-      "astro"
-    ],
-    "source_label": "Orion Folder",
-    "notes": "Testing Astro images",
-    "filters": {
-      "field_filters": []
-    }
-  },
   "docx_test": {
     "path": "/Users/raednasr/Documents/OmniVista/Case Studies/OmniVista_WhitePaper_RN_ModernizingAdmin_250901.docx",
     "allowed_filetypes": [
@@ -137,21 +126,6 @@
       "field_filters": []
     }
   },
-  "bbg_test": {
-    "path": "/Users/raednasr/RaedsMacM1/nas-ai/table_test_input/BBG_FIELDS_TEST.xlsx",
-    "allowed_filetypes": [
-      "tables"
-    ],
-    "allowed_extensions": [],
-    "exclude_dirs": [],
-    "exclude_extensions": [],
-    "asset_search_roots": [],
-    "source_label": "",
-    "notes": "",
-    "filters": {
-      "field_filters": []
-    }
-  },
   "bbg_fields": {
     "path": "/Users/raednasr/RaedsMacM1/nas-ai/table_test_input/BBG_FIELDS_TEST.xlsx",
     "allowed_filetypes": [
@@ -184,5 +158,53 @@
     "template_config": {
       "sheet_name": "Sheet 1 - RECON_ Moore <> P (2)"
     }
+  },
+  "astro_test": {
+    "path": "/Users/raednasr/RaedsMacM1/nas-ai/astro_test_files",
+    "allowed_filetypes": [
+      "astro"
+    ],
+    "allowed_extensions": [],
+    "exclude_dirs": [],
+    "exclude_extensions": [],
+    "asset_search_roots": [],
+    "source_label": "",
+    "notes": "astro 3 image test - 2 Fit and 1 xisf",
+    "filters": {
+      "field_filters": []
+    },
+    "template_config": {}
+  },
+  "pdf_test": {
+    "path": "/Users/raednasr/RaedsMacM1/nas-ai/pdf_test_files",
+    "allowed_filetypes": [
+      "pdf"
+    ],
+    "allowed_extensions": [],
+    "exclude_dirs": [],
+    "exclude_extensions": [],
+    "asset_search_roots": [],
+    "source_label": "",
+    "notes": "2 PDF - readable and OCR",
+    "filters": {
+      "field_filters": []
+    },
+    "template_config": {}
+  },
+  "astro_catalog": {
+    "path": "/Users/raednasr/RaedsMacM1/nas-ai/claude/Data_Prep_outpupts/cleaned_messier_ngc_catalog_outer_join.csv",
+    "allowed_filetypes": [
+      "tables"
+    ],
+    "allowed_extensions": [],
+    "exclude_dirs": [],
+    "exclude_extensions": [],
+    "asset_search_roots": [],
+    "source_label": "",
+    "notes": "Combined NGC and Messier catalog",
+    "filters": {
+      "field_filters": []
+    },
+    "template_config": {}
   }
 }

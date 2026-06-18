@@ -675,9 +675,10 @@ tabs = st.tabs([
     "Validation",
     "Ask",
     "Preview",
-    "Qdrant Debug",
+    "SQL Inspector",
     "System Config",
     "Chat",
+    "Data Prep",
     "Filetypes"
 ])
 
@@ -1207,28 +1208,52 @@ with tabs[1]:
 with tabs[2]:
     st.subheader("Validation")
 
-    schema_files = sorted(SCHEMAS_DIR.glob("*_schema.json"))
-    schema_overrides = load_json(SCHEMA_OVERRIDES_PATH, {})
+    from core.schema_inference import (
+        ensure_schemas_table, list_schemas_from_db,
+        load_schema_from_db, save_schema_to_db
+    )
+    ensure_schemas_table()
+    db_schemas = list_schemas_from_db()
+    disk_schemas = sorted(SCHEMAS_DIR.glob("*_schema.json"))
 
-    if not schema_files:
-        st.info("No schema files found.")
+    schema_options = []
+    for row in db_schemas:
+        schema_options.append(f"{row['collection_name']}/{row['source_file_stem']} [DB]")
+    for f in disk_schemas:
+        label = f"{f.name} [disk]"
+        if not any(f.stem.replace('_schema','') in s for s in schema_options):
+            schema_options.append(label)
+
+    if not schema_options:
+        st.info("No schema files found in PostgreSQL or on disk.")
     else:
         selected_schema = st.selectbox(
-            "Select schema output file",
-            [p.name for p in schema_files],
+            "Select schema",
+            schema_options,
             key="validation_schema_select"
         )
 
-        schema_path = SCHEMAS_DIR / selected_schema
-        schema = load_json(schema_path, {})
+        schema = {}
+        collection_name_sel = None
+        source_stem_sel = None
 
-        st.markdown("### Generated Schema Output")
-        st.caption("This is the schema produced by ingestion. It is not edited directly.")
+        if "[DB]" in selected_schema:
+            parts = selected_schema.replace(" [DB]", "").split("/")
+            collection_name_sel = parts[0]
+            source_stem_sel = parts[1]
+            schema = load_schema_from_db(collection_name_sel, source_stem_sel) or {}
+        else:
+            fname = selected_schema.replace(" [disk]", "")
+            schema_path = SCHEMAS_DIR / fname
+            schema = load_json(schema_path, {})
+
+        st.markdown("### Schema")
+        st.caption("Current schema. Edit below and save to update.")
         st.json(schema)
 
-        current_override = schema_overrides.get(selected_schema, {})
+        current_override = schema
 
-        st.markdown("### Schema Override")
+        st.markdown("### Edit Schema")
 
         all_fields = []
         for values in schema.values():
@@ -1239,50 +1264,15 @@ with tabs[2]:
 
         all_fields = sorted(all_fields)
 
-        identifier_default = current_override.get(
-            "identifier",
-            schema.get("identifier", [])
-        )
-
-        reference_identifier_default = current_override.get(
-            "reference_identifier",
-            []
-        )
-
-        primary_name_default = current_override.get(
-            "primary_name",
-            schema.get("primary_name", [])
-        )
-
-        aliases_default = current_override.get(
-            "aliases",
-            schema.get("aliases", [])
-        )
-
-        description_default = current_override.get(
-            "description",
-            schema.get("description", [])
-        )
-
-        type_default = current_override.get(
-            "type",
-            schema.get("type", [])
-        )
-
-        enum_value_default = current_override.get(
-            "enum_value",
-            schema.get("enum_value", [])
-        )
-
-        enum_name_default = current_override.get(
-            "enum_name",
-            schema.get("enum_name", [])
-        )
-
-        structured_subtype_default = current_override.get(
-            "structured_subtype",
-            ""
-        )
+        identifier_default = schema.get("identifier", [])
+        reference_identifier_default = schema.get("reference_identifier", [])
+        primary_name_default = schema.get("primary_name", [])
+        aliases_default = schema.get("aliases", [])
+        description_default = schema.get("description", [])
+        type_default = schema.get("type", [])
+        enum_value_default = schema.get("enum_value", [])
+        enum_name_default = schema.get("enum_name", [])
+        structured_subtype_default = schema.get("structured_subtype", "")
 
         identifier_override = st.multiselect(
             "Primary identifier field(s)",
@@ -1356,8 +1346,8 @@ with tabs[2]:
             key=f"override_structured_subtype_{selected_schema}"
         )
 
-        if st.button("Save schema override", key=f"save_override_{selected_schema}"):
-            schema_overrides[selected_schema] = {
+        if st.button("Save schema", key=f"save_override_{selected_schema}"):
+            new_schema = {
                 "identifier": identifier_override,
                 "reference_identifier": reference_identifier_override,
                 "primary_name": primary_name_override,
@@ -1368,21 +1358,32 @@ with tabs[2]:
                 "enum_name": enum_name_override,
                 "structured_subtype": structured_subtype_override,
             }
-
-            save_json(SCHEMA_OVERRIDES_PATH, schema_overrides)
-            st.success(f"Saved override for {selected_schema}")
+            if collection_name_sel and source_stem_sel:
+                save_schema_to_db(new_schema, collection_name_sel, source_stem_sel)
+                st.success(f"Saved schema to PostgreSQL: {collection_name_sel}/{source_stem_sel}")
+            else:
+                save_json(SCHEMA_OVERRIDES_PATH, {selected_schema: new_schema})
+                st.success(f"Saved schema override for {selected_schema}")
             st.rerun()
 
         if current_override:
             with st.expander("Current Saved Override", expanded=False):
                 st.json(current_override)
 
+        if collection_name_sel and source_stem_sel:
+            st.markdown("---")
+            if st.button("🗑️ Delete this schema from PostgreSQL", key=f"delete_schema_{selected_schema}", type="secondary"):
+                from core.schema_inference import delete_schema_from_db
+                delete_schema_from_db(collection_name_sel, source_stem_sel)
+                st.success(f"Deleted schema: {collection_name_sel}/{source_stem_sel}")
+                st.rerun()
+
         warnings = []
 
-        identifier_fields = current_override.get("identifier", schema.get("identifier", []))
-        enum_value_fields = current_override.get("enum_value", schema.get("enum_value", []))
-        primary_name_fields = current_override.get("primary_name", schema.get("primary_name", []))
-        description_fields = current_override.get("description", schema.get("description", []))
+        identifier_fields = schema.get("identifier", [])
+        enum_value_fields = schema.get("enum_value", [])
+        primary_name_fields = schema.get("primary_name", [])
+        description_fields = schema.get("description", [])
 
         if len(identifier_fields) > 1:
             warnings.append(
@@ -2462,5 +2463,9 @@ with tabs[7]:
     st.info("Chat tab scaffold ready.")
 
 with tabs[8]:
+    from core.ui_data_prep import render_data_prep_tab
+    render_data_prep_tab()
+
+with tabs[9]:
     st.subheader("Filetypes")
     st.info("Filetypes tab scaffold ready.")

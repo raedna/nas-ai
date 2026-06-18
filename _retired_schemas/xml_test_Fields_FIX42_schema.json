@@ -1,0 +1,25 @@
+{
+  "identifier": [
+    "Tag"
+  ],
+  "primary_name": [
+    "Name"
+  ],
+  "aliases": [],
+  "description": [
+    "Description"
+  ],
+  "type": [
+    "Type"
+  ],
+  "enum_value": [],
+  "enum_name": [],
+  "reference_identifier": [
+    "AssociatedDataTag"
+  ],
+  "other": [
+    "added",
+    "NotReqXML",
+    "deprecated"
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "identifier": [
+    "ComponentID",
+    "CategoryID"
+  ],
+  "primary_name": [
+    "Name"
+  ],
+  "aliases": [],
+  "description": [
+    "Description"
+  ],
+  "type": [
+    "ComponentType"
+  ],
+  "enum_value": [],
+  "enum_name": [],
+  "reference_identifier": [],
+  "other": [
+    "added",
+    "NotReqXML"
+  ]
+}
