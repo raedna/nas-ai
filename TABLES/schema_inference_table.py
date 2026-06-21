@@ -34,17 +34,24 @@ def infer_table_schema(rows, collection_name=None, source_file=None):
             save_schema_to_db(schema, collection_name, source_file_stem)
             return schema
 
-    # ── 3. LLM inference (new file — no schema exists anywhere)
-    print(f"[SCHEMA] No existing schema found — running LLM inference")
-    schema = llm_infer_schema(rows, roles)
-    if schema is None:
-        print("[SCHEMA] LLM inference unavailable — using heuristic")
-        schema = infer_schema(rows, roles)
+    # ── 3. Heuristic first (fast), LLM only if key roles missing
+    print(f"[SCHEMA] No existing schema — running heuristic for {source_file_stem}")
+    schema = infer_schema(rows, roles)
 
-    # Ensure all expected keys exist
     for key in ["identifier", "primary_name", "aliases", "description",
                 "type", "enum_value", "enum_name", "reference_identifier", "other"]:
         schema.setdefault(key, [])
+
+    if not schema.get("identifier") or not schema.get("primary_name"):
+        print(f"[SCHEMA] Heuristic missed key roles — escalating to LLM")
+        llm_result = llm_infer_schema(rows, roles)
+        if llm_result:
+            schema = llm_result
+            for key in ["identifier", "primary_name", "aliases", "description",
+                        "type", "enum_value", "enum_name", "reference_identifier", "other"]:
+                schema.setdefault(key, [])
+        else:
+            print("[SCHEMA] LLM escalation failed — keeping heuristic result")
 
     if DEBUG:
         print("[TABLE SCHEMA] Inferred schema:")
@@ -53,38 +60,7 @@ def infer_table_schema(rows, collection_name=None, source_file=None):
     # Save to PostgreSQL (primary) and disk (legacy backup)
     if collection_name and source_file_stem:
         save_schema_to_db(schema, collection_name, source_file_stem)
-        save_schema(schema, source_file, SCHEMAS_DIR, collection_name)
+        #save_schema(schema, source_file, SCHEMAS_DIR, collection_name) # saving schema to disk
 
     return schema
 
-    # make sure expected keys always exist
-    for key in [
-        "identifier",
-        "primary_name",
-        "aliases",
-        "description",
-        "type",
-        "enum_value",
-        "enum_name",
-        "other",
-    ]:
-        schema.setdefault(key, [])
-
-    if DEBUG:
-        print("[TABLE SCHEMA] Inferred schema:")
-        print(schema)
-
-    if collection_name and source_file:
-        from pathlib import Path as _Path
-        source_stem = _Path(source_file).stem
-        schema_path = SCHEMAS_DIR / f"{collection_name}_{source_stem}_schema.json"
-        print(f"[SCHEMA] checking path: {schema_path} exists: {schema_path.exists()}")
-        if not schema_path.exists():
-            save_schema(schema, source_file, SCHEMAS_DIR, collection_name)
-        else:
-            import json
-            with open(schema_path, 'r', encoding='utf-8') as f:
-                schema = json.load(f)
-            print(f"[SCHEMA] loaded existing schema, identifier={schema.get('identifier')}")
-
-    return schema

@@ -688,6 +688,8 @@ def build_fuller_doc_payload(
     merged_related_titles: List[str] = []
     seen_image_paths: set = set()
     merged_image_paths: List[str] = []
+    merged_ocr_map: List[Dict] = []
+    seen_ocr_targets: set = set()
     seen_image_targets: set = set()
     merged_image_targets: List[str] = []
 
@@ -708,6 +710,12 @@ def build_fuller_doc_payload(
             if image_target and image_target not in seen_image_targets:
                 seen_image_targets.add(image_target)
                 merged_image_targets.append(image_target)
+
+        for ocr_entry in payload.get("embedded_image_ocr_map") or []:
+            target = str(ocr_entry.get("image_target") or "").strip()
+            if target and target not in seen_ocr_targets:
+                seen_ocr_targets.add(target)
+                merged_ocr_map.append(ocr_entry)
 
         for title in payload.get("related_titles") or []:
             title = str(title).strip()
@@ -758,5 +766,7 @@ def build_fuller_doc_payload(
         merged_payload["embedded_image_paths"] = merged_image_paths
     if merged_image_targets:
         merged_payload["embedded_image_targets"] = merged_image_targets
+    if merged_ocr_map:
+        merged_payload["embedded_image_ocr_map"] = merged_ocr_map
 
     return merged_payload

@@ -49,6 +49,7 @@ from core.paths import (
     SYSTEM_CONFIG_PATH,
     FILETYPES_PATH,
     SCHEMA_OVERRIDES_PATH,
+    DOC_QUERY_HINTS_PATH,
     SCHEMAS_DIR,
 )
 
@@ -68,6 +69,7 @@ if "chat_history" not in st.session_state:
 
 if "ask_result" not in st.session_state:
     st.session_state.ask_result = None
+    st.session_state.ask_answer_payload = None
 
 if "ask_debug_data" not in st.session_state:
     st.session_state.ask_debug_data = None
@@ -304,7 +306,7 @@ def render_answer_with_inline_images(
             except Exception as e:
                 st.caption(f"Could not render image: {image_path} — {e}")
 
-            ocr_text = image_item.get("ocr") or ""
+            ocr_text = (image_item.get("ocr") or "").strip()
 
             if show_inline_ocr and ocr_text:
                 st.markdown(ocr_text)
@@ -316,29 +318,16 @@ def render_answer_with_inline_images(
             if show_images:
                 st.caption(f"Image not resolved: {image_name}")
 
+        # Skip past the marker AND the raw OCR text that follows it in the
+        # source text (since we already have clean OCR via image_item["ocr"]
+        # and don't want it duplicated as plain prose).
         pos = match.end()
-
-        # Skip OCR text immediately following the marker unless inline OCR is enabled.
-        # OCR may continue until the next blank paragraph, the next image marker, or end of answer.
-        if not show_inline_ocr:
-            j = pos
-
-            # skip whitespace after marker
-            while j < len(text) and text[j] in [" ", "\t", "\r", "\n"]:
-                j += 1
-
-            next_marker = re.search(pattern, text[j:])
-            next_marker_pos = j + next_marker.start() if next_marker else None
-
-            next_blank = text.find("\n\n", j)
-
-            if next_blank != -1 and (next_marker_pos is None or next_blank < next_marker_pos):
-                pos = next_blank + 2
-            elif next_marker_pos is not None:
-                pos = next_marker_pos
-            else:
-                # OCR was the last thing in the answer
-                pos = len(text)
+        known_ocr = (image_item.get("ocr") or "").strip() if image_item else ""
+        if known_ocr:
+            remainder = text[pos:]
+            idx = remainder.find(known_ocr[:80])  # match on a stable prefix
+            if idx != -1:
+                pos = pos + idx + len(known_ocr)
 
     if not found_marker:
         st.markdown(text)
@@ -721,6 +710,96 @@ with tabs[0]:
                 st.warning(f"Config deleted but PostgreSQL cleanup failed: {e}")
             st.success(f"Deleted config: {del_name}")
             st.rerun()
+
+        st.markdown("### Build Cross-Links")
+
+        crosslink_source = st.selectbox(
+            "Source collection",
+            sorted(collections_cfg.keys()),
+            key="crosslink_source_select"
+        )
+
+        crosslink_targets = st.multiselect(
+            "Target collections (leave empty for all others)",
+            [c for c in sorted(collections_cfg.keys()) if c != crosslink_source],
+            key="crosslink_targets_select"
+        )
+
+        if st.button("Build Cross-Links"):
+            from core.cross_link_discoverer import discover_cross_links
+            from core.cross_link_store import ensure_cross_links_table, save_cross_link_candidates
+
+            ensure_cross_links_table()
+            targets = crosslink_targets or None
+
+            with st.spinner(f"Discovering links from {crosslink_source}..."):
+                candidates = discover_cross_links(crosslink_source, target_collections=targets)
+                result = save_cross_link_candidates(candidates)
+
+            st.success(f"Found {len(candidates)} candidates — saved {result['saved']}, skipped {result['skipped']} (low confidence)")
+
+        st.markdown("### Review Pending Cross-Links")
+
+        from core.db import fetchall, execute
+
+        review_source = st.selectbox(
+            "Filter by source collection",
+            ["(all)"] + sorted(collections_cfg.keys()),
+            key="crosslink_review_source"
+        )
+
+        review_query = "SELECT id, source_collection, source_identifier, target_collection, target_identifier, match_type, confidence FROM cross_links WHERE status = 'pending_review'"
+        review_params = []
+        if review_source != "(all)":
+            review_query += " AND source_collection = %s"
+            review_params.append(review_source)
+        review_query += " ORDER BY confidence DESC LIMIT 50"
+
+        pending_links = fetchall(review_query, tuple(review_params))
+
+        st.caption(f"Showing {len(pending_links)} pending links (top 50 by confidence)")
+
+        for link in pending_links:
+            with st.expander(f"{link['source_collection']} `{link['source_identifier']}` → {link['target_collection']} `{link['target_identifier']}` ({link['match_type']}, {link['confidence']:.2f})"):
+                src_row = fetchall(
+                    "SELECT payload->>'primary_name' AS name, LEFT(payload->>'description', 300) AS d FROM chunks WHERE collection_name = %s AND payload->>'identifier' = %s LIMIT 1",
+                    (link['source_collection'], link['source_identifier'])
+                )
+                tgt_row = fetchall(
+                    "SELECT payload->>'primary_name' AS name, LEFT(payload->>'description', 300) AS d FROM chunks WHERE collection_name = %s AND payload->>'identifier' = %s LIMIT 1",
+                    (link['target_collection'], link['target_identifier'])
+                )
+
+                col_a, col_b = st.columns(2)
+                with col_a:
+                    st.markdown(f"**Source: {link['source_collection']}**")
+                    if src_row:
+                        st.caption(src_row[0]['name'] or '')
+                        st.write(src_row[0]['d'] or '(no description)')
+                with col_b:
+                    st.markdown(f"**Target: {link['target_collection']}**")
+                    if tgt_row:
+                        st.caption(tgt_row[0]['name'] or '')
+                        st.write(tgt_row[0]['d'] or '(no description)')
+
+                btn_a, btn_b, btn_c = st.columns(3)
+                with btn_a:
+                    if st.button("✓ Confirm", key=f"confirm_{link['id']}"):
+                        execute("UPDATE cross_links SET status = 'confirmed', updated_at = NOW() WHERE id = %s", (link['id'],))
+                        st.rerun()
+                with btn_b:
+                    if st.button("✗ Reject", key=f"reject_{link['id']}"):
+                        execute("UPDATE cross_links SET status = 'rejected', updated_at = NOW() WHERE id = %s", (link['id'],))
+                        st.rerun()
+                with btn_c:
+                    if st.button("✗ Reject + Ignore term", key=f"reject_ignore_{link['id']}"):
+                        execute("UPDATE cross_links SET status = 'rejected', updated_at = NOW() WHERE id = %s", (link['id'],))
+                        hints = load_json(DOC_QUERY_HINTS_PATH, {})
+                        terms = set(hints.get("generic_terms", []))
+                        terms.add(link['source_identifier'].strip().lower())
+                        hints["generic_terms"] = sorted(terms)
+                        save_json(DOC_QUERY_HINTS_PATH, hints)
+                        st.rerun()
 
     with right:
         st.markdown("### Create / Edit Collection")
@@ -1575,7 +1654,7 @@ with tabs[3]:
         debug_top_k = st.number_input(
             "Debug top K",
             min_value=1,
-            max_value=20,
+            max_value=500,
             value=10,
             step=1,
             key="ask_debug_top_k"
@@ -1626,15 +1705,15 @@ with tabs[3]:
                             )
                             st.session_state.ask_discovery_result = None
                             result = query_run["result"]
-
+                            print(f"[UI DEBUG] method={query_run.get('method')} result_type={type(result)} result={str(result)[:100]}")
                         else:
                             query_run = run_query_with_method(
                                 selected_collection,
                                 question,
-                                limit=int(debug_top_k)
+                                limit=200
                             )
 
-                            if query_run.get("method") == "discovery_list":
+                            if query_run.get("method") in {"discovery_count", "discovery_list"}:
                                 st.session_state.ask_discovery_result = query_run["result"]
                             else:
                                 st.session_state.ask_discovery_result = None
@@ -1642,6 +1721,7 @@ with tabs[3]:
                             result = query_run["result"]
 
                     st.session_state.ask_result = result
+                    st.session_state.ask_answer_payload = query_run.get("answer_payload")
                     st.session_state.ask_method = query_run["method"]
                     st.session_state.ask_method_reason = query_run["reason"]
                     st.session_state.ask_related_titles = []
@@ -1698,13 +1778,35 @@ with tabs[3]:
                 total_matches = int(discovery_result.get("total_matches", 0))
                 results = discovery_result.get("results", [])
 
+                _non_structured_doc_types = {"entity_row", "procedural", "mixed"}
+                _result_doc_types = {r.get("doc_type") for r in results}
+                _show_as_content = (
+                    method_used == "discovery_list"
+                    and results
+                    and _result_doc_types
+                    and _result_doc_types.issubset(_non_structured_doc_types)
+                )
+
                 st.info(f"{total_matches} match(es) found.")
+
+                if _show_as_content:
+                    for item in results:
+                        _payload = item.get("payload") or {}
+                        _text = (
+                            _payload.get("description")
+                            or _payload.get("text")
+                            or item.get("preview")
+                            or ""
+                        )
+                        st.markdown(f"**{item.get('primary_name') or '(no title)'}**")
+                        st.markdown(str(_text))
+                        st.markdown("---")
 
                 preview_count = st.number_input(
                     "How many previews to show",
                     min_value=1,
-                    max_value=100,
-                    value=min(preview_count, max(len(results), 1)),
+                    max_value=500,
+                    value=int(preview_count),
                     step=1,
                     key="ask_discovery_preview_count_input"
                 )
@@ -1743,7 +1845,7 @@ with tabs[3]:
                     pass
 
                 preview_rows = []
-                for item in results[:int(preview_count)]:
+                for item in (results[:int(preview_count)] if not _show_as_content else []):
                     _payload = item.get("payload") or {}
                     _aliases = _payload.get("aliases") or []
                     _aliases_str = ", ".join(str(a) for a in _aliases if a) if isinstance(_aliases, list) else str(_aliases)
@@ -1754,6 +1856,7 @@ with tabs[3]:
                         _id_label: item.get("identifier"),
                         _name_label: item.get("primary_name"),
                         _alias_label: _aliases_str,
+                        "category": (_payload.get("category") or ""),
                         "source_type": item.get("source_type"),
                         "source_file": item.get("source_file"),
                         "preview": item.get("preview")
@@ -1833,7 +1936,7 @@ with tabs[3]:
                     with st.expander("Returned Discovery Payload", expanded=False):
                         st.json(discovery_result)
 
-            if isinstance(result, list):
+            elif isinstance(result, list):
                 st.info(f"{len(result)} result(s) returned.")
 
                 rows = []
@@ -1857,9 +1960,9 @@ with tabs[3]:
                 answer_text = str(result)
                 main_answer = strip_related_articles_from_answer(answer_text)
 
-                answer_payload = None
+                answer_payload = st.session_state.get("ask_answer_payload")
 
-                if isinstance(debug_data, dict):
+                if not answer_payload and isinstance(debug_data, dict):
                     ranked_points = debug_data.get("ranked_points") or []
                     if ranked_points:
                         answer_payload = ranked_points[0].payload or {}
@@ -1867,15 +1970,27 @@ with tabs[3]:
                 source_image_items = []
 
                 if answer_payload:
-                    source_file = answer_payload.get("source_file")
-                    source_image_items = fetch_image_paths_for_source_file(
-                        selected_collection,
-                        qdrant_url,
-                        source_file,
-                        related_titles=answer_payload.get("related_titles") or [],
-                    )
-
-                inline_images_rendered = False
+                    _ocr_by_target = {
+                        e.get("image_target"): e.get("ocr_text", "")
+                        for e in (answer_payload.get("embedded_image_ocr_map") or [])
+                    }
+                    _targets = answer_payload.get("embedded_image_targets") or []
+                    source_image_items = [
+                        {
+                            "path": p,
+                            "caption": _targets[i] if i < len(_targets) else None,
+                            "ocr": _ocr_by_target.get(_targets[i] if i < len(_targets) else "", ""),
+                        }
+                        for i, p in enumerate(answer_payload.get("embedded_image_paths") or [])
+                    ]
+                    if not source_image_items:
+                        source_file = answer_payload.get("source_file")
+                        source_image_items = fetch_image_paths_for_source_file(
+                            selected_collection,
+                            qdrant_url,
+                            source_file,
+                            related_titles=answer_payload.get("related_titles") or [],
+                        )
 
                 inline_images_rendered = render_answer_with_inline_images(
                     main_answer,
@@ -1884,11 +1999,6 @@ with tabs[3]:
                     show_inline_ocr=show_inline_ocr,
                     show_ocr_expanders=show_ocr_expanders,
                 )
-
-                if isinstance(debug_data, dict):
-                    ranked_points = debug_data.get("ranked_points") or []
-                    if ranked_points:
-                        answer_payload = ranked_points[0].payload or {}
 
                 render_answer_images_from_payload(answer_payload)
 
@@ -1938,7 +2048,7 @@ with tabs[3]:
                             "related_titles": answer_payload.get("related_titles"),
                             "source_file": answer_payload.get("source_file"),
                         })
-                else:
+                elif method_used not in {"discovery_count", "discovery_list", "comparison"}:
                     st.caption("No answer payload available for image rendering.")
 
                 related_titles = st.session_state.ask_related_titles
@@ -2246,7 +2356,11 @@ with tabs[4]:
                         })
 
                     st.markdown("### Sample Points")
-                    st.dataframe(preview_rows, width="stretch")
+                    st.dataframe(
+                        preview_rows, 
+                        width="stretch",
+                        height=600
+                    )
 
                     with st.expander("Raw Payloads", expanded=False):
                         st.json(points)

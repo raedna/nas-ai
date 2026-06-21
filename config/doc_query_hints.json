@@ -142,31 +142,55 @@
   "structured_filter_operators": [
     {
       "operator": "gte",
-      "terms": ["greater than or equal to", "at least", ">="]
+      "terms": [
+        "greater than or equal to",
+        "at least",
+        ">="
+      ]
     },
     {
       "operator": "lte",
-      "terms": ["less than or equal to", "at most", "<="]
+      "terms": [
+        "less than or equal to",
+        "at most",
+        "<="
+      ]
     },
     {
       "operator": "gt",
-      "terms": ["greater than", "more than", "over", ">"]
+      "terms": [
+        "greater than",
+        "more than",
+        "over",
+        ">"
+      ]
     },
     {
       "operator": "lt",
-      "terms": ["less than", "under", "below", "<"]
+      "terms": [
+        "less than",
+        "under",
+        "below",
+        "<"
+      ]
     },
     {
       "operator": "after",
-      "terms": ["after"]
+      "terms": [
+        "after"
+      ]
     },
     {
       "operator": "before",
-      "terms": ["before"]
+      "terms": [
+        "before"
+      ]
     },
     {
       "operator": "eq",
-      "terms": ["on"]
+      "terms": [
+        "on"
+      ]
     }
   ],
   "structured_namespace_terms": [
@@ -176,16 +200,16 @@
     "componentid"
   ],
   "exact_lexical_query_noise_terms": [
-  "where",
-  "what",
-  "how",
-  "to",
-  "file",
-  "files",
-  "find",
-  "are",
-  "at",
-  "who"
+    "where",
+    "what",
+    "how",
+    "to",
+    "file",
+    "files",
+    "find",
+    "are",
+    "at",
+    "who"
   ],
   "exact_lexical_min_len": 3,
   "exact_lexical_short_allow_terms": [
@@ -196,5 +220,20 @@
     "uat",
     "dev",
     "prod"
+  ],
+  "generic_terms": [
+    "active",
+    "common",
+    "confirmation",
+    "default",
+    "field",
+    "general",
+    "indication",
+    "marketdata",
+    "other",
+    "process",
+    "status",
+    "system",
+    "value"
   ]
 }

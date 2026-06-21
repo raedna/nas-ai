@@ -858,6 +858,12 @@ def run_discovery_with_method(
                 limit=limit,
             )
             if structured_discovery is not None and structured_discovery.get("results"):
+                if intent["mode"] == "discovery_count":
+                    return {
+                        "method": intent["mode"],
+                        "reason": f"{intent['reason']} using structured field match",
+                        "result": f"Found {structured_discovery.get('total_matches', len(structured_discovery.get('results', [])))} matching records.",
+                    }
                 return {
                     "method": intent["mode"],
                     "reason": f"{intent['reason']} using structured field match",
@@ -889,6 +895,12 @@ def run_discovery_with_method(
                     fallback_results = dedupe_discovery_results(fallback_results)
                     for i, item in enumerate(fallback_results, start=1):
                         item["rank"] = i
+                    if intent["mode"] == "discovery_count":
+                        return {
+                            "method": intent["mode"],
+                            "reason": f"{intent['reason']} using name substring match",
+                            "result": f"Found {len(fallback_results)} matching records.",
+                        }
                     return {
                         "method": intent["mode"],
                         "reason": f"{intent['reason']} using name substring match",
@@ -902,6 +914,13 @@ def run_discovery_with_method(
                 limit=limit,
             )
             if distinct_discovery is not None:
+                if intent["mode"] == "discovery_count":
+                    _count = len(distinct_discovery) if isinstance(distinct_discovery, list) else distinct_discovery.get("total_matches", 0)
+                    return {
+                        "method": intent["mode"],
+                        "reason": f"{intent['reason']} using structured distinct values",
+                        "result": f"Found {_count} matching records.",
+                    }
                 return {
                     "method": intent["mode"],
                     "reason": f"{intent['reason']} using structured distinct values",
@@ -915,6 +934,13 @@ def run_discovery_with_method(
                 limit=limit,
             )
             if distinct_discovery is not None:
+                if intent["mode"] == "discovery_count":
+                    _count = len(distinct_discovery) if isinstance(distinct_discovery, list) else distinct_discovery.get("total_matches", 0)
+                    return {
+                        "method": intent["mode"],
+                        "reason": f"{intent['reason']} using structured distinct values",
+                        "result": f"Found {_count} matching records.",
+                    }
                 return {
                     "method": intent["mode"],
                     "reason": f"{intent['reason']} using structured distinct values",

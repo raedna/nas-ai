@@ -131,6 +131,7 @@ def scroll_collection(
                primary_name, description, nlp_text, payload
         FROM chunks
         WHERE {" AND ".join(conditions)}
+        ORDER BY source_file, identifier, primary_name, id
         LIMIT %s
     """
     rows = fetchall(sql, tuple(params))

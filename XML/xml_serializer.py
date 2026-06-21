@@ -1,5 +1,3 @@
-from core.paths import SCHEMAS_DIR, CONFIG_DIR
-from core.schema_inference import infer_schema, load_roles_config
 from core.link_index import build_link_index
 from core.normalizer import normalize_link_index
 
@@ -28,10 +26,14 @@ def xml_serializer(parsed, file_path, template_config, file_tags, collection_nam
     rows = parsed.get("rows", [])
     schema = parsed.get("schema")
 
-    # 🔥 ensure schema exists
+    # 🔥 ensure schema exists — check PostgreSQL first, then LLM, then heuristic
     if not schema:
-        roles = load_roles_config(CONFIG_DIR / "structured_roles.json")
-        schema = infer_schema(rows, roles)
+        from TABLES.schema_inference_table import infer_table_schema
+        schema = infer_table_schema(
+            rows,
+            collection_name=collection_name,
+            source_file=str(file_path)
+        )
 
     if isinstance(rows, dict):
         rows = [rows]
@@ -46,6 +48,53 @@ def xml_serializer(parsed, file_path, template_config, file_tags, collection_nam
 
     # never emit here; orchestrator will call finalize()
     return []
+
+def merge_rows_by_version(all_rows, file_kind):
+    """
+    Merge rows across FIX version files for the same logical record.
+    file_kind: 'fields' or 'enums' — determines merge key.
+    Returns: dict {merged_key: merged_row}
+    """
+    import re
+
+    def extract_version(filename):
+        m = re.search(r'FIX(\d)(\d)', filename)
+        if m:
+            return int(m.group(1)) * 10 + int(m.group(2))  # FIX44 -> 44
+        return 0  # unknown version, lowest priority
+
+    grouped = {}  # key -> list of (version, row)
+
+    for filename, rows in all_rows.items():
+        version = extract_version(filename)
+        if version == 0:
+            continue  # not a versioned FIX file, skip merge for these rows
+
+        for row in rows:
+            if file_kind == "enums":
+                key = (row.get("Tag"), row.get("Value"))
+            else:
+                key = row.get("Tag")
+
+            if key is None:
+                continue
+
+            grouped.setdefault(key, []).append((version, row, filename))
+
+    merged = {}
+    for key, version_rows in grouped.items():
+        version_rows.sort(key=lambda x: x[0])  # ascending version
+        latest_version, latest_row, latest_file = version_rows[-1]
+
+        merged_row = dict(latest_row)
+        merged_row["_version_history"] = [
+            {"version": v, "file": f, "data": r}
+            for v, r, f in version_rows
+        ]
+        merged_row["_latest_version"] = latest_version
+        merged[key] = merged_row
+
+    return merged
 
 
 def xml_finalize(file_path, collection_name, file_tags):
@@ -72,20 +121,38 @@ def xml_finalize(file_path, collection_name, file_tags):
     all_rows = getattr(xml_serializer, "_all_rows", {})
     schemas = getattr(xml_serializer, "_schemas", {})
 
+    # Merge FIX version files by Tag before building link index
+    fields_files = {k: v for k, v in all_rows.items() if k.lower().startswith("fields_")}
+    enums_files = {k: v for k, v in all_rows.items() if k.lower().startswith("enums_")}
+    other_files = {k: v for k, v in all_rows.items() if k not in fields_files and k not in enums_files}
+
+    merged_fields = merge_rows_by_version(fields_files, "fields") if fields_files else {}
+    merged_enums = merge_rows_by_version(enums_files, "enums") if enums_files else {}
+
+    # Rebuild all_rows: merged fields/enums as single synthetic file, others untouched
+    all_rows_merged = dict(other_files)
+    if merged_fields:
+        all_rows_merged["_merged_fields"] = list(merged_fields.values())
+    if merged_enums:
+        all_rows_merged["_merged_enums"] = list(merged_enums.values())
+
+    # only run merge if we actually found versioned FIX files
+    if merged_fields or merged_enums:
+        all_rows = all_rows_merged
+        schemas = {**schemas, "_merged_fields": schemas.get(next(iter(fields_files), ""), {}),
+                   "_merged_enums": schemas.get(next(iter(enums_files), ""), {})}
+
     # build merged index across ALL files
     link_index = build_link_index(all_rows, schemas)
 
-    from core.schema_inference import save_schema
+    from core.schema_inference import save_schema_to_db
+    from pathlib import Path as _Path
 
-    # 🔥 save all schemas once (correct place)
+    # 🔥 save all schemas to PostgreSQL
     for src_file, schema in schemas.items():
         if schema:
-            save_schema(
-                schema,
-                src_file,
-                SCHEMAS_DIR,
-                collection_name
-            )
+            source_stem = _Path(src_file).stem
+            save_schema_to_db(schema, collection_name, source_stem)
 
     
     if DEBUG:

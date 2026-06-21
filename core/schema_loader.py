@@ -32,6 +32,9 @@ def load_collection_schemas(collection_name):
         pass
 
     # ── 2. Fall back to disk JSON files
+    if not schema_dir.exists():
+        return schemas
+
     for file in schema_dir.iterdir():
         if file.name.startswith(f"{collection_name}_") and file.name.endswith("_schema.json"):
             stem = file.stem

@@ -31,6 +31,7 @@ def _make_chunk(
     embedded_image_paths = []
     embedded_image_modes = []
     embedded_image_doc_types = []
+    embedded_image_ocr_map = []
 
     for i, block in enumerate(blocks):
         block_type = block.get("block_type")
@@ -60,6 +61,13 @@ def _make_chunk(
 
             if image_path and image_path not in embedded_image_paths:
                 embedded_image_paths.append(image_path)
+
+            if image_target:
+                embedded_image_ocr_map.append({
+                    "image_target": image_target,
+                    "image_path": image_path,
+                    "ocr_text": block_text,
+                })
 
             if image_mode and image_mode not in embedded_image_modes:
                 embedded_image_modes.append(image_mode)
@@ -136,6 +144,7 @@ def _make_chunk(
         "embedded_image_paths": embedded_image_paths,
         "embedded_image_modes": embedded_image_modes,
         "embedded_image_doc_types": embedded_image_doc_types,
+        "embedded_image_ocr_map": embedded_image_ocr_map,
         "file_name": source_file,
         "related_titles": related_titles,
         "note_title": source_stem if is_markdown else None,

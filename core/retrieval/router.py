@@ -418,19 +418,19 @@ def route_query(
 
    # DISABLED RERANKER USING MINILM AFTER CHANGING RERANKING PROCESS TO NOT RELY ON RRF SCORE
 
-   ## Confidence check — if top RRF score is below threshold return top 5
-   #from core.system_config import load_system_config
-   #CONFIDENCE_THRESHOLD = load_system_config().get("retrieval_confidence_threshold", 0.105)
-   #if doc_type == "structured" and getattr(best, "score", 0.0) < CONFIDENCE_THRESHOLD:
-   #    top5 = points[:5]
-   #    lines = [f"No exact match found for '{question}'. Closest results:"]
-   #    for p in top5:
-   #        pl = p.payload or {}
-   #        name = pl.get("primary_name") or ""
-   #        identifier = pl.get("identifier") or ""
-   #        desc = str(pl.get("description") or "")[:80]
-   #        lines.append(f"- {identifier}: {name} — {desc}" if desc else f"- {identifier}: {name}")
-   #    return "\n".join(lines)
+    ## Confidence check — if top RRF score is below threshold return top 5
+    from core.system_config import load_system_config
+    CONFIDENCE_THRESHOLD = load_system_config().get("retrieval_confidence_threshold", 0.105)
+    if doc_type == "structured" and getattr(best, "score", 0.0) < CONFIDENCE_THRESHOLD:
+        top5 = points[:5]
+        lines = [f"No exact match found for '{question}'. Closest results:"]
+        for p in top5:
+            pl = p.payload or {}
+            name = pl.get("primary_name") or ""
+            identifier = pl.get("identifier") or ""
+            desc = str(pl.get("description") or "")[:80]
+            lines.append(f"- {identifier}: {name} — {desc}" if desc else f"- {identifier}: {name}")
+        return "\n".join(lines)
 
 
    # Stage 2: LLM reranker for structured and entity_row
@@ -462,6 +462,7 @@ def route_query(
     ## For chunked document payloads, enrich by merging nearby/same-section chunks
     if doc_type not in ("structured", "entity_row"):
         payload = build_fuller_doc_payload(collection, payload) or payload
+    route_query._last_answer_payload = payload
     return synthesize_answer(payload, roles, collection)
 
 
@@ -488,7 +489,7 @@ def run_query_with_method(
     import re
     _filename_matches = re.findall(r'\b([a-zA-Z0-9_\-]+\.[a-zA-Z0-9]{2,5})\b', question)
     if _filename_matches:
-        from core.retrieval.db_retrieval import get_by_identifier
+        from core.retrieval.db_retrieval import get_by_identifier, fetchall
         for _fname in _filename_matches:
             _pts = get_by_identifier(collection, _fname)
             if _pts:
@@ -500,6 +501,39 @@ def run_query_with_method(
                     "reason": f"filename identifier detected: {_fname}",
                     "result": synthesize_answer(_payload, _roles, collection),
                 }
+            else:
+                try:
+                    _similar = fetchall("""
+                        SELECT DISTINCT
+                            payload->>'identifier' AS identifier,
+                            payload->>'primary_name' AS primary_name,
+                            similarity(payload->>'identifier', %s) AS sim
+                        FROM chunks
+                        WHERE collection_name = %s
+                        AND payload->>'identifier' IS NOT NULL
+                        AND similarity(payload->>'identifier', %s) > 0.2
+                        ORDER BY sim DESC
+                        LIMIT 3
+                    """, (_fname, collection, _fname))
+                except Exception:
+                    _similar = []
+
+                if _similar:
+                    _suggestions = "\n".join([
+                        f"  - {r['identifier']} ({r['primary_name'] or ''})"
+                        for r in _similar
+                    ])
+                    return {
+                        "method": "identifier_lookup",
+                        "reason": f"filename detected but not found: {_fname}",
+                        "result": f"No exact match found for '{_fname}'.\n\nDid you mean one of these?\n{_suggestions}",
+                    }
+                else:
+                    return {
+                        "method": "identifier_lookup",
+                        "reason": f"filename detected but not found: {_fname}",
+                        "result": f"No record found for '{_fname}' in this collection. Please check the filename and try again.",
+                    }
 
     from core.retrieval.discovery import llm_detect_intent
     intent = llm_detect_intent(question)
@@ -649,6 +683,7 @@ def run_query_with_method(
         "method": method_info["mode"],
         "reason": method_info["reason"],
         "result": route_query(collection, question, mode=mode, limit=limit),
+        "answer_payload": getattr(route_query, "_last_answer_payload", None),
     }
 
     if structured_plan:

@@ -169,10 +169,10 @@
 | 3.42 | Astro catalog ingest (OpenNGC + Messier merged via Data Prep tab) | ⏳ Pending |
 | 3.43 | Astro cross-link tagger — RA/Dec proximity + name/alias matching | ⏳ Pending |
 | 3.44 | LLM schema inference: add column population count to prompt (fix identifier vs aliases confusion) | ⏳ Pending |
-| 3.45 | Cross-link builder: Option C (manual trigger button in Collections tab) | ⏳ Pending |
+| 3.45 | Cross-link builder: Option C (manual trigger button in Collections tab) | ✅ Done 2026-06-22 |
 | 3.46 | Cross-link builder: Option B (background thread triggered after each ingest) | ⏳ Pending |
-| 3.47 | Inline images in Ask tab with expandable OCR (Obsidian + docs) | ⏳ Pending |
-| 3.48 | Run full smoke test suite after today's changes | ⏳ Pending |
+| 3.47 | Inline images in Ask tab with expandable OCR (Obsidian + docs) | ✅ Done 2026-06-22 |
+| 3.48 | Run full smoke test suite after today's changes | ✅ Done 2026-06-22 — all pass except OBS-01 (bad test, content never existed) |
 | 3.49 | schemas/ folder retired — all schemas now in PostgreSQL | ✅ Done 2026-06-18 |
 
 **Key architectural decisions made in Phase 3:**
@@ -460,3 +460,60 @@ Recorded for when the system is proven and ready for blind testing. NAS remains 
 ### Guardrail
 - Protect the core/UI separation religiously.
 - **NAS-AI is fully local. No external AI or cloud model connections, ever.**
+
+---
+
+### Session 2026-06-22 — Retrieval fixes, image/OCR fix, cross-linking v1
+
+**Retrieval bug fixes (all verified):**
+- `discovery_count` returning raw JSON instead of count string — root cause: 3 early-return paths in `discovery.py` (`structured_discovery`, `fallback_results`, `distinct_discovery` ×2 duplicate blocks) bypassed the count-string conversion. Fixed all paths to check `intent["mode"] == "discovery_count"` before returning.
+- Preview table capped at 10 rows — root cause: "Debug top K" input (`ui_app.py`) was passed as the actual discovery query `limit=`, defaulting to 10/max 20. Fixed: discovery queries now use `limit=200` regardless of debug setting.
+- Wrong/misleading answer for misspelled filenames (e.g. "gsct.txt") — added trigram-based "did you mean" suggestions in `router.py` filename-detection block when no exact identifier match found.
+- False-confidence wrong answers for missing data (e.g. "horse head nebula" returning Trifid Nebula) — re-enabled confidence threshold check in `router.py`, scoped to `doc_type == "structured"` only (RRF score is the only signal there since BGE reranker doesn't apply). Below threshold (`system.json` `retrieval_confidence_threshold`, default 0.105) returns "no confident match" + top 5 closest instead of single wrong answer.
+- Discovery results table missing `category` column — added so users can see WHY a field matched (e.g. category path containing query term, not just name).
+- Single/non-structured discovery_list results showing sparse table instead of full content — added `_show_as_content` logic: when all result doc_types are in `{entity_row, procedural, mixed}`, render full description content instead of summary table.
+- "No answer payload available for image rendering" caption — now scoped to skip discovery_count/list/comparison methods.
+
+**XML/FIX schema fixes:**
+- `xml_serializer.py` was bypassing PostgreSQL schema storage entirely — called `infer_schema()` (heuristic-only) instead of `infer_table_schema()`, and saved to disk via `save_schema()` instead of `save_schema_to_db()`. Fixed both call sites — XML pipeline now uses the same PostgreSQL-first schema flow as tables.
+- `schema_inference_table.py` rewritten: heuristic-first (fast), LLM escalation only when heuristic misses `identifier`/`primary_name` — was previously LLM-first which is slow under concurrent load and frequently wrong for domain-specific column names (e.g. RECON's "Moore file name" vs "Tidal Job Name" — LLM and heuristic both repeatedly chose wrong columns). Dead/unreachable code removed.
+- `local_llm_client.py` `_parse_json_response()` — added bracket-counting algorithm to extract first complete JSON object when LLM appends extra text after closing brace (fixes "Extra data" JSONDecodeError during schema inference).
+- `schema_loader.py` — added `if not schema_dir.exists(): return schemas` guard (crashed after `schemas/` folder was deleted, since disk fallback still unconditionally called `.iterdir()`).
+- **RECON schema corrected via Validation tab + direct PostgreSQL writes** after both heuristic and LLM repeatedly produced wrong identifier/primary_name (`Tidal Job Name`/`Comment` instead of `Moore file name`/`Tidal Job Name`). `sFTP Folder` field was found completely missing from ALL roles (silently dropped by LLM) — added via direct Python `save_schema_to_db` call. **Known Validation tab limitation confirmed**: schema editor multiselect only shows fields already mapped to *some* role, so fields dropped entirely are invisible in the UI — this is how `sFTP Folder` got lost. Still needs UI fix.
+- **[DECISION] Domain-specific collections need manual schema definition, not LLM/heuristic inference.** Confirmed via repeated RECON failures — column names like "Moore file name" vs "Tidal Job Name" require business context no amount of prompt engineering reliably captures. LLM/heuristic work well for standard naming (BBG: `Id`, `Mnemonic`, `Description`, `DataType` — heuristic succeeded immediately).
+
+**Phase 1b — FIX version consolidation (COMPLETE, verified):**
+- Root cause of enum truncation (Tag 22 showing 9 values instead of 19): FIX enums/fields are split per-version-file (`Fields_FIX42.xml`, `Fields_FIX44.xml`, etc.) and ingested independently rather than merged by Tag across versions.
+- `merge_rows_by_version(all_rows, file_kind)` added to `xml_serializer.py`: extracts version from filename (`FIX44` → 44), groups rows by Tag (fields) or (Tag, Value) (enums) across all matching files, picks latest version as canonical, retains full `_version_history` per record. Files with unparseable version numbers skip merge (original per-file behavior preserved).
+- Call site in `xml_finalize()`: splits `all_rows` into fields/enums/other by filename prefix, merges each kind, replaces with synthetic `_merged_fields`/`_merged_enums` keys (with matching schema copied from an original file) before `build_link_index` runs.
+- **Verified**: re-ingested xml_test (1168→1164 chunks), "values for tag 22" now correctly returns all 19 values (9 from FIX42 + 10 from FIX44, A–J). `smoke_fix.py` 13/13 pass.
+
+**Obsidian inline images + expandable OCR (COMPLETE, major debugging session):**
+- Root cause #1: `debug_route_query` (which resolves images via `ranked_points[0]`) was gated behind `if show_debug and intent["mode"] == "answer":` — meant the debug checkbox controlled whether images resolved at all. Fixed: now runs whenever `intent["mode"] == "answer"`, debug *display* panels remain separately gated by the checkbox.
+- Root cause #2 (the real bug): for multi-chunk markdown notes, `build_fuller_doc_payload` (`crosslink.py`) correctly merges ALL relevant chunks' text AND images into one combined payload used to generate the answer text — but the UI's image-fetching logic used a *separate*, freshly-re-derived `ranked_points[0]` (single top chunk only) instead of this merged payload. Result: answer text correctly showed all embedded image OCR markers, but only images belonging to the single top-ranked chunk would resolve — others showed "Image not resolved."
+- Fix: `router.py` `route_query()` now stashes its merged payload as `route_query._last_answer_payload` right before returning; `run_query_with_method()` exposes it as `"answer_payload"` in its result dict. `ui_app.py` stores this in `st.session_state.ask_answer_payload` and uses it directly for image lookup (falling back to old debug-derived approach only if empty). **Verified working** — images from all merged chunks now render correctly inline.
+- Expandable OCR fix: added `embedded_image_ocr_map` field (list of `{image_target, image_path, ocr_text}`) to `_make_chunk()` in `doc_serializer.py` — captures OCR text as a clean, isolated value per image block (previously only available flattened into the combined `description` text, with no way to know where one image's OCR ended and surrounding prose began). `build_fuller_doc_payload` (`crosslink.py`) updated to merge this map across chunks alongside `embedded_image_paths`/`targets`. `render_answer_with_inline_images` (`ui_app.py`) simplified to use `image_item["ocr"]` directly for expander/inline display, and skips past the matching raw OCR text in the source string (via prefix-match) so it doesn't ALSO render as duplicate plain prose. **Verified working** — clean per-image expandable OCR, no duplication.
+- **Requires re-ingestion of Obsidian/doc collections** to populate `embedded_image_ocr_map` for existing notes (only new ingests after this change have the field).
+- Temporary `[CHUNK DEBUG]` print added during investigation was removed from `doc_serializer.py` after the fix was confirmed.
+
+**Cross-linking v1 (NEW — built and validated this session):**
+- `core/cross_link_discoverer.py` (new): `discover_cross_links(source_collection, target_collections=None)` — three match strategies: (1) exact identifier match, confidence 1.0, with guard to skip plain short numeric IDs (<5 digits) since these collide meaninglessly across unrelated collections (e.g. FIX tag "79" vs KB article "79"); (2) name/primary_name trigram similarity (>0.3), confidence = similarity score; (3) mention matching — source identifier or `type` field found as substring in target `description`, confidence flat 0.6, with generic-term filtering (length ≥4, not purely numeric, not in `generic_terms` config list) to suppress false positives from common financial vocabulary (e.g. "Common", "MarketData", "Confirmation", "Session" matching unrelated KB content purely by word overlap).
+- `config/doc_query_hints.json` — new `generic_terms` key added (reusing existing config infrastructure rather than hardcoding in Python) for mention-matching noise suppression. User can add terms ad-hoc via UI (see below).
+- `core/cross_link_store.py` (new): `ensure_cross_links_table()`, `save_cross_link_candidates()` (confidence ≥0.9 → `confirmed`, 0.3–0.9 → `pending_review`, <0.3 → skipped), `get_cross_links_for_identifier()` (lookup helper, not yet wired into query-time retrieval).
+- `cross_links` PostgreSQL table created manually by user; UNIQUE constraint added via ALTER TABLE (`source_collection, source_identifier, target_collection, target_identifier, match_type`) to support `ON CONFLICT` upsert.
+- **UI — Collections tab**: "Build Cross-Links" section (source collection selector, optional target multiselect, button → runs discoverer + saves candidates, shows saved/skipped counts). "Review Pending Cross-Links" section: filterable by source collection, expandable rows showing side-by-side source/target content preview (primary_name + description snippet) so the match can actually be judged, three actions per row — Confirm, Reject, **Reject + Ignore term** (rejects AND appends the matched term to `generic_terms` in `doc_query_hints.json` in one click — added per user request to avoid manual JSON editing).
+- `core/paths.py` — added `DOC_QUERY_HINTS_PATH` constant (was missing; `doc_query_hints.json` previously only loaded via `load_doc_query_hints()` helper, no direct path constant existed for UI read/write).
+- **Tested across real collection pairs**: RECON↔KB (mention matches confirmed meaningful, e.g. "bony_pos.txt" correctly found in a KB article about checking sFTP for missing files), RECON↔all (400 candidates: 149 KB, 230 Obsidian, 15 FIX — all `pending_review`, none auto-confirmed), xml_test↔KB (after generic-term filtering, dropped from 150→68→20 candidates as false positives were identified and filtered: numeric-ID collisions, then years/common words).
+- **[KNOWN ISSUE — not yet fixed]** Obsidian's `identifier` field is per-chunk synthetic (e.g. `notename_chunk_3`), not a real entity — produces duplicate near-identical cross-link candidates (one per chunk of the same note) when Obsidian is the *source* collection. Needs note-level (source_file) deduplication for Obsidian-as-source discovery, not yet implemented.
+- **[KNOWN ISSUE — not yet addressed]** All `mention` matches get a flat confidence of 0.6 regardless of match quality/specificity — not scored variably like `name_similarity`. Acceptable for now since all land in `pending_review` tier requiring manual confirmation anyway, but flagged as a future refinement (e.g. scale by term length/rarity).
+- **Not yet built**: Option B (background thread trigger after each ingest) — deferred until Option C (manual button) is exercised more and match quality is trusted. Query-time usage of confirmed cross-links (surfacing linked records from other collections in the Ask tab) — `get_cross_links_for_identifier()` helper exists but is not wired into `router.py` yet.
+
+**Smoke test status:** `smoke_fix.py` `smoke_bbg.py` `smoke_kb.py` `smoke_recon.py` all pass. `smoke_obsidian.py` — OBS-01 fails by design; confirmed via direct grep that the test's expected content (`gsact.txt` sftp folder) never existed in the actual Obsidian vault. Test needs rewriting against real note content or removal — not yet done.
+
+**Next session priorities (per user, in rough order):**
+1. Cross-linking: address Obsidian per-chunk duplicate identifier issue (note-level dedup)
+2. Cross-linking: variable mention confidence scoring (replace flat 0.6)
+3. Wire confirmed cross-links into query-time retrieval (`router.py` + `get_cross_links_for_identifier`)
+4. Option B — background thread cross-link trigger after ingest
+5. Fix/retire `OBS-01` smoke test
+6. Validation tab UI fix — show ALL source columns, not just currently-mapped ones
