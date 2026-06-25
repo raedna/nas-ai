@@ -45,17 +45,18 @@ def call_local_llm_json(system_prompt, user_prompt, temperature=0.0):
         "stream": False,
     }
 
-    response = requests.post(
-        url,
-        json=payload,
-        timeout=llm_cfg["timeout"],
-    )
-    response.raise_for_status()
-
-    data = response.json()
-    content = data["choices"][0]["message"]["content"]
-
-    return _parse_json_response(content)
+    try:
+        response = requests.post(
+            url,
+            json=payload,
+            timeout=llm_cfg["timeout"],
+        )
+        response.raise_for_status()
+        data = response.json()
+        content = data["choices"][0]["message"]["content"]
+        return _parse_json_response(content)
+    except Exception:
+        return None
 
 
 def _parse_json_response(content):

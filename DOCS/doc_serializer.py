@@ -75,9 +75,9 @@ def _make_chunk(
             if image_doc_type and image_doc_type not in embedded_image_doc_types:
                 embedded_image_doc_types.append(image_doc_type)
 
-            # visible marker in chunk text
+            # visible marker in chunk text (OCR content stored in embedded_image_ocr_map, not inline)
             marker_name = image_target or "unknown image"
-            block_text = f"[Embedded image OCR from: {marker_name}]\n{block_text}"
+            block_text = f"[Embedded image OCR from: {marker_name}]"
 
         text_parts.append(block_text)
 

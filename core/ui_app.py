@@ -70,6 +70,7 @@ if "chat_history" not in st.session_state:
 if "ask_result" not in st.session_state:
     st.session_state.ask_result = None
     st.session_state.ask_answer_payload = None
+    st.session_state.ask_related_sections = []
 
 if "ask_debug_data" not in st.session_state:
     st.session_state.ask_debug_data = None
@@ -711,95 +712,7 @@ with tabs[0]:
             st.success(f"Deleted config: {del_name}")
             st.rerun()
 
-        st.markdown("### Build Cross-Links")
-
-        crosslink_source = st.selectbox(
-            "Source collection",
-            sorted(collections_cfg.keys()),
-            key="crosslink_source_select"
-        )
-
-        crosslink_targets = st.multiselect(
-            "Target collections (leave empty for all others)",
-            [c for c in sorted(collections_cfg.keys()) if c != crosslink_source],
-            key="crosslink_targets_select"
-        )
-
-        if st.button("Build Cross-Links"):
-            from core.cross_link_discoverer import discover_cross_links
-            from core.cross_link_store import ensure_cross_links_table, save_cross_link_candidates
-
-            ensure_cross_links_table()
-            targets = crosslink_targets or None
-
-            with st.spinner(f"Discovering links from {crosslink_source}..."):
-                candidates = discover_cross_links(crosslink_source, target_collections=targets)
-                result = save_cross_link_candidates(candidates)
-
-            st.success(f"Found {len(candidates)} candidates — saved {result['saved']}, skipped {result['skipped']} (low confidence)")
-
-        st.markdown("### Review Pending Cross-Links")
-
-        from core.db import fetchall, execute
-
-        review_source = st.selectbox(
-            "Filter by source collection",
-            ["(all)"] + sorted(collections_cfg.keys()),
-            key="crosslink_review_source"
-        )
-
-        review_query = "SELECT id, source_collection, source_identifier, target_collection, target_identifier, match_type, confidence FROM cross_links WHERE status = 'pending_review'"
-        review_params = []
-        if review_source != "(all)":
-            review_query += " AND source_collection = %s"
-            review_params.append(review_source)
-        review_query += " ORDER BY confidence DESC LIMIT 50"
-
-        pending_links = fetchall(review_query, tuple(review_params))
-
-        st.caption(f"Showing {len(pending_links)} pending links (top 50 by confidence)")
-
-        for link in pending_links:
-            with st.expander(f"{link['source_collection']} `{link['source_identifier']}` → {link['target_collection']} `{link['target_identifier']}` ({link['match_type']}, {link['confidence']:.2f})"):
-                src_row = fetchall(
-                    "SELECT payload->>'primary_name' AS name, LEFT(payload->>'description', 300) AS d FROM chunks WHERE collection_name = %s AND payload->>'identifier' = %s LIMIT 1",
-                    (link['source_collection'], link['source_identifier'])
-                )
-                tgt_row = fetchall(
-                    "SELECT payload->>'primary_name' AS name, LEFT(payload->>'description', 300) AS d FROM chunks WHERE collection_name = %s AND payload->>'identifier' = %s LIMIT 1",
-                    (link['target_collection'], link['target_identifier'])
-                )
-
-                col_a, col_b = st.columns(2)
-                with col_a:
-                    st.markdown(f"**Source: {link['source_collection']}**")
-                    if src_row:
-                        st.caption(src_row[0]['name'] or '')
-                        st.write(src_row[0]['d'] or '(no description)')
-                with col_b:
-                    st.markdown(f"**Target: {link['target_collection']}**")
-                    if tgt_row:
-                        st.caption(tgt_row[0]['name'] or '')
-                        st.write(tgt_row[0]['d'] or '(no description)')
-
-                btn_a, btn_b, btn_c = st.columns(3)
-                with btn_a:
-                    if st.button("✓ Confirm", key=f"confirm_{link['id']}"):
-                        execute("UPDATE cross_links SET status = 'confirmed', updated_at = NOW() WHERE id = %s", (link['id'],))
-                        st.rerun()
-                with btn_b:
-                    if st.button("✗ Reject", key=f"reject_{link['id']}"):
-                        execute("UPDATE cross_links SET status = 'rejected', updated_at = NOW() WHERE id = %s", (link['id'],))
-                        st.rerun()
-                with btn_c:
-                    if st.button("✗ Reject + Ignore term", key=f"reject_ignore_{link['id']}"):
-                        execute("UPDATE cross_links SET status = 'rejected', updated_at = NOW() WHERE id = %s", (link['id'],))
-                        hints = load_json(DOC_QUERY_HINTS_PATH, {})
-                        terms = set(hints.get("generic_terms", []))
-                        terms.add(link['source_identifier'].strip().lower())
-                        hints["generic_terms"] = sorted(terms)
-                        save_json(DOC_QUERY_HINTS_PATH, hints)
-                        st.rerun()
+    
 
     with right:
         st.markdown("### Create / Edit Collection")
@@ -1108,6 +1021,178 @@ with tabs[0]:
     else:
         st.info("No collections found in PostgreSQL.")
 
+    st.divider()
+    st.markdown("### Build Cross-Links")
+
+    crosslink_source = st.selectbox(
+        "Source collection",
+        sorted(collections_cfg.keys()),
+        key="crosslink_source_select"
+    )
+
+    crosslink_targets = st.multiselect(
+        "Target collections (leave empty for all others)",
+        [c for c in sorted(collections_cfg.keys()) if c != crosslink_source],
+        key="crosslink_targets_select"
+    )
+
+    if st.button("Build Cross-Links + Concept Vectors"):
+        from core.cross_link_discoverer import discover_cross_links
+        from core.cross_link_store import ensure_cross_links_table, save_cross_link_candidates
+        from core.concept_vector_builder import build_concept_vectors
+
+        ensure_cross_links_table()
+        targets = crosslink_targets or None
+
+        with st.spinner(f"Discovering links from {crosslink_source}..."):
+            candidates = discover_cross_links(crosslink_source, target_collections=targets)
+            result = save_cross_link_candidates(candidates)
+
+        with st.spinner(f"Building concept vectors for {crosslink_source}..."):
+            n_vectors = build_concept_vectors(crosslink_source)
+
+        st.success(f"Cross-links: found {len(candidates)} candidates — saved {result['saved']}, skipped {result['skipped']}. Concept vectors: {n_vectors} built.")
+
+    st.markdown("### Review Pending Cross-Links")
+
+    from core.db import fetchall, execute
+
+    review_source = st.selectbox(
+        "Filter by source collection",
+        ["(all)"] + sorted(collections_cfg.keys()),
+        key="crosslink_review_source"
+    )
+
+    review_query = "SELECT id, source_collection, source_identifier, target_collection, target_identifier, match_type, confidence FROM cross_links WHERE status = 'pending_review'"
+    review_params = []
+    if review_source != "(all)":
+        review_query += " AND source_collection = %s"
+        review_params.append(review_source)
+    review_query += " ORDER BY confidence DESC LIMIT 50"
+
+    pending_links = fetchall(review_query, tuple(review_params))
+
+    st.caption(f"Showing {len(pending_links)} pending links (top 50 by confidence)")
+
+    col_thresh, col_btn = st.columns([2, 1])
+    with col_thresh:
+        bulk_threshold = st.slider(
+            "Bulk confirm threshold",
+            min_value=0.3, max_value=1.0, value=0.7, step=0.05,
+            key="crosslink_bulk_threshold"
+        )
+    with col_btn:
+        st.markdown("<br>", unsafe_allow_html=True)
+        if st.button("✓ Confirm all above threshold"):
+            execute("""
+                UPDATE cross_links SET status = 'confirmed', updated_at = NOW()
+                WHERE status = 'pending_review'
+                AND confidence >= %s
+            """, (bulk_threshold,))
+            st.rerun()
+        if st.button("✗ Reject all below threshold"):
+            execute("""
+                UPDATE cross_links SET status = 'rejected', updated_at = NOW()
+                WHERE status = 'pending_review'
+                AND confidence < %s
+            """, (bulk_threshold,))
+            st.rerun()
+
+    st.divider()
+
+    for link in pending_links:
+        with st.expander(f"{link['source_collection']} `{link['source_identifier']}` → {link['target_collection']} `{link['target_identifier']}` ({link['match_type']}, {link['confidence']:.2f})"):
+            src_row = fetchall(
+                "SELECT payload->>'primary_name' AS name, LEFT(payload->>'description', 300) AS d FROM chunks WHERE collection_name = %s AND (payload->>'identifier' = %s OR payload->>'source_file' = %s) LIMIT 1",
+                (link['source_collection'], link['source_identifier'], link['source_identifier'])
+            )
+            tgt_row = fetchall(
+                "SELECT payload->>'primary_name' AS name, LEFT(payload->>'description', 300) AS d FROM chunks WHERE collection_name = %s AND (payload->>'identifier' = %s OR payload->>'source_file' = %s) LIMIT 1",
+                (link['target_collection'], link['target_identifier'], link['target_identifier'])
+            )
+
+            col_a, col_b = st.columns(2)
+            with col_a:
+                st.markdown(f"**Source: {link['source_collection']}**")
+                if src_row:
+                    st.caption(src_row[0]['name'] or '')
+                    st.text(src_row[0]['d'] or '(no description)')
+                else:
+                    st.text('(no description)')
+            with col_b:
+                st.markdown(f"**Target: {link['target_collection']}**")
+                if tgt_row:
+                    st.caption(tgt_row[0]['name'] or '')
+                    st.text(tgt_row[0]['d'] or '(no description)')
+                else:
+                    st.text('(no description)')
+
+            btn_a, btn_b, btn_c = st.columns(3)
+            with btn_a:
+                if st.button("✓ Confirm", key=f"confirm_{link['id']}"):
+                    execute("UPDATE cross_links SET status = 'confirmed', updated_at = NOW() WHERE id = %s", (link['id'],))
+                    st.rerun()
+            with btn_b:
+                if st.button("✗ Reject", key=f"reject_{link['id']}"):
+                    execute("UPDATE cross_links SET status = 'rejected', updated_at = NOW() WHERE id = %s", (link['id'],))
+                    st.rerun()
+            with btn_c:
+                if st.button("✗ Reject + Ignore term", key=f"reject_ignore_{link['id']}"):
+                    execute("UPDATE cross_links SET status = 'rejected', updated_at = NOW() WHERE id = %s", (link['id'],))
+                    hints = load_json(DOC_QUERY_HINTS_PATH, {})
+                    terms = set(hints.get("generic_terms", []))
+                    terms.add(link['source_identifier'].strip().lower())
+                    hints["generic_terms"] = sorted(terms)
+                    save_json(DOC_QUERY_HINTS_PATH, hints)
+                    st.rerun()
+
+    st.markdown("### Review Rejected Cross-Links")
+    _show_rejected = st.checkbox("Show rejected cross-links", value=False, key="show_rejected_toggle")
+    if _show_rejected:
+        rejected_col_filter = st.selectbox(
+            "Filter by source collection",
+            ["all"] + sorted(set(c for c in collections_cfg.keys())),
+            key="rejected_col_filter"
+        )
+        rejected_query = "SELECT id, source_collection, source_identifier, target_collection, target_identifier, match_type, confidence FROM cross_links WHERE status = 'rejected'"
+        rejected_params = ()
+        if rejected_col_filter != "all":
+            rejected_query += " AND source_collection = %s"
+            rejected_params = (rejected_col_filter,)
+        rejected_query += " ORDER BY source_collection, source_identifier LIMIT 200"
+        rejected_links = fetchall(rejected_query, rejected_params)
+
+        if not rejected_links:
+            st.info("No rejected cross-links.")
+        else:
+            st.caption(f"{len(rejected_links)} rejected links")
+            if st.button("Reset ALL rejected → pending_review", key="reset_all_rejected"):
+                execute(
+                    "UPDATE cross_links SET status = 'pending_review', updated_at = NOW() WHERE status = 'rejected'",
+                    ()
+                )
+                st.success("All rejected links reset to pending_review.")
+                st.rerun()
+
+            for link in rejected_links:
+                col1, col2, col3 = st.columns([4, 1, 1])
+                with col1:
+                    st.caption(f"`{link['source_collection']}` `{link['source_identifier']}` → `{link['target_collection']}` `{link['target_identifier']}` ({link['match_type']}, {link['confidence']:.2f})")
+                with col2:
+                    if st.button("✓ Confirm", key=f"restore_{link['id']}"):
+                        execute(
+                            "UPDATE cross_links SET status = 'confirmed', updated_at = NOW() WHERE id = %s",
+                            (link['id'],)
+                        )
+                        st.rerun()
+                with col3:
+                    if st.button("↩ Pending", key=f"restore_pending_{link['id']}"):
+                        execute(
+                            "UPDATE cross_links SET status = 'pending_review', updated_at = NOW() WHERE id = %s",
+                            (link['id'],)
+                        )
+                        st.rerun()
+
 with tabs[1]:
     st.subheader("Ingestion")
 
@@ -1223,6 +1308,10 @@ with tabs[1]:
                 log_ingestion(f"{selected_collection} → {result}")
 
                 st.success("Ingestion complete.")
+
+                from core.background_runner import launch_cross_link_discovery
+                launch_cross_link_discovery(selected_collection)
+                st.info("⚙️ Cross-link discovery + concept vector rebuild running in background...")
 
                 st.markdown("### Ingestion Summary")
 
@@ -1340,6 +1429,23 @@ with tabs[2]:
                 for v in values:
                     if v not in all_fields:
                         all_fields.append(v)
+
+        # Also fetch all actual column names from DB to show unassigned fields
+        if collection_name_sel and source_stem_sel:
+            try:
+                from core.db import fetchall as _val_fetchall
+                _raw_rows = _val_fetchall("""
+                    SELECT DISTINCT jsonb_object_keys(payload->'description_fields') AS col
+                    FROM chunks
+                    WHERE collection_name = %s
+                    AND payload->>'source_file' ILIKE %s
+                    LIMIT 200
+                """, (collection_name_sel, f"%{source_stem_sel}%"))
+                for r in _raw_rows:
+                    if r['col'] and r['col'] not in all_fields:
+                        all_fields.append(r['col'])
+            except Exception:
+                pass
 
         all_fields = sorted(all_fields)
 
@@ -1638,6 +1744,12 @@ with tabs[3]:
         #    f"Description field: description"
         #)
 
+        from core.background_runner import is_cross_link_running, get_running_tasks
+        if is_cross_link_running():
+            _running = get_running_tasks()
+            _cols = ", ".join(t['collection'] for t in _running)
+            st.info(f"⚙️ Cross-link discovery running in background for: {_cols}")
+
         question = st.text_area(
             "Question",
             key="ask_question_input",
@@ -1678,6 +1790,18 @@ with tabs[3]:
             key="ask_show_ocr_expanders"
         )
 
+        show_exact_links = st.checkbox(
+            "Show exact cross-links",
+            value=True,
+            key="ask_show_exact_links"
+        )
+
+        show_related_topics = st.checkbox(
+            "Show related topics",
+            value=True,
+            key="ask_show_related_topics"
+        )
+
         if st.button("Ask", key="ask_run_button"):
             if not question.strip():
                 st.warning("Enter a question.")
@@ -1710,7 +1834,9 @@ with tabs[3]:
                             query_run = run_query_with_method(
                                 selected_collection,
                                 question,
-                                limit=200
+                                limit=200,
+                                show_exact_links=show_exact_links,
+                                show_related_topics=show_related_topics,
                             )
 
                             if query_run.get("method") in {"discovery_count", "discovery_list"}:
@@ -1722,6 +1848,7 @@ with tabs[3]:
 
                     st.session_state.ask_result = result
                     st.session_state.ask_answer_payload = query_run.get("answer_payload")
+                    st.session_state.ask_related_sections = query_run.get("related_sections", [])
                     st.session_state.ask_method = query_run["method"]
                     st.session_state.ask_method_reason = query_run["reason"]
                     st.session_state.ask_related_titles = []
@@ -2048,10 +2175,18 @@ with tabs[3]:
                             "related_titles": answer_payload.get("related_titles"),
                             "source_file": answer_payload.get("source_file"),
                         })
-                elif method_used not in {"discovery_count", "discovery_list", "comparison"}:
+                elif method_used not in {"discovery_count", "discovery_list", "comparison", "identifier_lookup"}:
                     st.caption("No answer payload available for image rendering.")
 
-                related_titles = st.session_state.ask_related_titles
+                # Related sections from cross-links + concept similarity
+                _related_sections = st.session_state.get("ask_related_sections", [])
+                if _related_sections:
+                    st.markdown("---")
+                    st.markdown("**Related from other collections:**")
+                    for _sec in _related_sections:
+                        _label = f"[{_sec['collection']}] {_sec['title']} — {_sec['match_type']} ({_sec['confidence']:.2f})"
+                        with st.expander(_label):
+                            st.markdown(_sec['preview'])
 
                 related_titles = st.session_state.ask_related_titles
                 if related_titles:
@@ -2574,7 +2709,96 @@ with tabs[6]:
 
 with tabs[7]:
     st.subheader("Chat")
-    st.info("Chat tab scaffold ready.")
+
+    # Session state init
+    if "chat_history" not in st.session_state:
+        st.session_state.chat_history = []
+
+    from core.background_runner import is_cross_link_running, get_running_tasks
+    if is_cross_link_running():
+        _running = get_running_tasks()
+        _cols = ", ".join(t['collection'] for t in _running)
+        st.info(f"⚙️ Cross-link discovery running in background for: {_cols}")
+
+    # Collection selector
+    chat_collections = sorted(collections_cfg.keys())
+    # Default operational collections for auto-routing
+    _default_chat_cols = [c for c in ["recon_assist_file", "obsidian", "kb_docs", "xml_test", "bbg_fields"] if c in collections_cfg]
+    chat_col_select = st.multiselect(
+        "Collections to search (leave empty for auto-select)",
+        chat_collections,
+        key="chat_collection_select"
+    )
+    available_cols = chat_col_select if chat_col_select else _default_chat_cols
+
+    # Clear button
+    if st.button("Clear chat", key="chat_clear"):
+        st.session_state.chat_history = []
+        st.rerun()
+
+    # Display history
+    for msg in st.session_state.chat_history:
+        if msg["role"] == "user":
+            with st.chat_message("user"):
+                st.markdown(msg["content"])
+        else:
+            with st.chat_message("assistant"):
+                _payload = msg.get("answer_payload")
+                _source_image_items = []
+                if _payload:
+                    _ocr_by_target = {
+                        e.get("image_target"): e.get("ocr_text", "")
+                        for e in (_payload.get("embedded_image_ocr_map") or [])
+                    }
+                    _targets = _payload.get("embedded_image_targets") or []
+                    _source_image_items = [
+                        {
+                            "path": p,
+                            "caption": _targets[i] if i < len(_targets) else None,
+                            "ocr": _ocr_by_target.get(_targets[i] if i < len(_targets) else "", ""),
+                        }
+                        for i, p in enumerate(_payload.get("embedded_image_paths") or [])
+                    ]
+
+                st.write(f"DEBUG payload: {bool(_payload)}, images: {len(_source_image_items)}")
+
+                render_answer_with_inline_images(
+                    msg["content"],
+                    image_items=_source_image_items,
+                    show_images=True,
+                    show_inline_ocr=False,
+                    show_ocr_expanders=True,
+                )
+                if msg.get("collection"):
+                    st.caption(f"Source: {msg['collection']} | Method: {msg.get('method', '')}")
+                if msg.get("related_sections"):
+                    st.markdown("**Related:**")
+                    for sec in msg["related_sections"]:
+                        label = f"[{sec['collection']}] {sec['title']} ({sec['match_type']}, {sec['confidence']:.2f})"
+                        with st.expander(label):
+                            render_answer_with_inline_images(
+                                sec.get("preview") or "",
+                                image_items=[],
+                                show_images=True,
+                                show_inline_ocr=False,
+                                show_ocr_expanders=True,
+                            )
+
+    # Input
+    user_input = st.chat_input("Ask anything...", key="chat_input")
+    if user_input:
+        st.session_state.chat_history.append({"role": "user", "content": user_input})
+
+        with st.spinner("Thinking..."):
+            from core.chat_engine import chat_turn
+            response = chat_turn(
+                user_input,
+                st.session_state.chat_history[:-1],
+                available_cols
+            )
+
+        st.session_state.chat_history.append(response)
+        st.rerun()
 
 with tabs[8]:
     from core.ui_data_prep import render_data_prep_tab

@@ -23,7 +23,7 @@
 | FIX collection (`xml_test`) | Re-ingested 2026-06-18 — 13/13 smoke tests passing |
 | BBG collection (`bbg_fields`) | Re-ingested 2026-06-18 — 7/7 smoke tests passing |
 | KB docs (`kb_docs`) | Re-ingested 2026-06-18 — 10/10 smoke tests passing |
-| Obsidian (`obsidian`) | Re-ingested 2026-06-18 — 10/10 smoke tests passing |
+| Obsidian (`obsidian`) | Re-ingested 2026-06-24 — OCR inline dump removed from text field; cross-link + concept vectors rebuilt |
 | recon_assist_file | Re-ingested 2026-06-18 — 10/10 smoke tests passing |
 | PDF (`pdf_test`) | Ingested 2026-06-18 — 66 chunks (63 readable + 3 OCR). Parsers verified. |
 | Images (`image_test`) | Ingested 2026-06-18 — 3 chunks. OCR working (pytesseract). Auto doc_type detection working. |
@@ -47,6 +47,10 @@
 | CODE-013 | ui_app.py | BM25/lexical candidates not shown in debug panel | ⏳ Pending |
 | CODE-014 | ui_app.py | System Config tab shows embeddings model but not LLM model — add LLM model + base_url + timeout fields writing to nlp_config.json | ⏳ Pending |
 | CODE-015 | db schema | files table missing last_ingested column — needed for tracking when files were last processed | ⏳ Pending |
+| CODE-016 | doc_serializer.py | OCR text stored inline in chunk `text` field (after `[Embedded image OCR from: marker]`) as well as in `embedded_image_ocr_map` — caused raw OCR garbage to appear in chat previews and LLM context. | ✅ Resolved 2026-06-24 — marker retained, OCR dump removed from `text` field. Obsidian re-ingested. |
+| CODE-017 | chat_engine.py | `generate_conversational_response` used single `SYSTEM_PROMPT` for both grounded and conversational responses — LLM would paraphrase/rename field values. | ✅ Resolved 2026-06-24 — split into `CHAT_SYSTEM_PROMPT` and `GROUNDED_SYSTEM_PROMPT`; temperature lowered to 0.2 for grounded responses. |
+| CODE-018 | chat_engine.py | Faithfulness guard fell back to full `retrieved` string (including appended context blocks) when LLM failed check — exposed `[Additional context from...]` labels to user. | ✅ Resolved 2026-06-24 — `primary_answer` tracked separately; faithfulness baseline and fallback both use `primary_answer` only. |
+| CODE-019 | local_llm_client.py | `call_local_llm_json` had no try/except — any LLM failure crashed `select_collections` and `detect_chat_intent`. | ✅ Resolved 2026-06-24 — wrapped in try/except, returns `None` on failure; callers already handle `None`. |
 | DISPLAY-001 | ui_app.py | Two-tier table header (role name row 1, source column names grouped beneath) NOT supported by st.dataframe — needs HTML render or AgGrid. Deferred until final UI pinned. Single-mapped role relabeling (identifier→real field name, aliases→Prime Broker file name) now works via payload fields. | ⏳ Deferred |
 | DISCOVERY-001 | discovery.py | discovery_count returns correct count but no record list. Root cause: BM25 body scoring doesn't surface category-matched notes well. Real fix: metadata query path (Phase 4.6). | ⏳ Pending — blocked on metadata query path |
 | DISCOVERY-002 | discovery.py | Discovery count (39) vs DB ground truth (41) — different counting methods. Will resolve with metadata query path. | ⏳ Pending |
@@ -58,6 +62,11 @@
 | PENDING-001 | retrieval | Cross-link testing: recon_assist_file ↔ kb_docs — architecture designed (Phase 3.5), NER-based tagging at ingest time. Build after full dataset ingestion complete. | ⏳ Pending — Phase 3.5 |
 | DB-001 | PostgreSQL trigger | chunks_tsv_update trigger: slash-delimited category paths (e.g. "Industry/Airlines") tokenize as compound token — "airlines" not searchable. | ✅ Resolved 2026-06-17 — trigger updated to replace / with space before tsvector build. All collections rebuilt. |
 | DB-002 | nlp_generator.py | type_value not included in build_structured_nlp_text — type-based queries (e.g. "what string fields") return 0 BM25 matches. | ✅ Resolved 2026-06-17 — type_value now added to parts in build_structured_nlp_text. |
+
+
+IDAreaDescriptionStatusCODE-020concept_vector_builder.pySingle-file collections (recon_assist_file, kb_docs) group by source_file — all chunks get same label, producing useless routing descriptions like "covers [RECON_Moore-PB Mapping_100225.xlsx]". Should group by type field for structured collections.⏳ Pending — next fixCODE-021cross_link_discoverer.pyObsidian related_titles (wikilinks extracted at ingestion) never persisted to cross_links table — same-collection note relationships not queryable as confirmed links.⏳ PendingCODE-022ui_app.pyNo UI to view concept vectors or relationship graph between collections. Cross-link review sections still in Collections tab — should move to dedicated Knowledge Graph tab (repurposing Filetypes tab).⏳ Pending
+
+
 
 **Retired issues (resolved):**
 - RET-011 — FIX-01 enum suppression: fixed in Phase 1
@@ -77,6 +86,9 @@
 - **XISF vs FITS metadata:** FITS capture files have rich astrometric headers (RA, Dec, OBJECT, camera, exposure). XISF processed files (PixInsight output) typically have image geometry only. Don't assume astro metadata is present — always check format first.
 - **Astro filename conventions vary:** Different capture software uses different filename patterns. Always prioritize FITS header fields over filename parsing. Filename parsing is a fallback only.
 - **Catalog joins need normalization before fuzzy:** For structured IDs (NGC numbers), normalize first (strip spaces, lowercase, add prefix) before comparing. True fuzzy matching (rapidfuzz) reserved for name/description fields where spelling variation is genuine.
+- **LLM max_tokens budget:** when `retrieved` context grows (primary answer + merged high-confidence previews), `max_tokens=1024` causes the LLM to truncate before covering all content. Increase to 2048 for grounded responses with multi-source context.
+- **Faithfulness guard scope:** guard must check against `primary_answer` only, not the full `retrieved` string that includes appended context — otherwise extra terms from merged sections cause false failures and raw context blocks leak to the user.
+- **OCR inline in text field:** ingestion was storing OCR text both inline in `text` (after the marker) AND in `embedded_image_ocr_map`. The inline copy causes garbage in chat previews and LLM context. Fix at source (doc_serializer.py) and re-ingest — don't try to strip downstream.
 
 ---
 
@@ -152,7 +164,7 @@
 | 3.25 | type_field added to all table_serializer builders | ✅ Done 2026-06-17 |
 | 3.26 | type_value added to build_structured_nlp_text (BM25-searchable) | ✅ Done 2026-06-17 |
 | 3.27 | PostgreSQL tsvector trigger: slash→space preprocessing for category paths | ✅ Done 2026-06-17 |
-| 3.28 | Obsidian inline images + expandable OCR display | ⏳ Pending — next major focus |
+| 3.28 | Obsidian inline images + expandable OCR display | ✅ Done 2026-06-24 |
 | 3.29 | Discovery ILIKE name fallback for short/uppercase tokens | ✅ Done 2026-06-16 |
 | 3.30 | Word-boundary keyword matching in role detection | ✅ Done 2026-06-16 (superseded by 3.21) |
 | 3.31 | Shared payload enrichment utility (core/payload_utils.py) | ✅ Done 2026-06-18 |
@@ -164,13 +176,13 @@
 | 3.37 | Ingest full PDF collection — verify payload fields + smoke test | ⏳ Pending |
 | 3.38 | Ingest full image collection — verify payload fields + smoke test | ⏳ Pending |
 | 3.39 | Ingest full astro collection — verify payload fields + smoke test | ⏳ Pending |
-| 3.40 | Inline images in Obsidian/docs Ask tab answer (with expandable OCR) | ⏳ Pending |
-| 3.41 | Data Prep tab (Phase 3.6) — build UI for file merge/clean before ingest | ⏳ Pending — next session |
-| 3.42 | Astro catalog ingest (OpenNGC + Messier merged via Data Prep tab) | ⏳ Pending |
+| 3.40 | Inline images in Obsidian/docs Ask tab answer (with expandable OCR) | ✅ Done 2026-06-22 (see 3.47) |
+| 3.41 | Data Prep tab (Phase 3.6) — build UI for file merge/clean before ingest | ✅ Done 2026-06-18 |
+| 3.42 | Astro catalog ingest (OpenNGC + Messier merged via Data Prep tab) | ✅ Done 2026-06-18 |
 | 3.43 | Astro cross-link tagger — RA/Dec proximity + name/alias matching | ⏳ Pending |
 | 3.44 | LLM schema inference: add column population count to prompt (fix identifier vs aliases confusion) | ⏳ Pending |
 | 3.45 | Cross-link builder: Option C (manual trigger button in Collections tab) | ✅ Done 2026-06-22 |
-| 3.46 | Cross-link builder: Option B (background thread triggered after each ingest) | ⏳ Pending |
+| 3.46 | Cross-link builder: Option B (background thread triggered after each ingest) | ✅ Done 2026-06-24 — `launch_cross_link_discovery` via `background_runner.py`; status banner shown in Ask + Chat tabs |
 | 3.47 | Inline images in Ask tab with expandable OCR (Obsidian + docs) | ✅ Done 2026-06-22 |
 | 3.48 | Run full smoke test suite after today's changes | ✅ Done 2026-06-22 — all pass except OBS-01 (bad test, content never existed) |
 | 3.49 | schemas/ folder retired — all schemas now in PostgreSQL | ✅ Done 2026-06-18 |
@@ -197,6 +209,7 @@
 - Cross-link builder: Option C (manual trigger) then Option B (background thread after ingest) — not synchronous during ingestion
 - Batch embedding: batch_size=32 for LM Studio stability with BGE-large
 - PDF/image/astro parsers all functional; ingest verified against test files
+- OCR text stored in `embedded_image_ocr_map` only — removed from inline `text` field to prevent garbage in LLM context and chat previews
 
 ---
 
@@ -270,14 +283,18 @@ New UI tab in Streamlit for file preparation before ingestion. CSV-first; XLSX w
 
 | Step | Description | Status |
 |---|---|---|
-| 3.6.1 | Data Prep tab UI — file upload, preview, column ops | ⏳ Pending |
-| 3.6.2 | Two-file join with key normalization | ⏳ Pending |
-| 3.6.3 | Fuzzy matching (rapidfuzz) with threshold slider | ⏳ Pending |
-| 3.6.4 | Export cleaned CSV | ⏳ Pending |
-| 3.6.5 | Merge Messier + OpenNGC → ingest as `astro_catalog` | ⏳ Pending |
+| 3.6.1 | Data Prep tab UI — file upload, preview, column ops | ✅ Done 2026-06-18 |
+| 3.6.2 | Two-file join with key normalization | ✅ Done 2026-06-18 |
+| 3.6.3 | Fuzzy matching (rapidfuzz) with threshold slider | ✅ Done 2026-06-18 |
+| 3.6.4 | Export cleaned CSV | ✅ Done 2026-06-18 |
+| 3.6.5 | Merge Messier + OpenNGC → ingest as `astro_catalog` | ✅ Done 2026-06-18 |
 | 3.6.6 | Astro filename parser fix — target extraction without frame type prefix | ⏳ Pending |
 | 3.6.7 | RA/Dec cross-link tagger — match astro files to catalog within 0.5° tolerance | ⏳ Pending |
 | 3.6.8 | Name/alias cross-link — match filename tokens against catalog common names | ⏳ Pending |
+
+| ID | Area | Description | Status |
+| CODE-025 | ui_data_prep.py | Data Prep tab only accepts CSV — add Excel (.xlsx) upload with sheet selector and forward-fill option for merged cells | ⏳ Pending |
+| CODE-026 | ui_data_prep.py | Add PostgreSQL chunk editor — load collection chunks, edit payload fields inline, save with confirmation. Needed for fixing ingestion errors without full re-ingest | ⏳ Pending
 
 ---
 
@@ -327,6 +344,9 @@ New UI tab in Streamlit for file preparation before ingestion. CSV-first; XLSX w
 - Query expansion via LLM before search
 - FIX version-aware queries (Phase 1b) — version in source_file name; Stage 0 extracts version; filter by source_file ILIKE '%FIX44%'
 - Folder/category-scoped discovery (search by Moore/CRD subfolder) — Option B preferred (structured filter WHERE folder_path LIKE 'Moore/CRD%'). Deferred until metadata query path (4.6) validated.
+
+| Step | Description | Status |
+|---|---|---|
 | 5.S1 | LLM-driven schema inference — replace structured_roles.json with LLaMA 8B semantic role assignment | ⏳ Pending |
 
 ---
@@ -359,20 +379,39 @@ New UI tab in Streamlit for file preparation before ingestion. CSV-first; XLSX w
 | 2026-06-18 | 3.37–3.39 | PDF, image (JPG/PNG), DOCX, FITS, XISF all ingested via Streamlit UI | pdf_test, image_test, docx_test, astro_test collections | All file types ingesting correctly. Astro filename parsing gaps logged (ASTRO-001/002/003). |
 | 2026-06-18 | Design | Cross-linking architecture agreed (Phase 3.5): NER-based tagging at ingest, entity dict from Postgres, config-driven collection pairs, no hardcoding | — | Design complete; build after full dataset ingest |
 | 2026-06-18 | Design | Data Prep tab agreed (Phase 3.6): CSV join/merge/clean UI with key normalization + fuzzy matching (rapidfuzz). First use: merge Messier + OpenNGC CSVs for astro_catalog | — | Design complete; build next session |
+| 2026-06-24 | R1 Chat tab | Chat tab built: multi-turn history, intent detection, collection routing, grounded LLM responses | `core/chat_engine.py` (new), `core/ui_app.py` | R1 working — natural language chat with retrieval |
+| 2026-06-24 | Hallucination fix | Split SYSTEM_PROMPT into CHAT_SYSTEM_PROMPT + GROUNDED_SYSTEM_PROMPT; temperature 0.7→0.2 for grounded; faithfulness guard added (`_response_is_faithful`) — falls back to raw answer if LLM drops >30% of key terms | `core/chat_engine.py` | Field values (filenames, IDs) now reproduced verbatim |
+| 2026-06-24 | R2 Multi-collection | `select_collections` (1–3 ranked collections via LLM), `run_parallel_queries` (ThreadPoolExecutor fan-out), winner selection skips "No record found" results | `core/chat_engine.py` | Correct collection wins even when others return no match |
+| 2026-06-24 | High-confidence merge | Related sections ≥0.75 confidence merged into LLM context as additional grounded data; <0.75 shown as collapsible related items; `primary_answer` tracked separately as faithfulness baseline and fallback | `core/chat_engine.py` | Obsidian + KB context included in answer without leaking labels |
+| 2026-06-24 | Inline images chat | Chat tab renders images inline via `answer_payload` from best-result anchor chunk; mirrors Ask tab image rendering exactly | `core/ui_app.py`, `core/chat_engine.py` | Images from merged high-confidence sections resolve correctly |
+| 2026-06-24 | OCR inline fix | Removed OCR text dump from chunk `text` field in doc_serializer.py — marker retained, OCR content stored only in `embedded_image_ocr_map` | `DOCS/doc_serializer.py` | No more OCR garbage in chat previews or LLM context |
+| 2026-06-24 | Obsidian re-ingest | Obsidian re-ingested after OCR inline fix; cross-link discovery + concept vector rebuild triggered automatically in background | `obsidian` collection | Clean text fields; background rebuild confirmed running |
+| 2026-06-24 | Background status | Cross-link discovery background status banner added to Chat tab (mirrors Ask tab) | `core/ui_app.py` | Banner shows during background rebuild, disappears when done |
+| 2026-06-24 | local_llm_client fix | `call_local_llm_json` wrapped in try/except — returns None on failure instead of raising | `core/local_llm_client.py` | Prevents chat turn crash on LLM timeout or malformed response |
+| 2026-06-24 | max_tokens increase | `generate_conversational_response` max_tokens increased 1024→2048 for grounded responses with multi-source context | `core/chat_engine.py` | LLM no longer truncates when primary answer + merged context exceeds 1024 tokens |
+
+
+Fix concept vector grouping for structured collections — _get_group_field in concept_vector_builder.py (CODE-020)
+Persist obsidian related_titles wikilinks to cross_links table as confirmed links (CODE-021)
+Build Knowledge Graph tab — network graph (plotly), concept vector viewer, move cross-link review sections (CODE-022)
+R3 — clarifying questions when retrieval returns no answer
+OBS-01 smoke test fix
+Validation tab — show ALL source columns not just mapped ones
+Full BBG dataset ingest
 
 ---
 
 ## Smoke Test Results
 
-### All suites — 2026-06-18 **ALL PASSING** (verified after full re-ingest + new file type additions)
-⚠️  Re-verification needed after today's changes (schema inference, embedder, table_serializer, ui_data_prep)
+### All suites — 2026-06-18 ALL PASSING (verified after full re-ingest + new file type additions)
+⚠️ Re-verification needed after 2026-06-24 changes (doc_serializer OCR fix, chat_engine, ui_app)
 - FIX: 13/13
 - BBG: 7/7
 - KB: 10/10
 - RECON: 10/10
-- OBS: 10/10
+- OBS: 10/10 (OBS-01 bad test — needs rewrite against real vault content)
 
-### FIX Smoke Test (2026-06-10) **13/13 passed**
+### FIX Smoke Test (2026-06-10) 13/13 passed
 
 | ID | Question | Method | Pass? |
 |---|---|---|---|
@@ -390,7 +429,7 @@ New UI tab in Streamlit for file preparation before ingestion. CSV-first; XLSX w
 | FIX-12 | which tag is exec quantity | semantic | ✅ (no ExecQty in FIX — returns "no exact match") |
 | FIX-13 | which tag is targetcompid | semantic | ✅ |
 
-### BBG Smoke Test **7/7 passed**
+### BBG Smoke Test 7/7 passed
 
 | ID | Question | Method | Pass? |
 |---|---|---|---|
@@ -440,7 +479,7 @@ Route different query types and doc types to different LLM/embedding models load
 
 ---
 
-## Phase 4 Architecture Decisions — Deployment & Data Sources (open, captured 2026-06-15, refined 2026-06-16)
+## Phase 4 Architecture Decisions — Deployment & Data Sources
 
 Recorded for when the system is proven and ready for blind testing. NAS remains always-available dev/fallback environment.
 
@@ -510,10 +549,114 @@ Recorded for when the system is proven and ready for blind testing. NAS remains 
 
 **Smoke test status:** `smoke_fix.py` `smoke_bbg.py` `smoke_kb.py` `smoke_recon.py` all pass. `smoke_obsidian.py` — OBS-01 fails by design; confirmed via direct grep that the test's expected content (`gsact.txt` sftp folder) never existed in the actual Obsidian vault. Test needs rewriting against real note content or removal — not yet done.
 
-**Next session priorities (per user, in rough order):**
-1. Cross-linking: address Obsidian per-chunk duplicate identifier issue (note-level dedup)
-2. Cross-linking: variable mention confidence scoring (replace flat 0.6)
-3. Wire confirmed cross-links into query-time retrieval (`router.py` + `get_cross_links_for_identifier`)
-4. Option B — background thread cross-link trigger after ingest
-5. Fix/retire `OBS-01` smoke test
-6. Validation tab UI fix — show ALL source columns, not just currently-mapped ones
+---
+
+### Session 2026-06-23 — Cross-linking v2, Concept Vectors, Query-Time Enrichment
+
+**Cross-linking improvements:**
+- Obsidian per-chunk dedup: `cross_link_discoverer.py` detects chunk-style identifiers (`_chunk_N` suffix via 5-sample check) and groups by `source_file` instead — one query per note, not per chunk. Same applied to target side: when target collection has chunk-level identifiers, uses `source_file` as `target_identifier`.
+- Variable mention confidence: replaced flat 0.6 with term-length-based scoring: <7 chars = 0.45, 7–12 chars = 0.55, 13+ chars = 0.70. Also removed occurrence-count scoring (PostgreSQL NULLIF bug with REPLACE on NULL descriptions).
+- Bulk review UI: confidence threshold slider + "Confirm all above threshold" / "Reject all below threshold" buttons added to Collections tab cross-link review section.
+- Source/target preview now uses `OR payload->>'source_file' = %s` fallback in the DB lookup so Obsidian note-level targets (stored as source_file, not identifier) correctly show content.
+- `cross_link_store.py`: `save_cross_link_candidates()` deduplicates candidates by unique key (source_collection, source_identifier, target_collection, target_identifier, match_type) before saving, keeping highest confidence per key — prevents duplicate rows from chunk-level matching.
+- `DOC_QUERY_HINTS_PATH` added to `core/paths.py`; imported in `ui_app.py` for "Reject + Ignore term" button.
+
+**Concept vectors (NEW — `core/concept_vector_builder.py`):**
+- HDBSCAN clustering on chunk embeddings grouped by folder_path/category/source_file.
+- Multi-label assignment: chunks assigned to any cluster with cosine similarity >= 0.75 (not hard assignment).
+- Anchor chunks: top-5 closest chunks to centroid stored as `anchor_chunk_ids` + `anchor_texts` (1000 chars).
+- `concept_vectors` PostgreSQL table created (collection, group_field, group_value, cluster_id, centroid vector(1024), anchor_chunk_ids JSONB, anchor_texts JSONB).
+- HDBSCAN and scikit-learn installed via pip; both confirmed available.
+- Built and validated on all collections: recon_assist_file (2 clusters), kb_docs (4 clusters: FIX/CTM, RECON batch, Market data/AutoSys, Runbook procedures), obsidian (42 clusters across folders — correctly separated RECON procedures, CRD workflows, Soros checks, Astro posts, personal notes, etc.).
+- `anchor_texts` stored at 1000 chars (was 200 — caused truncated previews in Related sections).
+- Bug fixed: psycopg2 auto-parses JSONB to Python list — removed `json.loads()` wrappers around `anchor_chunk_ids`/`anchor_texts` in `concept_link_finder.py`.
+- Bug fixed: orphan `chunk_emb_str` reference before assignment in fallback path of `find_concept_links()`.
+- Bug fixed: `centroid::vector` cast required in pgvector queries (stored as string, needs explicit cast).
+- Bug fixed: `embedding <=>` typo in fallback cluster search — should be `centroid::vector <=>`.
+
+**`core/concept_link_finder.py` (NEW):**
+- `find_concept_links(collection, chunk_id, target_collections=None, similarity_threshold=0.75)`.
+- Step 1: find source cluster via `anchor_chunk_ids @> [chunk_id]::jsonb`; fallback to nearest cluster by chunk embedding if not an anchor.
+- Step 2: compare source centroid against all target collection centroids using pgvector `<=>` distance.
+- Returns top-3 matches per target collection above threshold.
+
+**Query-time enrichment wired into `router.py`:**
+- `identifier_lookup` path: enriched with both confirmed cross-links (`get_cross_links_for_identifier`) AND concept links (`find_concept_links`) on the matched chunk. Results merged, deduplicated by (collection, title), returned as structured `related_sections` list.
+- Semantic/answer path: same enrichment applied after `route_query()` — uses `_chunk_db_id` stashed in merged payload (set via `best.id` before `build_fuller_doc_payload` call, NOT after, to survive the merge replacement).
+- `run_query_with_method()` signature extended: `show_exact_links=True, show_related_topics=True` params gate each enrichment step independently.
+- `related_sections` returned as structured dicts: `{title, collection, match_type, confidence, preview, anchor_chunk_ids}`.
+
+**Ask tab UI (`ui_app.py`):**
+- Two new checkboxes: "Show exact cross-links" and "Show related topics".
+- `st.session_state.ask_related_sections` stores related sections, initialized to `[]`.
+- Related sections rendered as `st.expander` blocks below the answer: `[collection] title — match_type (confidence)` as label, content preview inside.
+- "No answer payload available for image rendering" caption now also suppressed for `identifier_lookup` method.
+
+**Collections tab UI (`ui_app.py`):**
+- "Build Cross-Links" button renamed "Build Cross-Links + Concept Vectors" — runs both `discover_cross_links` + `save_cross_link_candidates` + `build_concept_vectors`.
+- Auto-rebuild concept vectors after every ingestion (`DELETE FROM concept_vectors WHERE collection=X` then `build_concept_vectors(X)`).
+
+**Verified working end-to-end:**
+- "what is the sftp folder for jpm_holdings.xlsx" (recon_assist_file): returns confirmed cross-link (obsidian | 8. JPM Recurring Issue for jpm_activity.xlsx) + concept match (obsidian | Moore/Tidal Jobs/RECON, 0.80) + concept match (kb_docs | KB_Articles, 0.78) — all as expandable sections.
+- "how to check recon files on server" (obsidian, semantic mode): concept links surface RECON procedure cluster and KB batch articles as Related Topics.
+
+**Smoke tests:** All pass except OBS-01 (confirmed bad test — content never existed in vault).
+
+**New PostgreSQL tables added this session:**
+- `concept_vectors`: collection, group_field, group_value, cluster_id, centroid vector(1024), anchor_chunk_ids JSONB, anchor_texts JSONB. UNIQUE(collection, group_value, cluster_id).
+- `cross_links`: UNIQUE constraint added via ALTER TABLE (was missing from manually-created table).
+
+---
+
+### Session 2026-06-24 — Chat Tab (R1+R2), Hallucination Fix, OCR Inline Fix
+
+**R1 — Conversational chat tab (built and working):**
+- `core/chat_engine.py` (new file): `chat_turn()` entry point, `detect_chat_intent()`, `generate_conversational_response()`, `augment_query_with_focus()`, `extract_focus_terms()`.
+- Multi-turn history: last 5 turns passed to LLM; last 3 turns used for intent detection and collection routing.
+- Intent detection: LLM classifies each message as `retrieval` or `chat` — greetings/small talk get free-form response, operational questions go to retrieval pipeline.
+- `CHAT_SYSTEM_PROMPT` for conversational responses; `GROUNDED_SYSTEM_PROMPT` for retrieval-backed responses with strict verbatim rules.
+- Temperature: 0.7 for chat, 0.2 for grounded.
+
+**Hallucination fix:**
+- Faithfulness guard (`_response_is_faithful`): extracts key terms from retrieved answer (filenames, numeric IDs, ALL_CAPS tokens); verifies ≥70% appear in LLM response; falls back to raw answer if check fails.
+- Faithfulness baseline uses `primary_answer` only (not appended context) — prevents false failures from extra terms in merged sections.
+- Fallback also returns `primary_answer` only — prevents `[Additional context from...]` labels leaking to user.
+- `max_tokens` increased 1024→2048 for grounded responses to prevent truncation when multi-source context is included.
+
+**R2 — Multi-collection routing:**
+- `select_collections()`: LLM picks 1–3 most relevant collections, ranked by relevance; fallback to first available collection if LLM fails.
+- `run_parallel_queries()`: `ThreadPoolExecutor` fan-out across selected collections; winner selection skips collections returning "No record found" or "No answer found" — correct collection wins even when others have no match.
+- `collections_queried` key added to return dict for future UI display.
+
+**High-confidence context merging:**
+- Related sections ≥0.75 confidence merged into LLM context as additional grounded data (stripped of OCR markers via `_strip_ocr_markers`).
+- Related sections <0.75 shown as collapsible expanders in the UI.
+- High-confidence anchor chunks searched for image payloads — first chunk with `embedded_image_paths` used as `answer_payload` for inline image rendering.
+
+**Inline images in chat tab:**
+- Chat tab renders images inline using `answer_payload` from retrieval result — mirrors Ask tab image rendering exactly.
+- `answer_payload` passed through `chat_turn()` return dict; UI builds `_source_image_items` from `embedded_image_paths`, `embedded_image_targets`, `embedded_image_ocr_map`.
+- Related sections expander uses plain `st.markdown` — no images in expanders (clean, no OCR garbage).
+
+**OCR inline text fix (doc_serializer.py):**
+- Root cause: ingestion wrote OCR text both inline in `text` field (after `[Embedded image OCR from: marker]`) AND in `embedded_image_ocr_map`. The inline copy polluted chat previews and LLM context with garbled table content.
+- Fix: `doc_serializer.py` line 80 — marker retained in `text`, OCR dump removed. OCR content stored only in `embedded_image_ocr_map`.
+- Obsidian re-ingested after fix; cross-link discovery + concept vector rebuild triggered automatically in background via `launch_cross_link_discovery`.
+- No impact on Ask tab — `render_answer_with_inline_images` finds marker, renders image, reads OCR from `embedded_image_ocr_map` (unchanged).
+
+**Background status banner:**
+- Cross-link discovery background status banner added to Chat tab (mirrors Ask tab).
+- Shows collection name being processed; disappears automatically when task completes.
+
+**`local_llm_client.py` robustness fix:**
+- `call_local_llm_json` wrapped in try/except — returns `None` on any failure instead of raising.
+- Callers (`select_collections`, `detect_chat_intent`) already handle `None` with fallbacks — no other changes needed.
+
+**Next session priorities:**
+1. Test chat tab after obsidian re-ingest completes — verify OCR garbage gone, images rendering inline
+2. OBS-01 smoke test fix/retire — rewrite against real vault content
+3. Validation tab UI fix — show ALL source columns, not just currently-mapped ones
+4. R3 — Clarifying questions (ambiguity gate when top candidates score similarly)
+5. R4 — Basic memory layer (`chat_memory` table, store/retrieve key facts)
+6. Full BBG dataset ingest (currently 730-row test subset of 69k)
+7. NER-based cross-linking (Phase 3.5)

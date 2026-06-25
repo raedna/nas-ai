@@ -414,6 +414,7 @@ def route_query(
     # Use the best point — check doc_type before reranking
     best = points[0]
     payload = best.payload or {}
+    payload["_chunk_db_id"] = str(getattr(best, "id", "") or "")
     doc_type = infer_doc_type(payload)
 
    # DISABLED RERANKER USING MINILM AFTER CHANGING RERANKING PROCESS TO NOT RELY ON RRF SCORE
@@ -459,9 +460,11 @@ def route_query(
         payload = best.payload or {}
 
     payload["_question"] = question
+    _best_chunk_db_id = str(getattr(best, "id", "") or "")
     ## For chunked document payloads, enrich by merging nearby/same-section chunks
     if doc_type not in ("structured", "entity_row"):
         payload = build_fuller_doc_payload(collection, payload) or payload
+    payload["_chunk_db_id"] = _best_chunk_db_id
     route_query._last_answer_payload = payload
     return synthesize_answer(payload, roles, collection)
 
@@ -475,6 +478,10 @@ def run_query_with_method(
     question: str,
     mode: str = "best",
     limit: int = 25,
+    show_exact_links: bool = True,
+    show_related_topics: bool = True,
+    skip_planner: bool = False,
+    force_answer: bool = False,
 ) -> Dict:
     """
     Primary query entry point.  Returns a dict with keys:
@@ -496,11 +503,87 @@ def run_query_with_method(
                 _payload = _pts[0].payload or {}
                 _payload["_question"] = question
                 _roles = _detect_requested_roles(question, {})
+                _answer = synthesize_answer(_payload, _roles, collection)
+
+                # Enrich with cross-links — both confirmed exact links and concept similarity
+                from core.cross_link_store import get_cross_links_for_identifier
+                from core.concept_link_finder import find_concept_links
+                from core.db import fetchall as _fetchall
+                import json as _json
+
+                _related_sections = []
+
+                # Step 1: confirmed exact/name cross-links
+                _links = get_cross_links_for_identifier(collection, _fname, status="confirmed") if show_exact_links else []
+                for _link in _links:
+                    _linked_pts = get_by_identifier(_link["target_collection"], _link["target_identifier"])
+                    if not _linked_pts:
+                        _linked_rows = _fetchall(
+                            "SELECT payload FROM chunks WHERE collection_name = %s AND payload->>'source_file' = %s LIMIT 1",
+                            (_link["target_collection"], _link["target_identifier"])
+                        )
+                        if _linked_rows:
+                            _linked_payload = _linked_rows[0]["payload"] if isinstance(_linked_rows[0]["payload"], dict) else _json.loads(_linked_rows[0]["payload"])
+                            _linked_pts = [type("P", (), {"payload": _linked_payload})()]
+                    if _linked_pts:
+                        _lp = _linked_pts[0].payload or {}
+                        _lname = _lp.get("primary_name") or _link["target_identifier"]
+                        _source_file = _lp.get("source_file") or _link["target_identifier"]
+                        _full = _fetchall(
+                            """SELECT payload->>'text' AS text FROM chunks
+                               WHERE collection_name = %s
+                               AND payload->>'source_file' = %s
+                               ORDER BY id LIMIT 3""",
+                            (_link["target_collection"], _source_file)
+                        )
+                        if _full:
+                            _ldesc = "\n\n".join(r["text"] for r in _full if r["text"])
+                        else:
+                            _ldesc = str(_lp.get("description") or "")
+                        _related_sections.append({
+                            "title": _lname,
+                            "collection": _link["target_collection"],
+                            "match_type": "confirmed",
+                            "confidence": _link.get("confidence", 1.0),
+                            "preview": _ldesc
+                        })
+
+                # Step 2: concept similarity links (semantic cross-collection)
+                _chunk_id = _pts[0].id if hasattr(_pts[0], 'id') else None
+                if _chunk_id and show_related_topics:
+                    _concept_links = find_concept_links(collection, str(_chunk_id))
+                    _seen_targets = {(_link["target_collection"], _link["target_identifier"]) for _link in _links}
+                    for _cl in _concept_links:
+                        _anchor_texts = _cl.get("anchor_texts") or []
+                        _anchor_chunk_ids = _cl.get("anchor_chunk_ids") or []
+                        if _anchor_chunk_ids:
+                            from core.db import fetchall as _fetchall
+                            _full_row = _fetchall(
+                                "SELECT payload->>'text' AS text FROM chunks WHERE id = %s LIMIT 1",
+                                (_anchor_chunk_ids[0],)
+                            )
+                            _preview = _full_row[0]["text"] if _full_row else (_anchor_texts[0] if _anchor_texts else "")
+                        else:
+                            _preview = _anchor_texts[0] if _anchor_texts else ""
+                        _section_key = (_cl["target_collection"], _cl["group_value"])
+                        if _section_key not in _seen_targets:
+                            _seen_targets.add(_section_key)
+                            _related_sections.append({
+                                "title": _cl['group_value'],
+                                "collection": _cl['target_collection'],
+                                "match_type": "concept",
+                                "confidence": round(_cl['similarity'], 2),
+                                "preview": _preview,
+                                "anchor_chunk_ids": _cl.get('anchor_chunk_ids', []),
+                                })
+
                 return {
                     "method": "identifier_lookup",
                     "reason": f"filename identifier detected: {_fname}",
-                    "result": synthesize_answer(_payload, _roles, collection),
+                    "result": _answer,
+                    "related_sections": _related_sections,
                 }
+
             else:
                 try:
                     _similar = fetchall("""
@@ -537,6 +620,8 @@ def run_query_with_method(
 
     from core.retrieval.discovery import llm_detect_intent
     intent = llm_detect_intent(question)
+    if force_answer:
+        intent["mode"] = "answer"
 
     # ------------------------------------------------------------------
     # 1. Relationship queries (before plain namespace lookup)
@@ -643,7 +728,7 @@ def run_query_with_method(
     structured_plan = None
 
     planner_cfg = _get_structured_planner_config()
-    planner_enabled = bool(planner_cfg.get("enabled", True))
+    planner_enabled = bool(planner_cfg.get("enabled", True)) and not skip_planner
     planner_execute = bool(planner_cfg.get("execute", False))
     planner_dry_run = bool(planner_cfg.get("dry_run", True))
     planner_min_confidence = float(planner_cfg.get("min_confidence", 0.7))
@@ -679,11 +764,88 @@ def run_query_with_method(
     # ------------------------------------------------------------------
     method_info = detect_query_mode(question)
 
+    _route_result = route_query(collection, question, mode=mode, limit=limit)
+    _last_payload = getattr(route_query, "_last_answer_payload", None)
+    _related_sections = []
+
+    if _last_payload and (show_exact_links or show_related_topics):
+        from core.cross_link_store import get_cross_links_for_identifier
+        from core.concept_link_finder import find_concept_links
+        from core.db import fetchall as _fetchall
+        import json as _json
+
+        _identifier = _last_payload.get("identifier")
+        _chunk_id = str(_last_payload.get("_chunk_db_id") or "")
+
+        if show_exact_links and _identifier:
+            _links = get_cross_links_for_identifier(collection, _identifier, status="confirmed")
+            for _link in _links:
+                from core.retrieval.db_retrieval import get_by_identifier
+                _linked_pts = get_by_identifier(_link["target_collection"], _link["target_identifier"])
+                if not _linked_pts:
+                    _linked_rows = _fetchall(
+                        "SELECT payload FROM chunks WHERE collection_name = %s AND payload->>'source_file' = %s LIMIT 1",
+                        (_link["target_collection"], _link["target_identifier"])
+                    )
+                    if _linked_rows:
+                        _lp = _linked_rows[0]["payload"] if isinstance(_linked_rows[0]["payload"], dict) else _json.loads(_linked_rows[0]["payload"])
+                        _linked_pts = [type("P", (), {"payload": _lp})()]
+                if _linked_pts:
+                    _lp = _linked_pts[0].payload or {}
+                    _lname = _lp.get("primary_name") or _link["target_identifier"]
+                    _source_file = _lp.get("source_file") or _link["target_identifier"]
+                    _full = _fetchall(
+                        """SELECT payload->>'text' AS text FROM chunks
+                           WHERE collection_name = %s
+                           AND payload->>'source_file' = %s
+                           ORDER BY id LIMIT 3""",
+                        (_link["target_collection"], _source_file)
+                    )
+                    if _full:
+                        _ldesc = "\n\n".join(r["text"] for r in _full if r["text"])
+                    else:
+                        _ldesc = str(_lp.get("description") or "")
+                    _related_sections.append({
+                        "title": _lname,
+                        "collection": _link["target_collection"],
+                        "match_type": "confirmed",
+                        "confidence": _link.get("confidence", 1.0),
+                        "preview": _ldesc
+                    })
+
+        if show_related_topics and _chunk_id:
+            _concept_links = find_concept_links(collection, _chunk_id)
+            _seen = {(_s["collection"], _s["title"]) for _s in _related_sections}
+            for _cl in _concept_links:
+                _key = (_cl["target_collection"], _cl["group_value"])
+                if _key not in _seen:
+                    _seen.add(_key)
+                    _anchor_texts = _cl.get("anchor_texts") or []
+                    _anchor_chunk_ids = _cl.get("anchor_chunk_ids") or []
+                    if _anchor_chunk_ids:
+                        from core.db import fetchall as _fetchall
+                        _full_row = _fetchall(
+                            "SELECT payload->>'text' AS text FROM chunks WHERE id = %s LIMIT 1",
+                            (_anchor_chunk_ids[0],)
+                        )
+                        _cl_preview = _full_row[0]["text"] if _full_row else (_anchor_texts[0] if _anchor_texts else "")
+                    else:
+                        _cl_preview = _anchor_texts[0] if _anchor_texts else ""
+                    _related_sections.append({
+                        "title": _cl["group_value"],
+                        "collection": _cl["target_collection"],
+                        "match_type": "concept",
+                        "confidence": round(_cl["similarity"], 2),
+                        "preview": _cl_preview,
+                        "anchor_chunk_ids": _anchor_chunk_ids,
+                    })
+
     response: Dict = {
         "method": method_info["mode"],
         "reason": method_info["reason"],
-        "result": route_query(collection, question, mode=mode, limit=limit),
-        "answer_payload": getattr(route_query, "_last_answer_payload", None),
+        "result": _route_result,
+        "answer_payload": _last_payload,
+        "related_sections": _related_sections,
     }
 
     if structured_plan:

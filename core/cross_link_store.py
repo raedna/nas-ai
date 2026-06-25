@@ -32,6 +32,15 @@ def ensure_cross_links_table():
 
 def save_cross_link_candidates(candidates):
     """Save candidates to DB. Auto-confirm >0.9, pending_review 0.3-0.9, skip <0.3."""
+    # Deduplicate by unique key, keeping highest confidence
+    seen = {}
+    for c in candidates:
+        key = (c["source_collection"], c["source_identifier"],
+               c["target_collection"], c["target_identifier"], c["match_type"])
+        if key not in seen or c["confidence"] > seen[key]["confidence"]:
+            seen[key] = c
+    candidates = list(seen.values())
+
     saved = 0
     skipped = 0
 
@@ -53,7 +62,10 @@ def save_cross_link_candidates(candidates):
                      target_identifier, match_type, confidence, status)
                 VALUES (%s, %s, %s, %s, %s, %s, %s)
                 ON CONFLICT (source_collection, source_identifier, target_collection, target_identifier, match_type)
-                DO UPDATE SET confidence = EXCLUDED.confidence, updated_at = NOW()
+                DO UPDATE SET 
+                    confidence = EXCLUDED.confidence, 
+                    updated_at = NOW()
+                    -- status intentionally not updated to preserve manual confirmations/rejections
             """, (
                 c["source_collection"], c["source_identifier"],
                 c["target_collection"], c["target_identifier"],

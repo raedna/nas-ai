@@ -14,18 +14,33 @@
   "cross_encoder": {
     "enabled": false,
     "model": "cross-encoder/ms-marco-MiniLM-L-6-v2",
-    "apply_to_doc_types": ["entity_row", "procedural", "reference", "mixed"],
+    "apply_to_doc_types": [
+      "entity_row",
+      "procedural",
+      "reference",
+      "mixed"
+    ],
     "top_k": 3
   },
   "llm_reranker": {
     "enabled": true,
-    "apply_to_doc_types": ["entity_row", "procedural", "reference", "mixed"],
+    "apply_to_doc_types": [
+      "entity_row",
+      "procedural",
+      "reference",
+      "mixed"
+    ],
     "top_k": 10
   },
   "bge_reranker": {
     "enabled": true,
     "model": "BAAI/bge-reranker-large",
-    "apply_to_doc_types": ["entity_row", "procedural", "reference", "mixed"],
+    "apply_to_doc_types": [
+      "entity_row",
+      "procedural",
+      "reference",
+      "mixed"
+    ],
     "top_k": 25
   }
 }

@@ -13,15 +13,40 @@ def discover_cross_links(source_collection, target_collections=None):
         )
         target_collections = [r["collection_name"] for r in rows]
 
-    source_rows = fetchall("""
-        SELECT DISTINCT
-            payload->>'identifier' AS identifier,
-            payload->>'primary_name' AS primary_name,
-            payload->>'type' AS type_value
-        FROM chunks
-        WHERE collection_name = %s
+    # Check if this collection uses chunk-level identifiers (e.g. Obsidian: note_chunk_N)
+    # If so, group by source_file and use that as the anchor — one query per note, not per chunk
+    _sample = fetchall("""
+        SELECT payload->>'identifier' AS identifier
+        FROM chunks WHERE collection_name = %s
         AND payload->>'identifier' IS NOT NULL
+        LIMIT 5
     """, (source_collection,))
+
+    _is_chunked = any(
+        "_chunk_" in (r.get("identifier") or "")
+        for r in _sample
+    )
+
+    if _is_chunked:
+        source_rows = fetchall("""
+            SELECT DISTINCT
+                payload->>'source_file' AS identifier,
+                payload->>'primary_name' AS primary_name,
+                payload->>'type' AS type_value
+            FROM chunks
+            WHERE collection_name = %s
+            AND payload->>'source_file' IS NOT NULL
+        """, (source_collection,))
+    else:
+        source_rows = fetchall("""
+            SELECT DISTINCT
+                payload->>'identifier' AS identifier,
+                payload->>'primary_name' AS primary_name,
+                payload->>'type' AS type_value
+            FROM chunks
+            WHERE collection_name = %s
+            AND payload->>'identifier' IS NOT NULL
+        """, (source_collection,))
 
     candidates = []
 
@@ -89,6 +114,18 @@ def discover_cross_links(source_collection, target_collections=None):
                 from core.query_helpers import load_doc_query_hints
                 generic_terms = set(load_doc_query_hints().get("generic_terms", []))
 
+                # Check once if target uses chunk-level identifiers
+                _target_sample = fetchall("""
+                    SELECT payload->>'identifier' AS identifier
+                    FROM chunks WHERE collection_name = %s
+                    AND payload->>'identifier' IS NOT NULL
+                    LIMIT 5
+                """, (target,))
+                _target_chunked = any(
+                    "_chunk_" in (r.get("identifier") or "")
+                    for r in _target_sample
+                )
+
                 for term in mention_terms:
                     if not term or len(term) < 4:
                         continue
@@ -99,7 +136,8 @@ def discover_cross_links(source_collection, target_collections=None):
                     mentions = fetchall("""
                         SELECT DISTINCT
                             payload->>'identifier' AS identifier,
-                            payload->>'primary_name' AS primary_name
+                            payload->>'primary_name' AS primary_name,
+                            payload->>'source_file' AS source_file
                         FROM chunks
                         WHERE collection_name = %s
                         AND payload->>'description' ILIKE %s
@@ -107,13 +145,21 @@ def discover_cross_links(source_collection, target_collections=None):
                     """, (target, f"%{term}%"))
 
                     for m in mentions:
+                        t_id = (m.get("source_file") or m.get("identifier") or m.get("primary_name")) if _target_chunked else (m.get("identifier") or m.get("primary_name"))
+                        term_len = len(term)
+                        if term_len >= 13:
+                            confidence = 0.70
+                        elif term_len >= 7:
+                            confidence = 0.55
+                        else:
+                            confidence = 0.45
                         candidates.append({
                             "source_collection": source_collection,
                             "source_identifier": src_id,
                             "target_collection": target,
-                            "target_identifier": m["identifier"] or m["primary_name"],
+                            "target_identifier": t_id,
                             "match_type": "mention",
-                            "confidence": 0.6,
+                            "confidence": round(confidence, 3),
                         })
 
     return candidates
