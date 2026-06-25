@@ -4,11 +4,17 @@
     "allowed_filetypes": [
       "xml"
     ],
+    "allowed_extensions": [],
+    "exclude_dirs": [],
+    "exclude_extensions": [],
+    "asset_search_roots": [],
     "source_label": "FIX Dictionaries",
     "notes": "",
+    "routing_description": "This collection contains the fix dictionary for versions 4.2 and 4.4.  The  files contain tags, enums and components of the Fix Protocol and are used in transmitting the messages between traders and brokers",
     "filters": {
       "field_filters": []
-    }
+    },
+    "template_config": {}
   },
   "kb_docs": {
     "path": "/Users/raednasr/RaedsMacM1/nas-ai/table_test_input/KB_Articles RN_20260225.csv",
@@ -18,8 +24,10 @@
     "allowed_extensions": [],
     "exclude_dirs": [],
     "exclude_extensions": [],
+    "asset_search_roots": [],
     "source_label": "Kb Docs",
     "notes": "KB as of  20260225",
+    "routing_description": "This collection is a .csv dump of knowledge base articles that are procedural and narrative at times. it contains steps for executing in certain situations when issues are faced and also gives information on observed behavior of the various client systems used.",
     "filters": {
       "field_filters": [
         {
@@ -30,7 +38,8 @@
           ]
         }
       ]
-    }
+    },
+    "template_config": {}
   },
   "kb_docs_nofilter": {
     "path": "/Volumes/raedsync/Documents/OmniVista/Support Desk/KB Articles/KB_Articles RN_20260225.csv",
@@ -56,9 +65,11 @@
     ],
     "source_label": "Obsidian Notes",
     "notes": "Notes as of 04/16/2026",
+    "routing_description": "This collection contains my generated notes about troubleshooting client systems and processes, as well as work items that I keep track off.  it also contains information about astrophotography, whether image collections and acquisition details, or workflows for pre- and post-processing.",
     "filters": {
       "field_filters": []
-    }
+    },
+    "template_config": {}
   },
   "CRD_Manual": {
     "path": "/Volumes/raedsync/Documents/OmniVista/Intro to Charles River Inv Management System.pdf",
@@ -137,8 +148,12 @@
     "asset_search_roots": [],
     "source_label": "",
     "notes": "",
+    "routing_description": "This collection contains the Bloomberg Fields that are used to fetch security, valuation, and other financial information.  the file contains the mnemonics, and their description and type",
     "filters": {
       "field_filters": []
+    },
+    "template_config": {
+      "sheet_name": "Sheet1"
     }
   },
   "recon_assist_file": {
@@ -152,12 +167,11 @@
     "asset_search_roots": [],
     "source_label": "",
     "notes": "",
+    "routing_description": "This collection contains a table that is populated with all the files that are sent from the Prime Brokers to Moore.  It lists teh PB filename, Moore filename, and other information such as the location of the log files, sFTP, source types.",
     "filters": {
       "field_filters": []
     },
-    "template_config": {
-      "sheet_name": "Sheet 1 - RECON_ Moore <> P (2)"
-    }
+    "template_config": {}
   },
   "astro_test": {
     "path": "/Users/raednasr/RaedsMacM1/nas-ai/astro_test_files",

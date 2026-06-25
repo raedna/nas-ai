@@ -4,14 +4,14 @@ from core.db import fetchall, execute
 
 
 def _get_group_field(collection):
-    """Determine which payload field to group chunks by for this collection."""
+    """Determine which payload field to group chunks by — purely data-driven."""
     sample = fetchall("""
         SELECT 
             payload->>'folder_path' AS folder_path,
             payload->>'category' AS category,
             payload->>'type' AS type,
-            payload->>'doc_type' AS doc_type,
-            payload->>'source_file' AS source_file
+            payload->>'source_file' AS source_file,
+            payload->>'identifier_namespace' AS namespace
         FROM chunks WHERE collection_name = %s LIMIT 50
     """, (collection,))
 
@@ -20,30 +20,39 @@ def _get_group_field(collection):
 
     has_folder = any(r.get('folder_path') for r in sample)
     has_category = any(r.get('category') for r in sample)
-    has_type = any(r.get('type') for r in sample)
-    doc_types = set(r.get('doc_type') for r in sample if r.get('doc_type'))
-    unique_sources = len(set(r.get('source_file') for r in sample if r.get('source_file')))
 
-    # Doc collections with folder structure — best grouping
+    distinct_namespaces = len(set(
+        r.get('namespace') for r in sample if r.get('namespace')
+    ))
+
+    _data_types = {
+        'double', 'string', 'int32', 'int64', 'float', 'boolean',
+        'datetime', 'date', 'integer', 'decimal', 'structured'
+    }
+    meaningful_types = set(
+        r.get('type', '').lower() for r in sample
+        if r.get('type')
+        and r.get('type', '').lower() not in _data_types
+        and not r.get('type', '').strip().lstrip('-').isdigit()
+    )
+
+    # 1. Folder path — best for doc collections with hierarchy (obsidian)
     if has_folder:
         return 'folder_path'
 
-    # Multi-file collections with category
-    if has_category and unique_sources > 1:
-        return 'category'
+    # 2. Multiple distinct namespaces — XML/FIX collections
+    if distinct_namespaces > 1:
+        return 'identifier_namespace'
 
-    # Structured single-file collections (RECON, BBG) — group by type (Goldman/JPM/Citi or field category)
-    if 'structured' in doc_types and has_type:
+    # 3. Meaningful type values — broker names, object types etc.
+    if len(meaningful_types) > 1:
         return 'type'
 
-    # Single-file doc collections (KB articles) — group by category
+    # 4. Category field
     if has_category:
         return 'category'
 
-    # XML/FIX collections — group by category if available, else source_file
-    if has_category:
-        return 'category'
-
+    # 5. Fallback
     return 'source_file'
 
 
@@ -109,8 +118,10 @@ def build_concept_vectors(collection, min_cluster_size=3, similarity_threshold=0
         embeddings = np.array([c['embedding'] for c in chunks])
 
         # Cluster with HDBSCAN
+        # Scale min_cluster_size to collection size — smaller collections get finer clusters
+        _adaptive_min = max(2, min(min_cluster_size, len(chunks) // 10))
         clusterer = hdbscan.HDBSCAN(
-            min_cluster_size=min(min_cluster_size, max(2, len(chunks) // 3)),
+            min_cluster_size=_adaptive_min,
             metric='euclidean',
             prediction_data=True
         )

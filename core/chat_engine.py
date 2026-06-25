@@ -119,17 +119,45 @@ def select_collections(question: str, history: list, available_collections: list
         for m in history[-3:]
     ]) if history else ""
 
+    from core.paths import COLLECTIONS_PATH
+    import json as _json
+    try:
+        with open(COLLECTIONS_PATH, 'r') as _f:
+            _coll_cfg = _json.load(_f)
+    except Exception:
+        _coll_cfg = {}
+
     collection_lines = []
     for c in available_collections:
-        clusters = _fetchall(
-            "SELECT DISTINCT group_value FROM concept_vectors WHERE collection = %s ORDER BY group_value",
-            (c,)
-        )
-        if clusters:
-            topics = ", ".join(r["group_value"] for r in clusters)
-            collection_lines.append(f"- {c}: covers [{topics}]")
+        _rdesc = _coll_cfg.get(c, {}).get("routing_description", "")
+        _filetypes = _coll_cfg.get(c, {}).get("allowed_filetypes", [])
+        _is_doc = any(ft in _filetypes for ft in ["doc", "pdf", "docx"])
+
+        if _rdesc and _is_doc:
+            # Doc collections: static description + concept vector topics
+            clusters = _fetchall(
+                "SELECT DISTINCT group_value FROM concept_vectors WHERE collection = %s ORDER BY group_value",
+                (c,)
+            )
+            if clusters:
+                topics = ", ".join(r["group_value"] for r in clusters)
+                collection_lines.append(f"- {c}: {_rdesc} [topics: {topics}]")
+            else:
+                collection_lines.append(f"- {c}: {_rdesc}")
+        elif _rdesc:
+            # Structured collections: static description only
+            collection_lines.append(f"- {c}: {_rdesc}")
         else:
-            collection_lines.append(f"- {c}")
+            # No description: concept vectors only
+            clusters = _fetchall(
+                "SELECT DISTINCT group_value FROM concept_vectors WHERE collection = %s ORDER BY group_value",
+                (c,)
+            )
+            if clusters:
+                topics = ", ".join(r["group_value"] for r in clusters)
+                collection_lines.append(f"- {c}: covers [{topics}]")
+            else:
+                collection_lines.append(f"- {c}")
     collections_str = "\n".join(collection_lines)
 
     _procedural_hint = "\nNote: this question is procedural (how-to/steps) — prefer doc/note collections over structured data collections." if _procedural else ""

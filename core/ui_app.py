@@ -740,6 +740,7 @@ with tabs[0]:
                 st.session_state["collection_path_input"] = existing_cfg.get("path", "")
                 st.session_state["collection_source_label"] = existing_cfg.get("source_label", "")
                 st.session_state["collection_notes"] = existing_cfg.get("notes", "")
+                st.session_state["collection_routing_description"] = existing_cfg.get("routing_description", "")
 
                 st.session_state["collection_allowed_filetypes"] = existing_cfg.get("allowed_filetypes", [])
 
@@ -904,6 +905,13 @@ with tabs[0]:
             key="collection_source_label"
         )
 
+        routing_description = st.text_area(
+            "Routing description *(required)*",
+            key="collection_routing_description",
+            height=80,
+            help="Describe what this collection contains so the AI can route questions to it correctly. Example: 'FIX protocol dictionary containing tag numbers, names and enumerations'. Be specific about topics, domain and key terms users might ask about."
+        )
+
         notes = st.text_area(
             "Notes",
             #value=existing_cfg.get("notes", ""),
@@ -953,6 +961,7 @@ with tabs[0]:
                 "asset_search_roots": asset_search_roots,
                 "source_label": source_label.strip(),
                 "notes": notes.strip(),
+                "routing_description": routing_description.strip(),
                 "filters": {
                     "field_filters": field_filters
                 },
