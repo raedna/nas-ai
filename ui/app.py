@@ -20,6 +20,7 @@ from ui.collections_view import render_collections_panel  # noqa: E402
 from ui.ingestion import render_ingestion_panel  # noqa: E402
 from ui.knowledge_graph import render_kg_panel  # noqa: E402
 from ui.debug import render_debug_panel  # noqa: E402
+from ui.sql_inspector import render_sql_inspector_panel  # noqa: E402
 
 # Tab order — query tabs first, admin next, debug/remaining after.
 TABS = [
@@ -51,6 +52,8 @@ def index():
                     render_ingestion_panel()
                 elif name == "Knowledge Graph":
                     render_kg_panel()
+                elif name == "SQL Inspector":
+                    render_sql_inspector_panel()
                 elif name == "Debug":
                     render_debug_panel()
                 else:

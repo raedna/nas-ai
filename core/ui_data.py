@@ -23,7 +23,12 @@ def collection_stats():
         "SELECT collection_name, COUNT(*) AS n FROM enum_values GROUP BY collection_name", ())
     cmap = {r["collection_name"]: r["n"] for r in chunks}
     emap = {r["collection_name"]: r["n"] for r in enums}
-    names = sorted(set(cmap) | set(emap) | set(list_registered_collections()))
+    # Union of: collections with data (chunks/enums), DB-registered collections,
+    # and collections defined in collections.json but not yet ingested — so a
+    # freshly-created collection still appears (e.g. in the Ingestion dropdown)
+    # with 0 chunks until it's ingested.
+    configured = set(load_collections_config().keys())
+    names = sorted(set(cmap) | set(emap) | set(list_registered_collections()) | configured)
     return [{"name": n, "chunks": cmap.get(n, 0), "enums": emap.get(n, 0)} for n in names]
 
 

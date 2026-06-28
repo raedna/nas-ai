@@ -827,8 +827,18 @@ def run_query_with_method(
 
     # ------------------------------------------------------------------
     # 5. Discovery fallback  (count / list queries)
+    #    Metadata / aggregate questions ("how many files", "how many fits
+    #    files", "tickets closed in December") are answered by the guarded
+    #    text-to-SQL analytics engine; content-based discovery falls through.
     # ------------------------------------------------------------------
     if intent["mode"] in ("discovery_count", "discovery_list"):
+        try:
+            from core.retrieval.analytics import maybe_run_analytics
+            _ana = maybe_run_analytics(collection, question)
+        except Exception:
+            _ana = None
+        if _ana is not None:
+            return _ana
         return run_discovery_with_method(collection, question, limit=limit)
 
     # ------------------------------------------------------------------
