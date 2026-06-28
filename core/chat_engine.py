@@ -1,5 +1,5 @@
 import json
-from core.local_llm_client import call_local_llm_json, get_local_llm_config
+from core.local_llm_client import call_local_llm_json, get_local_llm_config, load_nlp_config
 import requests
 from core.retrieval.router import run_query_with_method
 from core.db import fetchall
@@ -294,22 +294,100 @@ def extract_focus_terms(history, last_n=3):
     return terms
 
 
-def augment_query_with_focus(question: str, history: list) -> str:
-    """Only inject history terms if the current question has no identifiers of its own."""
-    import re
-    # If the question already contains its own identifiers, don't augment
-    _own_files = re.findall(r'\b[a-zA-Z0-9_\-]+\.[a-zA-Z0-9]{2,5}\b', question)
-    _own_tags = re.findall(r'\btag\s+\d+\b', question, re.IGNORECASE)
-    _own_identifiers = _own_files + _own_tags
-    if _own_identifiers:
-        return question  # question is self-contained
+_CONTEXTUALIZE_FORMAT = {
+    "type": "json_schema",
+    "json_schema": {
+        "name": "contextualized_query",
+        "strict": True,
+        "schema": {
+            "type": "object",
+            "properties": {
+                "is_followup": {"type": "boolean"},
+                "standalone_query": {"type": "string"},
+                "reason": {"type": "string"},
+            },
+            "required": ["is_followup", "standalone_query", "reason"],
+            "additionalProperties": False,
+        },
+    },
+}
 
-    focus = extract_focus_terms(history)
-    q_lower = question.lower()
-    missing = [t for t in focus if t.lower() not in q_lower]
-    if missing:
-        return f"{question} [{' '.join(missing)}]"
-    return question
+
+def _fast_model():
+    """Optional small/fast model for the rewrite step (config: local_llm.rewrite_model
+    or local_llm.fast_model). Falls back to the default model when unset."""
+    try:
+        cfg = load_nlp_config().get("local_llm", {})
+        return cfg.get("rewrite_model") or cfg.get("fast_model") or None
+    except Exception:
+        return None
+
+
+def contextualize_query(question: str, history: list) -> dict:
+    """Decide whether `question` is a follow-up and, if so, rewrite it into a
+    self-contained query using recent history. New/standalone questions are
+    returned unchanged (no context injection) — this replaces the old bracket-
+    injection scheme that polluted retrieval.
+
+    Returns {is_followup: bool, standalone_query: str, reason: str}.
+    """
+    recent = [m for m in (history or []) if m.get("role") in ("user", "assistant")]
+    if not recent:
+        return {"is_followup": False, "standalone_query": question, "reason": "no history"}
+
+    # Compact, truncated history so a long prior answer can't dominate the prompt.
+    hist_lines = []
+    for m in recent[-4:]:
+        content = (m.get("content") or "").strip().replace("\n", " ")[:220]
+        hist_lines.append(f"{m['role'].upper()}: {content}")
+    hist_text = "\n".join(hist_lines)
+
+    system = (
+        "You rewrite the user's LATEST message into a standalone search query for a "
+        "knowledge base. Decide if the latest message depends on the previous turns.\n\n"
+        "DEFAULT to is_followup=false. Only set is_followup=true when the latest message "
+        "CANNOT be understood on its own — i.e. it uses a pronoun ('it', 'that', 'they'), "
+        "is elliptical ('what about X', 'and Citi?', 'the second one'), or omits its subject "
+        "entirely. If the message already names its own subject/topic/field, it is standalone "
+        "EVEN IF a previous turn was about something related.\n\n"
+        "When is_followup=false: return standalone_query EQUAL to the latest message, "
+        "UNCHANGED. Do NOT add qualifiers from earlier turns.\n"
+        "When is_followup=true: rewrite into a complete question by pulling ONLY the missing "
+        "subject from previous turns. Never append unrelated keywords or dump prior answer "
+        "text.\n\n"
+        "Examples:\n"
+        "- prior 'what files does Goldman send' + 'what about Citi' -> "
+        "is_followup=true, 'what files does Citi send'.\n"
+        "- prior 'sftp folder for gsact.txt' + 'what is the ask price field' -> "
+        "is_followup=false, 'what is the ask price field' (DO NOT add 'for gsact.txt').\n"
+        "- prior 'what is tag 22' + 'steps for manual file loading in recon' -> "
+        "is_followup=false, 'steps for manual file loading in recon'.\n\n"
+        "Return only the JSON object."
+    )
+    user = f"Previous turns:\n{hist_text}\n\nLatest message: {question}"
+    try:
+        result = call_local_llm_json(
+            system_prompt=system, user_prompt=user, temperature=0.0,
+            model=_fast_model(), response_format=_CONTEXTUALIZE_FORMAT,
+        )
+    except Exception:
+        result = None
+
+    if isinstance(result, dict) and isinstance(result.get("standalone_query"), str) \
+            and result["standalone_query"].strip():
+        return {
+            "is_followup": bool(result.get("is_followup")),
+            "standalone_query": result["standalone_query"].strip(),
+            "reason": str(result.get("reason") or "llm contextualization"),
+        }
+    # Fail safe: treat as standalone (never pollute).
+    return {"is_followup": False, "standalone_query": question, "reason": "fallback (standalone)"}
+
+
+def augment_query_with_focus(question: str, history: list) -> str:
+    """Back-compat wrapper — now delegates to the LLM contextualizer and returns the
+    standalone query (no more bracket injection)."""
+    return contextualize_query(question, history)["standalone_query"]
 
 def _strip_ocr_markers(text: str) -> str:
     """
@@ -348,7 +426,8 @@ def _response_is_faithful(response: str, retrieved_answer: str) -> bool:
         return True
     resp_lower = response.lower()
     matched = sum(1 for t in key_terms if t in resp_lower)
-    print("DEBUG faithful check:", _faithful, "baseline:", _baseline[:50])
+    if DEBUG:
+        print("DEBUG faithful check: matched", matched, "of", len(key_terms))
     return matched >= max(1, int(len(key_terms) * 0.7))
 
 
@@ -397,7 +476,7 @@ def generate_conversational_response(question: str, history: list, retrieved_ans
         if _baseline and not _faithful:
             return _baseline
         if DEBUG:
-            print("DEBUG final content snippet:", response[:300])
+            print("DEBUG final content snippet:", llm_response[:300])
         return llm_response
 
     except Exception:
@@ -432,8 +511,17 @@ def chat_turn(question: str, history: list, available_collections: list) -> dict
             "related_sections": []
         }
 
+    # Step 1b: contextualize. Rewrite genuine follow-ups into a standalone query;
+    # leave new/standalone questions untouched. Only follow-ups get to see prior
+    # history downstream (prevents the previous topic polluting a new question).
+    ctx = contextualize_query(question, history)
+    standalone_question = ctx["standalone_query"]
+    effective_history = history if ctx["is_followup"] else []
+    if DEBUG:
+        print("DEBUG contextualize:", ctx)
+
     # Step 2: select collections (1–3, ranked by relevance)
-    collections = select_collections(question, history, available_collections)
+    collections = select_collections(standalone_question, effective_history, available_collections)
     if not collections:
         return {
             "role": "assistant",
@@ -444,8 +532,7 @@ def chat_turn(question: str, history: list, available_collections: list) -> dict
         }
 
     # Step 3: retrieve answer (parallel across selected collections)
-    augmented_question = augment_query_with_focus(question, history)
-    query_run = run_parallel_queries(collections, augmented_question)
+    query_run = run_parallel_queries(collections, standalone_question)
     if DEBUG:
         print("DEBUG augmented_question:", augmented_question)
         print("DEBUG query_run related:", [(s.get('collection'), s.get('confidence'), bool(s.get('anchor_chunk_ids'))) for s in query_run.get('related_sections', [])])
@@ -527,7 +614,7 @@ def chat_turn(question: str, history: list, available_collections: list) -> dict
     if primary_answer and "No answer found" in primary_answer:
         response = "I couldn't find specific information about that in my knowledge base. Could you provide more details or rephrase the question?"
     else:
-        response = generate_conversational_response(question, history, retrieved_answer=retrieved, primary_answer=primary_answer)
+        response = generate_conversational_response(question, effective_history, retrieved_answer=retrieved, primary_answer=primary_answer)
     if high_confidence and extra_parts:
         formatted_parts = []
         for part in extra_parts:

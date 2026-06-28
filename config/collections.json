@@ -183,11 +183,8 @@
     "exclude_extensions": [],
     "asset_search_roots": [],
     "source_label": "",
-    "notes": "astro 3 image test - 2 Fit and 1 xisf",
-    "filters": {
-      "field_filters": []
-    },
-    "template_config": {}
+    "routing_description": "this collection contains astrophotography images of .fit and .xisf files.",
+    "notes": ""
   },
   "pdf_test": {
     "path": "/Users/raednasr/RaedsMacM1/nas-ai/pdf_test_files",
