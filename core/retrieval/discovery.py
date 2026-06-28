@@ -476,18 +476,43 @@ def llm_extract_search_terms(question: str) -> str:
             "'what fields are in category airlines' -> 'airlines'. "
             "Return JSON: {\"terms\": \"single short phrase\"}"
         )
-        result = call_local_llm_json(system_prompt, question, temperature=0.0)
-        if isinstance(result, dict) and "terms" in result:
+        # Structured output guarantees the {"terms": "..."} shape — without it some
+        # models (e.g. qwen) return a different key and we'd fall back to the whole
+        # question, which websearch_to_tsquery then ANDs into zero matches.
+        _rf = {"type": "json_schema", "json_schema": {
+            "name": "search_terms", "strict": True,
+            "schema": {"type": "object",
+                       "properties": {"terms": {"type": "string"}},
+                       "required": ["terms"], "additionalProperties": False}}}
+        result = call_local_llm_json(system_prompt, question, temperature=0.0,
+                                     response_format=_rf)
+        if isinstance(result, dict) and result.get("terms"):
             terms = result["terms"]
             if isinstance(terms, list):
                 terms = terms[0] if terms else ""
-            # Take first term if comma-separated
             terms = str(terms).split(",")[0].strip()
-            return terms
-            
+            if terms:
+                return terms
+
     except Exception:
         pass
-    return normalize_simple_text(question)
+    return _fallback_search_terms(question)
+
+
+def _fallback_search_terms(question: str) -> str:
+    """Strip question/generic words so a failed LLM extraction doesn't AND the whole
+    query into zero BM25 matches. Used when the LLM is unavailable or returns nothing."""
+    hints = load_doc_query_hints()
+    stop = {w.lower() for w in hints.get("stopwords", [])} | {
+        "what", "which", "who", "where", "how", "many", "much", "is", "are", "the",
+        "a", "an", "do", "does", "have", "has", "in", "of", "for", "to", "with",
+        "contain", "contains", "containing", "list", "show", "all", "available",
+        "field", "fields", "file", "files", "tag", "tags", "record", "records",
+        "data", "category", "name", "named", "called",
+        "there", "any", "me", "give", "get", "find", "can", "please", "and", "or",
+    }
+    words = [w for w in normalize_simple_text(question).split() if w and w not in stop]
+    return " ".join(words) if words else normalize_simple_text(question)
 
 def discover_collection_items(
     collection_name: str,

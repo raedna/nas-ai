@@ -88,16 +88,20 @@ def detect_table_type(rows, schema, template_config=None):
     if not (has_identifier or has_name or has_description):
         return "procedural"
 
-    # Dictionary/reference/code-list style
+    # Content signal takes priority: rows with long free-text are articles/entities,
+    # even when a reference/enum column is also present (e.g. a creator-id column that
+    # gets classified as reference_identifier). This must be checked BEFORE the
+    # dictionary/reference rule, or KB-style tables get mis-routed to "structured".
+    if has_description:
+        stats = _description_stats(rows, desc_fields)
+        if stats["median"] >= 500 or stats["max"] >= 1500:
+            return "entity_row"
+
+    # Dictionary/reference/code-list style (short rows)
     if has_identifier and has_name and (has_description or has_type) and (has_enum or has_reference):
         return "structured"
 
     if has_identifier and has_name and has_description:
-        stats = _description_stats(rows, desc_fields)
-
-        if stats["median"] >= 500 or stats["max"] >= 1500:
-            return "entity_row"
-
         return "structured"
 
     # One row represents a document/article/entity

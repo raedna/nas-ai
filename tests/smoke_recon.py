@@ -29,9 +29,9 @@ SMOKE_TESTS = [
     # --- Single structured record lookup ---
     {
         "id": "RECON-01",
-        "question": "what is the ftp for gsact.txt",
-        "description": "Structured lookup — gsact.txt sftp folder should be /outgoing",
-        "must_contain": ["/outgoing"],
+        "question": "what is the move script for gsact.txt",
+        "description": "Structured lookup — gsact.txt move script (K:/Recon/FTP)",
+        "must_contain": ["GSCopy_srpb.bat"],
         "must_not_contain": [],
         "expected_methods": ["identifier_lookup", "semantic", "answer"],
         "min_results": 1,
@@ -39,9 +39,9 @@ SMOKE_TESTS = [
     },
     {
         "id": "RECON-02",
-        "question": "what is the script for troubleshooting gsact.txt",
-        "description": "Structured lookup — gsact.txt troubleshooting script",
-        "must_contain": ["GetDcCh"],
+        "question": "what is the file format for gsact.txt",
+        "description": "Structured lookup — gsact.txt recon tool file format",
+        "must_contain": ["GS Cash Activity"],
         "must_not_contain": [],
         "expected_methods": ["identifier_lookup", "semantic", "answer"],
         "min_results": 1,
@@ -60,9 +60,9 @@ SMOKE_TESTS = [
     # --- Labeled key-value rendering (Phase 3.18 feature) ---
     {
         "id": "RECON-04",
-        "question": "what is the log file location for gsact.txt",
-        "description": "Labeled field rendering — log location should show field label",
-        "must_contain": ["Log"],
+        "question": "what is the recon tool data source for gsact.txt",
+        "description": "Labeled field rendering — recon tool data source",
+        "must_contain": ["Transaction"],
         "must_not_contain": [],
         "expected_methods": ["identifier_lookup", "semantic", "answer"],
         "min_results": 1,
@@ -113,9 +113,9 @@ SMOKE_TESTS = [
     # --- Different identifier lookup ---
     {
         "id": "RECON-09",
-        "question": "what is the sftp folder for gsact_fx.txt",
-        "description": "Structured lookup — gsact_fx.txt sftp folder",
-        "must_contain": ["/outgoing"],
+        "question": "what is the recon job for gsact_fx.txt",
+        "description": "Structured lookup — gsact_fx.txt recon job (Tidal job name)",
+        "must_contain": ["020_W_RECON_GOLDMAN_PB_PULL"],
         "must_not_contain": [],
         "expected_methods": ["identifier_lookup", "semantic", "answer"],
         "min_results": 1,

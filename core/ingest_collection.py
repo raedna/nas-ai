@@ -189,6 +189,15 @@ def ingest_collection(
     force_reingest=False,
     progress_callback=None,
 ):
+    # Ensure the parent collections row exists before any file/chunk write — the
+    # files table has a FK to collections.name. Self-heals when a collection was
+    # deleted but is being re-ingested from its config (no more FK violation).
+    try:
+        from core.db import upsert_collection
+        upsert_collection(collection_name, collection_cfg)
+    except Exception as e:
+        print(f"[INGEST] could not ensure collections row for {collection_name}: {e}")
+
     source_files = discover_files(_get_collection_paths(collection_cfg))
 
     source_files = [

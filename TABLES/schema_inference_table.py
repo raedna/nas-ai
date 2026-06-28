@@ -42,13 +42,24 @@ def infer_table_schema(rows, collection_name=None, source_file=None):
                 "type", "enum_value", "enum_name", "reference_identifier", "other"]:
         schema.setdefault(key, [])
 
-    if not schema.get("identifier") or not schema.get("primary_name"):
-        print(f"[SCHEMA] Heuristic missed key roles — escalating to LLM")
+    # Escalate to the LLM when the heuristic missed key roles, OR when the table looks
+    # like entity_row (article-style) — there the LLM detects a tags column and maps
+    # free-text roles better. Structured tables keep the fast heuristic. (Switch to
+    # always-run by removing the _is_entity_row gate.)
+    from TABLES.table_detector import detect_table_type
+    _heuristic_type = detect_table_type(rows, schema)
+    _missing_keys = not schema.get("identifier") or not schema.get("primary_name")
+    _is_entity_row = (_heuristic_type == "entity_row")
+
+    if _missing_keys or _is_entity_row:
+        _reason = "missed key roles" if _missing_keys else "entity_row table"
+        print(f"[SCHEMA] Escalating to LLM — {_reason}")
         llm_result = llm_infer_schema(rows, roles)
         if llm_result:
             schema = llm_result
             for key in ["identifier", "primary_name", "aliases", "description",
-                        "type", "enum_value", "enum_name", "reference_identifier", "other"]:
+                        "type", "tags", "enum_value", "enum_name",
+                        "reference_identifier", "other"]:
                 schema.setdefault(key, [])
         else:
             print("[SCHEMA] LLM escalation failed — keeping heuristic result")

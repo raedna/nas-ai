@@ -85,8 +85,19 @@ def bge_rerank(points: List, question: str) -> List:
             passage = f"{title}\n{text}".strip()
             pairs.append((question, passage))
 
-        scores = model.predict(pairs)
-        scored = sorted(zip(scores, points), key=lambda x: x[0], reverse=True)
+        scores = [float(s) for s in model.predict(pairs)]
+
+        # Stage-awareness (same rule as rerank_points, scaled to the cross-encoder's
+        # score spread): a query naming a stage (e.g. PROD) must not surface a
+        # conflicting-stage doc (e.g. DEV). Conflict is pushed below all non-conflicting
+        # candidates; a stage match is nudged up. No-stage queries are unaffected.
+        spread = (max(scores) - min(scores)) or 1.0
+        adjusted = []
+        for s, p in zip(scores, points):
+            sign = _stage_sign(question, p.payload or {})
+            adj = (0.5 * spread) if sign > 0 else (-1.5 * spread) if sign < 0 else 0.0
+            adjusted.append((s + adj, p))
+        scored = sorted(adjusted, key=lambda x: x[0], reverse=True)
         return [p for _, p in scored]
 
     except Exception as e:
@@ -443,6 +454,52 @@ def score_point_shared(p, question: str) -> float:
 # Main reranking entry point
 # ---------------------------------------------------------------------------
 
+# Generic software environment/stage vocabulary (not collection-specific). A query
+# that names a stage (e.g. PROD) should prefer same-stage docs and avoid other-stage
+# docs (e.g. a DEV runbook). Conservative on purpose — "test"/"stage" are excluded
+# because they're ordinary English words.
+_STAGE_TERMS = {
+    "prod": ("prod", "production"),
+    "dev": ("dev", "development"),
+    "qa": ("qa",),
+    "uat": ("uat",),
+    "preprod": ("preprod", "preproduction"),
+}
+_STAGE_MATCH_BOOST = 20.0
+_STAGE_CONFLICT_PENALTY = 40.0
+
+
+def _stages_in(text: str) -> set:
+    """Canonical stages present as WHOLE words in text (normalizer splits on
+    punctuation/space, so 'product' tokenizes to 'product' and never matches 'prod')."""
+    toks = set(normalize_simple_text(text).split())
+    return {canon for canon, variants in _STAGE_TERMS.items()
+            if any(v in toks for v in variants)}
+
+
+def _stage_sign(question: str, payload: dict) -> int:
+    """+1 if a candidate shares the query's stage, -1 if it names a conflicting stage,
+    0 when the query names no stage or the candidate names none."""
+    q_stages = _stages_in(question)
+    if not q_stages:
+        return 0
+    text = f"{payload.get('primary_name') or ''} {payload.get('description') or ''} {payload.get('text') or ''}"
+    d_stages = _stages_in(text)
+    if not d_stages:
+        return 0
+    return 1 if (q_stages & d_stages) else -1
+
+
+def _stage_adjustment(question: str, payload: dict) -> float:
+    """Fixed-magnitude stage nudge for the large-score entity_row/shared paths."""
+    sign = _stage_sign(question, payload)
+    if sign > 0:
+        return _STAGE_MATCH_BOOST
+    if sign < 0:
+        return -_STAGE_CONFLICT_PENALTY
+    return 0.0
+
+
 def rerank_points(points: List, question: str) -> List:
     """
     Rerank a list of Points by relevance to question.
@@ -516,7 +573,8 @@ def rerank_points(points: List, question: str) -> List:
             if negative_terms and contains_negative_term(desc, negative_terms):
                 negative_penalty += 80.0
 
-            final_score = semantic_score + title_boost - negative_penalty + (topic_hits * 12.0)
+            final_score = (semantic_score + title_boost - negative_penalty
+                           + (topic_hits * 12.0) + _stage_adjustment(question, payload))
 
             scored.append((final_score, idx, p))
 
@@ -544,6 +602,10 @@ def rerank_points(points: List, question: str) -> List:
         return [p for _, p in scored]
 
     # -------------------------------------------------------------------
-    # All other types: shared scoring
+    # All other types: shared scoring (+ stage-awareness)
     # -------------------------------------------------------------------
-    return sorted(points, key=lambda p: score_point_shared(p, question), reverse=True)
+    return sorted(
+        points,
+        key=lambda p: score_point_shared(p, question) + _stage_adjustment(question, p.payload or {}),
+        reverse=True,
+    )

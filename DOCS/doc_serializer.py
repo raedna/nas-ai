@@ -281,4 +281,6 @@ def doc_serializer(parsed, file_path, template_config, file_tags, collection_nam
         if items:
             print(f"[DOC SERIALIZER] First chunk: {items[0]['text'][:200]}")
 
-    return items
+    # P0b: cap any oversized block-chunk so it isn't silently truncated at embed time.
+    from core.chunking import split_oversized_chunks
+    return split_oversized_chunks(items)

@@ -164,17 +164,21 @@ def synthesize_answer(payload: Dict, roles: List[str], collection_name: str) -> 
         elif identifier_value:
             lines.append(f"{identifier_field} {identifier_value}.")
 
-        if description:
-            description_fields = payload.get("description_fields") or {}
-            if isinstance(description_fields, dict) and description_fields:
-                lines.append("")
-                for field_name, field_value in description_fields.items():
-                    lines.append(f"{field_name}: {field_value}")
-            else:
-                lines.append(f"\nDescription: {description}")
-            type_value = payload.get("type")
-            if type_value and type_value != "structured":
-                lines.append(f"\nType: {type_value}")
+        # Render the record's labeled fields whenever they exist — NOT gated on the
+        # 'description' role being populated. With auto-inferred schemas the useful
+        # fields often live in type/other/reference roles and 'description' is empty,
+        # so a structured record lookup must still surface description_fields.
+        description_fields = payload.get("description_fields") or {}
+        if isinstance(description_fields, dict) and description_fields:
+            lines.append("")
+            for field_name, field_value in description_fields.items():
+                lines.append(f"{field_name}: {field_value}")
+        elif description:
+            lines.append(f"\nDescription: {description}")
+
+        type_value = payload.get("type")
+        if type_value and type_value != "structured":
+            lines.append(f"\nType: {type_value}")
 
         if include_enums and enum_values:
             lines.append("\nAllowed values:")
@@ -210,6 +214,14 @@ def synthesize_answer(payload: Dict, roles: List[str], collection_name: str) -> 
     identifier = payload.get("identifier")
     name = payload.get("primary_name")
     description = payload.get("description")
+    # Strip any HTML/markup so answers render as clean text (KB markdown fields can
+    # carry raw <p>/<span> tags). Image markers like [Embedded image OCR from: ...]
+    # use square brackets and are preserved.
+    try:
+        from core.nlp_generator import _strip_html
+        description = _strip_html(description) if description else description
+    except Exception:
+        pass
     enums = payload.get("enum_values")
     doc_type = payload.get("doc_type")
     source_label = get_source_label(collection_name, payload)
@@ -289,6 +301,13 @@ def synthesize_answer(payload: Dict, roles: List[str], collection_name: str) -> 
             parts.append(name)
 
         desc_text = str(description or payload.get("text") or "").strip()
+        # Strip HTML/markup here too (covers the payload.get("text") fallback for
+        # docx/obsidian/pdf). Inline-image markers use [ ] and are preserved.
+        try:
+            from core.nlp_generator import _strip_html
+            desc_text = _strip_html(desc_text)
+        except Exception:
+            pass
         desc_text = dedupe_repeated_paragraphs(desc_text)
 
         if desc_text:

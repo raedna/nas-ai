@@ -1,12 +1,29 @@
+import re
+import html as _html
 from pathlib import Path
 
 from core.nlp_generator import (
     build_structured_nlp_text,
     build_entity_row_nlp_text,
     build_procedural_nlp_text,
+    clean_dedup_text,
 )
 
 DEBUG = True
+
+
+def _parse_tag_list(values):
+    """P4: split comma/semicolon/pipe tag strings into a clean, deduped list.
+    Handles HTML entities (e.g. 'A&gt;B') and hierarchical 'A>B' tags.
+    Input is the list of raw cell values mapped to the schema 'tags' role."""
+    out, seen = [], set()
+    for v in values or []:
+        for part in re.split(r"[,;|]", _html.unescape(str(v))):
+            t = part.strip()
+            if t and t.lower() not in seen:
+                seen.add(t.lower())
+                out.append(t)
+    return out
 
 
 # =========================================================
@@ -113,7 +130,19 @@ def _build_structured_doc(row, schema, source_file):
     primary_name = _first_value(row_n, name_fields)
     description_values = _all_values(row_n, desc_fields)
     description = "\n\n".join(description_values) if description_values else None
-    description_fields = _labeled_values(row_n, desc_fields)
+
+    # Render ALL meaningful columns as labeled fields — not just the 'description' role.
+    # A structured record lookup should surface every field of the record regardless of
+    # how the (auto-inferred) schema classified it, so retrieval no longer depends on
+    # perfect role assignment. Excludes the identifier and primary_name (shown elsewhere).
+    _label_fields, _seen_lf = [], set()
+    for _f in (list(desc_fields) + list(type_fields)
+               + list(schema.get("reference_identifier", []))
+               + list(schema.get("other", []))):
+        if _f and _f not in _seen_lf and _f not in id_fields and _f not in name_fields:
+            _seen_lf.add(_f)
+            _label_fields.append(_f)
+    description_fields = _labeled_values(row_n, _label_fields)
     aliases = _all_values(row_n, alias_fields)
     type_value = _first_value(row_n, type_fields)
 
@@ -153,6 +182,7 @@ def _build_entity_row_doc(row, schema, source_file):
     desc_fields = schema.get("description", [])
     alias_fields = schema.get("aliases", [])
     type_fields = schema.get("type", [])
+    tag_fields = schema.get("tags", [])
 
     identifier = _first_value(row_n, id_fields)
     identifier_field = id_fields[0] if id_fields else None
@@ -165,6 +195,7 @@ def _build_entity_row_doc(row, schema, source_file):
     description_values = _all_values(row_n, desc_fields)
     aliases = _all_values(row_n, alias_fields)
     type_value = _first_value(row_n, type_fields)
+    kb_tags = _parse_tag_list(_all_values(row_n, tag_fields))  # P4: schema-driven tags
 
     text = build_entity_row_nlp_text(row, schema)
 
@@ -178,14 +209,15 @@ def _build_entity_row_doc(row, schema, source_file):
         "identifier_namespace": identifier_namespace or None,
         "identifier_kind": "source",
         "primary_name": primary_name or None,
-        "description": "\n\n".join(description_values) if description_values else None,
+        "description": (clean_dedup_text(description_values) or None) if description_values else None,
         "enum_values": [],
         "link_keys": link_keys,
         "related_link_keys": [],
         "type": type_value or "entity_row",
         "source_file": str(source_file),
         "doc_type": "entity_row",
-        "aliases": aliases
+        "aliases": aliases,
+        "kb_tags": kb_tags,
     }
 
 
@@ -252,9 +284,35 @@ def process_entity_row_table(rows, schema, source_file):
     for row in rows:
         doc = _build_entity_row_doc(row, schema, source_file)
         if doc:
-            docs.append(doc)
+            docs.extend(_split_entity_row_doc(doc))
 
     return docs
+
+
+def _split_entity_row_doc(doc):
+    """P0: split a long entity-row doc into multiple chunks that fit under the embed
+    window. All chunks keep the SAME identifier/primary_name/source_file/link_keys/
+    kb_tags (storage id is seq-based, so they don't collide); each adds chunk_index/
+    chunk_total and repeats the title so every chunk embeds self-contained.
+    Short rows return a single unchanged doc."""
+    from core.chunking import split_text
+
+    text = doc.get("text") or ""
+    chunks = split_text(text)
+    if len(chunks) <= 1:
+        return [doc]
+
+    title = (doc.get("primary_name") or "").strip()
+    out = []
+    for i, body in enumerate(chunks):
+        if title and not body.lstrip().startswith(title):
+            body = f"{title}\n\n{body}"
+        d = dict(doc)
+        d["text"] = body
+        d["chunk_index"] = i + 1
+        d["chunk_total"] = len(chunks)
+        out.append(d)
+    return out
 
 
 def process_procedural_table(rows, schema, source_file):

@@ -24,13 +24,14 @@ def get_local_llm_config():
         "timeout": int(llm_cfg.get("timeout", 60)),
     }
 
-def call_local_llm_json(system_prompt, user_prompt, temperature=0.0):
+def call_local_llm_json(system_prompt, user_prompt, temperature=0.0,
+                        model=None, response_format=None):
     llm_cfg = get_local_llm_config()
 
     url = llm_cfg["base_url"].rstrip("/") + "/v1/chat/completions"
 
     payload = {
-        "model": llm_cfg["model"],
+        "model": model or llm_cfg["model"],
         "messages": [
             {
                 "role": "system",
@@ -44,6 +45,11 @@ def call_local_llm_json(system_prompt, user_prompt, temperature=0.0):
         "temperature": temperature,
         "stream": False,
     }
+
+    # Optional structured output (LM Studio honors response_format json_schema),
+    # which guarantees valid, well-shaped JSON instead of best-effort parsing.
+    if response_format:
+        payload["response_format"] = response_format
 
     try:
         response = requests.post(

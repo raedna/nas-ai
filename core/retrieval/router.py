@@ -77,6 +77,46 @@ from core.retrieval.answer import (
 
 from core.retrieval.db_retrieval import collection_has_enums
 
+
+# ---------------------------------------------------------------------------
+# CL-04: wikilink one-hop traversal helper
+# ---------------------------------------------------------------------------
+def _build_section_for_link(link):
+    """Build a related-section dict for a confirmed cross-link target. Used to follow
+    one hop of confirmed wikilinks from an initial cross-link target (CL-04)."""
+    from core.retrieval.db_retrieval import get_by_identifier
+    from core.db import fetchall as _f
+    import json as _j
+
+    tc, ti = link["target_collection"], link["target_identifier"]
+    lp, via = None, None
+    pts = get_by_identifier(tc, ti)
+    if pts:
+        lp, via = (pts[0].payload or {}), "identifier"
+    if lp is None:
+        # Fallback: target stored as source_file, then primary_name (CL-03 links to
+        # records that have no canonical identifier, e.g. some RECON rows).
+        for _field, _tag in (("source_file", "source_file"), ("primary_name", "primary_name")):
+            rows = _f(f"SELECT payload FROM chunks WHERE collection_name=%s "
+                      f"AND payload->>'{_field}'=%s LIMIT 1", (tc, ti))
+            if rows:
+                lp = rows[0]["payload"] if isinstance(rows[0]["payload"], dict) else _j.loads(rows[0]["payload"])
+                via = _tag
+                break
+    if lp is None:
+        return None
+    sf = lp.get("source_file") or ti
+    desc = ""
+    if via in ("identifier", "source_file"):  # doc-like: concat first chunks for context
+        full = _f("SELECT payload->>'text' AS text FROM chunks WHERE collection_name=%s "
+                  "AND payload->>'source_file'=%s ORDER BY id LIMIT 3", (tc, sf))
+        desc = "\n\n".join(r["text"] for r in full if r["text"]) if full else ""
+    if not desc:                              # structured / primary_name match: own description
+        desc = str(lp.get("description") or "")
+    return {"title": lp.get("primary_name") or ti, "collection": tc,
+            "source_file": sf, "confidence": link.get("confidence", 1.0), "preview": desc}
+
+
 # ---------------------------------------------------------------------------
 # Planner config helper
 # ---------------------------------------------------------------------------
@@ -519,8 +559,8 @@ def run_query_with_method(
                     _linked_pts = get_by_identifier(_link["target_collection"], _link["target_identifier"])
                     if not _linked_pts:
                         _linked_rows = _fetchall(
-                            "SELECT payload FROM chunks WHERE collection_name = %s AND payload->>'source_file' = %s LIMIT 1",
-                            (_link["target_collection"], _link["target_identifier"])
+                            "SELECT payload FROM chunks WHERE collection_name = %s AND (payload->>'source_file' = %s OR payload->>'primary_name' = %s) LIMIT 1",
+                            (_link["target_collection"], _link["target_identifier"], _link["target_identifier"])
                         )
                         if _linked_rows:
                             _linked_payload = _linked_rows[0]["payload"] if isinstance(_linked_rows[0]["payload"], dict) else _json.loads(_linked_rows[0]["payload"])
@@ -547,6 +587,26 @@ def run_query_with_method(
                             "confidence": _link.get("confidence", 1.0),
                             "preview": _ldesc
                         })
+
+                # CL-04: one hop along confirmed wikilinks from first-hop targets
+                if show_exact_links and _links:
+                    _seen_hop = {(s["collection"], s.get("source_file") or s["title"])
+                                 for s in _related_sections}
+                    for _l in _links:
+                        for _hl in get_cross_links_for_identifier(
+                                _l["target_collection"], _l["target_identifier"], status="confirmed"):
+                            if _hl["target_collection"] == collection and _hl["target_identifier"] == _fname:
+                                continue
+                            _hk = (_hl["target_collection"], _hl["target_identifier"])
+                            if _hk in _seen_hop:
+                                continue
+                            _seen_hop.add(_hk)
+                            _sec = _build_section_for_link(_hl)
+                            if _sec:
+                                _sec["match_type"] = "wikilink_hop"
+                                _sec["confidence"] = round(
+                                    min(_sec["confidence"], _l.get("confidence", 1.0)) * 0.9, 3)
+                                _related_sections.append(_sec)
 
                 # Step 2: concept similarity links (semantic cross-collection)
                 _chunk_id = _pts[0].id if hasattr(_pts[0], 'id') else None
@@ -784,8 +844,8 @@ def run_query_with_method(
                 _linked_pts = get_by_identifier(_link["target_collection"], _link["target_identifier"])
                 if not _linked_pts:
                     _linked_rows = _fetchall(
-                        "SELECT payload FROM chunks WHERE collection_name = %s AND payload->>'source_file' = %s LIMIT 1",
-                        (_link["target_collection"], _link["target_identifier"])
+                        "SELECT payload FROM chunks WHERE collection_name = %s AND (payload->>'source_file' = %s OR payload->>'primary_name' = %s) LIMIT 1",
+                        (_link["target_collection"], _link["target_identifier"], _link["target_identifier"])
                     )
                     if _linked_rows:
                         _lp = _linked_rows[0]["payload"] if isinstance(_linked_rows[0]["payload"], dict) else _json.loads(_linked_rows[0]["payload"])
@@ -812,6 +872,25 @@ def run_query_with_method(
                         "confidence": _link.get("confidence", 1.0),
                         "preview": _ldesc
                     })
+
+            # CL-04: one hop along confirmed wikilinks from first-hop targets
+            _seen_hop = {(s["collection"], s.get("source_file") or s["title"])
+                         for s in _related_sections}
+            for _l in _links:
+                for _hl in get_cross_links_for_identifier(
+                        _l["target_collection"], _l["target_identifier"], status="confirmed"):
+                    if _hl["target_collection"] == collection and _hl["target_identifier"] == _identifier:
+                        continue
+                    _hk = (_hl["target_collection"], _hl["target_identifier"])
+                    if _hk in _seen_hop:
+                        continue
+                    _seen_hop.add(_hk)
+                    _sec = _build_section_for_link(_hl)
+                    if _sec:
+                        _sec["match_type"] = "wikilink_hop"
+                        _sec["confidence"] = round(
+                            min(_sec["confidence"], _l.get("confidence", 1.0)) * 0.9, 3)
+                        _related_sections.append(_sec)
 
         if show_related_topics and _chunk_id:
             _concept_links = find_concept_links(collection, _chunk_id)

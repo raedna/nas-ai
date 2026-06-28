@@ -660,3 +660,16 @@ Recorded for when the system is proven and ready for blind testing. NAS remains 
 5. R4 — Basic memory layer (`chat_memory` table, store/retrieve key facts)
 6. Full BBG dataset ingest (currently 730-row test subset of 69k)
 7. NER-based cross-linking (Phase 3.5)
+
+
+| ID | Area | Description | Status |
+|---|---|---|---|
+| CV-01 | concept_vector_builder.py | Add section_heading as group field for mixed doc_type collections (docx, pdf). Update _get_group_field sample query to fetch it. | Pending |
+| CV-02 | concept_vector_builder.py | For entity_row collections (kb_docs), use kb_tags as Tier 1 category. Score tags by inverse document frequency — pick most distinctive tag as group_value. No LLM needed. | Pending |
+| CV-03 | concept_vector_builder.py | For entity_row chunks with no/generic tags (Tier 2): compute TF-IDF across collection, extract top 5-10 distinctive terms per chunk, batch call LLM for topic label. Use as group_value. | Pending |
+| CV-04 | concept_vector_builder.py | After HDBSCAN finds clusters, call LLM with anchor texts to generate meaningful group_value label. Applies to any collection where group_value is still a filename or generic value. | Pending |
+| CL-01 | cross_link_discoverer.py | Raise minimum identifier length in mention matcher from < 4 to < 8. Reduces false positives from short generic terms. | Pending |
+| CL-02 | cross_link_discoverer.py | Before saving mention link, verify matched term appears in meaningful context in target chunk — not just a passing reference. | Pending |
+| CL-03 | cross_link_discoverer.py | NER-based cross-linking Phase 3.5 — scan obsidian chunk text for known identifiers from other collections (RECON filenames, FIX tags). Creates proper obsidian to recon_assist_file links. | Deferred Phase 3.5 |
+| CL-04 | router.py | Wikilink traversal — follow one hop of confirmed wikilinks from initial cross-link targets. Enables gsact.txt to 4.2 to 4.3.1 chain. | Pending |
+| CL-05 | cross_link_discoverer.py | No obsidian to recon_assist_file links currently. Needs NER (CL-03) or manual hint file listing RECON filenames per obsidian note. | Deferred Phase 3.5 |

@@ -669,7 +669,7 @@ tabs = st.tabs([
     "System Config",
     "Chat",
     "Data Prep",
-    "Filetypes"
+    "Knowledge Graph"
 ])
 
 with tabs[0]:
@@ -707,6 +707,7 @@ with tabs[0]:
             save_json(COLLECTIONS_PATH, collections_cfg)
             try:
                 delete_pg_collection(del_name)
+                get_all_collection_stats.clear()   # refresh cached counts -> 0
             except Exception as e:
                 st.warning(f"Config deleted but PostgreSQL cleanup failed: {e}")
             st.success(f"Deleted config: {del_name}")
@@ -1004,7 +1005,9 @@ with tabs[0]:
     st.markdown("---")
     st.subheader("Delete Collection Data")
 
-    pg_collections = get_pg_collections()
+    # List every collection that has data, even orphans whose config row is gone
+    # (registered collections ∪ collections that still have chunks/enums).
+    pg_collections = sorted(set(get_pg_collections()) | set(get_all_collection_stats().keys()))
     if pg_collections:
         col_to_delete = st.selectbox(
             "Select collection to delete",
@@ -1023,6 +1026,7 @@ with tabs[0]:
             else:
                 try:
                     delete_pg_collection(col_to_delete)
+                    get_all_collection_stats.clear()   # refresh cached counts -> 0
                     st.success(f"✅ Deleted collection: {col_to_delete}")
                     st.rerun()
                 except Exception as e:
@@ -1110,7 +1114,12 @@ with tabs[0]:
     st.divider()
 
     for link in pending_links:
-        with st.expander(f"{link['source_collection']} `{link['source_identifier']}` → {link['target_collection']} `{link['target_identifier']}` ({link['match_type']}, {link['confidence']:.2f})"):
+        _tgt_name = fetchall(
+            "SELECT payload->>'primary_name' AS name FROM chunks WHERE collection_name = %s AND (payload->>'identifier' = %s OR payload->>'source_file' = %s) LIMIT 1",
+            (link['target_collection'], link['target_identifier'], link['target_identifier'])
+        )
+        _tgt_disp = (_tgt_name[0]['name'] if _tgt_name and _tgt_name[0]['name'] else link['target_identifier'])
+        with st.expander(f"{link['source_collection']} `{link['source_identifier']}` → {link['target_collection']} `{_tgt_disp}` ({link['match_type']}, {link['confidence']:.2f})"):
             src_row = fetchall(
                 "SELECT payload->>'primary_name' AS name, LEFT(payload->>'description', 300) AS d FROM chunks WHERE collection_name = %s AND (payload->>'identifier' = %s OR payload->>'source_file' = %s) LIMIT 1",
                 (link['source_collection'], link['source_identifier'], link['source_identifier'])
@@ -1753,11 +1762,18 @@ with tabs[3]:
         #    f"Description field: description"
         #)
 
-        from core.background_runner import is_cross_link_running, get_running_tasks
+        from core.background_runner import is_cross_link_running, get_running_tasks, cancel_running_tasks
         if is_cross_link_running():
             _running = get_running_tasks()
             _cols = ", ".join(t['collection'] for t in _running)
-            st.info(f"⚙️ Cross-link discovery running in background for: {_cols}")
+            _bgc1, _bgc2 = st.columns([5, 1])
+            with _bgc1:
+                st.info(f"⚙️ Cross-link discovery running in background for: {_cols}")
+            with _bgc2:
+                if st.button("🛑 Stop", key="kill_bg_ask"):
+                    _n = cancel_running_tasks()
+                    st.warning(f"Cancelled {_n} background task(s).")
+                    st.rerun()
 
         question = st.text_area(
             "Question",
@@ -2723,11 +2739,18 @@ with tabs[7]:
     if "chat_history" not in st.session_state:
         st.session_state.chat_history = []
 
-    from core.background_runner import is_cross_link_running, get_running_tasks
+    from core.background_runner import is_cross_link_running, get_running_tasks, cancel_running_tasks
     if is_cross_link_running():
         _running = get_running_tasks()
         _cols = ", ".join(t['collection'] for t in _running)
-        st.info(f"⚙️ Cross-link discovery running in background for: {_cols}")
+        _bgc1, _bgc2 = st.columns([5, 1])
+        with _bgc1:
+            st.info(f"⚙️ Cross-link discovery running in background for: {_cols}")
+        with _bgc2:
+            if st.button("🛑 Stop", key="kill_bg_chat"):
+                _n = cancel_running_tasks()
+                st.warning(f"Cancelled {_n} background task(s).")
+                st.rerun()
 
     # Collection selector
     chat_collections = sorted(collections_cfg.keys())
@@ -2814,5 +2837,449 @@ with tabs[8]:
     render_data_prep_tab()
 
 with tabs[9]:
-    st.subheader("Filetypes")
-    st.info("Filetypes tab scaffold ready.")
+    st.subheader("Knowledge Graph")
+    import plotly.graph_objects as go
+    import networkx as nx
+
+    from core.db import fetchall as _kg_fetchall, execute as _kg_execute
+
+    # ── Controls row ──────────────────────────────────────────────────────
+    ctrl1, ctrl2, ctrl3 = st.columns([2, 1, 1])
+    with ctrl1:
+        # Collection selector — drives bottom panels
+        all_kg_collections = sorted(collections_cfg.keys())
+        selected_kg_col = st.selectbox(
+            "Focus collection (filters bottom panels)",
+            ["(all)"] + all_kg_collections,
+            key="kg_selected_col"
+        )
+    with ctrl2:
+        min_conf = st.slider("Min confidence", 0.0, 1.0, 0.4, 0.05, key="kg_min_conf")
+    with ctrl3:
+        min_links = st.slider("Min link count", 1, 50, 1, 1, key="kg_min_links")
+
+    # ── Network Graph ─────────────────────────────────────────────────────
+    @st.cache_data(ttl=60)
+    def _fetch_graph_data(min_links, min_conf):
+        edges = _kg_fetchall("""
+            SELECT source_collection, target_collection,
+                   COUNT(*) as n, AVG(confidence) as avg_conf,
+                   string_agg(DISTINCT match_type, ', ') as types
+            FROM cross_links
+            WHERE status = 'confirmed'
+            GROUP BY source_collection, target_collection
+            HAVING COUNT(*) >= %s AND AVG(confidence) >= %s
+        """, (min_links, min_conf))
+        sizes = _kg_fetchall("""
+            SELECT collection_name, COUNT(*) as n
+            FROM chunks GROUP BY collection_name
+        """, ())
+        return edges, sizes
+
+    edges_raw, node_sizes_raw = _fetch_graph_data(min_links, min_conf)
+    node_sizes = {r['collection_name']: r['n'] for r in node_sizes_raw}
+
+    if not edges_raw:
+        st.info("No confirmed cross-links match the current filters. Build cross-links first in the Build section below.")
+    else:
+        G = nx.DiGraph()
+        for e in edges_raw:
+            G.add_node(e['source_collection'])
+            G.add_node(e['target_collection'])
+            G.add_edge(
+                e['source_collection'],
+                e['target_collection'],
+                weight=e['n'],
+                conf=round(float(e['avg_conf']), 2),
+                types=e['types']
+            )
+
+        # Add isolated nodes (collections with no confirmed links)
+        for col in all_kg_collections:
+            if col not in G.nodes():
+                G.add_node(col)
+
+        pos = nx.spring_layout(G, seed=42, k=2.5)
+
+        # Edge traces
+        edge_traces = []
+        for src, tgt, data in G.edges(data=True):
+            x0, y0 = pos[src]
+            x1, y1 = pos[tgt]
+            # Highlight edges connected to selected collection
+            is_focused = selected_kg_col in (src, tgt) if selected_kg_col != "(all)" else True
+            width = max(1, min(10, data['weight'] // 15)) if is_focused else 1
+            opacity = min(1.0, data['conf']) if is_focused else 0.2
+            color = f"rgba(100, 180, 255, {opacity})"
+            edge_traces.append(go.Scatter(
+                x=[x0, x1, None], y=[y0, y1, None],
+                mode='lines',
+                line=dict(width=width, color=color),
+                hoverinfo='text',
+                text=f"{src} → {tgt}<br>Links: {data['weight']}<br>Avg conf: {data['conf']}<br>Types: {data['types']}",
+                showlegend=False
+            ))
+
+        # Node trace
+
+        # Collections with internal (self) links get a ring
+        self_linked = {r['source_collection'] for r in edges_raw 
+                      if r['source_collection'] == r['target_collection']}
+
+        node_x, node_y, node_text, node_hover, node_color, node_size_list = [], [], [], [], [], []
+        for node in G.nodes():
+            x, y = pos[node]
+            node_x.append(x)
+            node_y.append(y)
+            node_text.append(node)
+            chunks = node_sizes.get(node, 0)
+            node_hover.append(f"<b>{node}</b><br>Chunks: {chunks}<br>Connections: {G.degree(node)}")
+            # Highlight selected node
+            if selected_kg_col != "(all)" and node == selected_kg_col:
+                node_color.append('#FF6B6B')
+            elif node in self_linked:
+                node_color.append('#9B59B6')
+            else:
+                node_color.append('#4A9EDB')
+            node_size_list.append(max(25, min(60, chunks // 100 + 25)))
+
+
+
+        node_trace = go.Scatter(
+            x=node_x, y=node_y,
+            mode='markers+text',
+            hoverinfo='text',
+            text=node_text,
+            textposition='top center',
+            hovertext=node_hover,
+            marker=dict(
+                size=node_size_list,
+                color=node_color,
+                line=dict(width=2, color='white')
+            ),
+            showlegend=False
+        )
+
+        fig = go.Figure(
+            data=edge_traces + [node_trace],
+            layout=go.Layout(
+                showlegend=False,
+                hovermode='closest',
+                margin=dict(b=20, l=5, r=5, t=10),
+                xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
+                yaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
+                height=450,
+                paper_bgcolor='rgba(0,0,0,0)',
+                plot_bgcolor='rgba(0,0,0,0)',
+            )
+        )
+        st.plotly_chart(fig, use_container_width=True)
+
+    st.divider()
+
+    # Edge summary table
+    if edges_raw:
+        st.markdown("**Cross-link summary:**")
+        edge_data = [
+            {
+                "Source": e['source_collection'],
+                "Target": e['target_collection'],
+                "Links": e['n'],
+                "Avg Conf": round(float(e['avg_conf']), 2),
+                "Types": e['types']
+            }
+            for e in edges_raw
+        ]
+        st.dataframe(edge_data, use_container_width=True, hide_index=True)
+
+    st.divider()
+
+    # ── Bottom two columns ────────────────────────────────────────────────
+    kg_left, kg_right = st.columns([1, 1])
+
+    # ── Left: Concept Clusters ────────────────────────────────────────────
+    with kg_left:
+        st.markdown("### Concept Clusters")
+        cv_col = selected_kg_col if selected_kg_col != "(all)" else None
+        if cv_col:
+            cv_rows = _kg_fetchall("""
+                SELECT group_field, group_value, cluster_id,
+                       anchor_chunk_ids,
+                       anchor_texts->0 AS first_anchor
+                FROM concept_vectors
+                WHERE collection = %s
+                ORDER BY group_value, cluster_id
+            """, (cv_col,))
+            if cv_rows:
+                st.caption(f"{len(cv_rows)} clusters — grouped by {cv_rows[0]['group_field']}")
+                if st.button(f"🗑 Delete concept vectors for {cv_col}", key="kg_delete_cv"):
+                    _kg_execute("DELETE FROM concept_vectors WHERE collection = %s", (cv_col,))
+                    st.success(f"Deleted concept vectors for {cv_col}. Rebuild in the Build section below.")
+                    st.rerun()
+                for r in cv_rows:
+                    label = f"**{r['group_value']}** — cluster {r['cluster_id']}"
+                    with st.expander(label, expanded=False):
+                        anchor = str(r['first_anchor'] or '')[:400]
+                        st.text(anchor)
+                        
+                        # Show semantic matches in other collections
+                        st.caption("**Semantic matches in other collections:**")
+                        from core.concept_link_finder import find_concept_links
+                        anchor_ids = r.get('anchor_chunk_ids') or []
+                        if anchor_ids:
+                            _cv_links = find_concept_links(cv_col, anchor_ids[0])
+                            if _cv_links:
+                                for lk in _cv_links:
+                                    st.caption(f"→ {lk['target_collection']} / {lk['group_value']} (similarity: {lk['similarity']:.2f})")
+                            else:
+                                st.caption("No semantic matches above threshold.")
+                        else:
+                            st.caption("No anchor chunks available.")
+            else:
+                st.info("Select a collection above to view its concept clusters.")
+
+    # ── Right: Cross-Links with actions ───────────────────────────────────
+    with kg_right:
+        st.markdown("### Cross-Links")
+
+        from core.db import fetchall, execute
+
+        link_status_filter = st.radio(
+            "Show",
+            ["pending_review", "confirmed", "rejected"],
+            horizontal=True,
+            key="kg_link_status"
+        )
+
+        link_direction = st.radio(
+            "Direction",
+            ["outgoing", "incoming", "both"],
+            horizontal=True,
+            key="kg_link_direction"
+        )
+
+        # Fetch grouped by target
+        group_query = """
+            SELECT 
+                target_collection,
+                target_identifier,
+                match_type,
+                COUNT(*) as n,
+                AVG(confidence) as avg_conf,
+                string_agg(source_identifier, ', ' ORDER BY source_identifier) as sources,
+                string_agg(source_collection, ', ' ORDER BY source_identifier) as source_cols
+            FROM cross_links
+            WHERE status = %s
+        """
+        group_params = [link_status_filter]
+
+        if selected_kg_col != "(all)":
+            if link_direction == "outgoing":
+                group_query += " AND source_collection = %s"
+                group_params.append(selected_kg_col)
+            elif link_direction == "incoming":
+                group_query += " AND target_collection = %s"
+                group_params.append(selected_kg_col)
+            else:
+                group_query += " AND (source_collection = %s OR target_collection = %s)"
+                group_params += [selected_kg_col, selected_kg_col]
+
+        group_query += """
+            GROUP BY target_collection, target_identifier, match_type
+            ORDER BY n DESC, avg_conf DESC
+            LIMIT 100
+        """
+
+        groups = fetchall(group_query, tuple(group_params))
+
+        if not groups:
+            st.info(f"No {link_status_filter} links for this selection.")
+        else:
+            st.caption(f"{len(groups)} target groups")
+
+            # Bulk reset for rejected
+            if link_status_filter == "rejected":
+                if st.button("↩ Reset ALL rejected → pending", key="kg_reset_rejected"):
+                    execute("UPDATE cross_links SET status='pending_review', updated_at=NOW() WHERE status='rejected'", ())
+                    st.rerun()
+
+            # Pre-resolve all target + source display names in ONE query per collection
+            # (kills the per-row N+1 round-trips to the NAS over Tailscale — the main
+            # source of slowness on this screen). Identical output, far fewer queries.
+            _need = {}
+            for grp in groups:
+                _need.setdefault(grp['target_collection'], set()).add(grp['target_identifier'])
+                _sids = str(grp['sources'] or '').split(', ')
+                _scols = str(grp['source_cols'] or '').split(', ')
+                for _i, _sid in enumerate(_sids[:10]):
+                    _c = _scols[_i] if _i < len(_scols) else grp['target_collection']
+                    _need.setdefault(_c, set()).add(_sid)
+
+            _name_map = {}
+            for _c, _ids in _need.items():
+                _idlist = [i for i in _ids if i]
+                if not _idlist:
+                    continue
+                for r in fetchall(
+                    """SELECT payload->>'identifier' AS ident, payload->>'source_file' AS sf,
+                              payload->>'primary_name' AS name,
+                              LEFT(payload->>'description', 200) AS d
+                       FROM chunks WHERE collection_name = %s
+                         AND (payload->>'identifier' = ANY(%s) OR payload->>'source_file' = ANY(%s))""",
+                    (_c, _idlist, _idlist)
+                ):
+                    if r.get('ident'):
+                        _name_map.setdefault((_c, r['ident']), {'name': r['name'], 'd': r['d']})
+                    if r.get('sf'):
+                        _name_map.setdefault((_c, r['sf']), {'name': r['name'], 'd': r['d']})
+
+            for grp in groups:
+                _tgt = _name_map.get((grp['target_collection'], grp['target_identifier'])) or {}
+                _tgt_display = _tgt.get('name') or grp['target_identifier']
+
+                label = f"→ **{grp['target_collection']}**: {_tgt_display} ({grp['match_type']}, avg {float(grp['avg_conf']):.2f}) — {grp['n']} links"
+
+                with st.expander(label, expanded=False):
+                    # Target preview (from the prefetched map)
+                    if _tgt:
+                        st.caption(f"Target: {_tgt.get('name') or grp['target_identifier']}")
+                        st.text(_tgt.get('d') or '')
+
+                    # Sources list — resolved via the prefetched map, each in its own collection
+                    sources_raw = str(grp['sources'] or '').split(', ')
+                    source_cols = str(grp['source_cols'] or '').split(', ')
+                    sources_display = []
+                    for _i, _src_id in enumerate(sources_raw[:10]):
+                        _src_col = source_cols[_i] if _i < len(source_cols) else grp['target_collection']
+                        _title = (_name_map.get((_src_col, _src_id)) or {}).get('name')
+                        _src_display = f"{_title} (#{_src_id})" if _title else _src_id
+                        sources_display.append(_src_display)
+                    _src_col_set = sorted(set(c for c in source_cols if c))
+                    _src_col_note = f" from {', '.join(_src_col_set)}" if _src_col_set else ""
+                    st.caption(f"Sources ({len(sources_raw)}){_src_col_note}:")
+                    for _sd in sources_display:
+                        st.markdown(f"- {_sd}")
+                    if len(sources_raw) > 10:
+                        st.caption(f"…and {len(sources_raw) - 10} more")
+
+                    # Action buttons
+                    b1, b2, b3 = st.columns(3)
+                    _btn_key = f"{grp['target_collection']}_{grp['target_identifier']}_{grp['match_type']}"
+
+                    with b1:
+                        if link_status_filter != "confirmed":
+                            if st.button("✓ Confirm All", key=f"kg_ca_{_btn_key}"):
+                                execute("""
+                                    UPDATE cross_links SET status='confirmed', updated_at=NOW()
+                                    WHERE target_collection=%s AND target_identifier=%s
+                                    AND match_type=%s AND status=%s
+                                """, (grp['target_collection'], grp['target_identifier'],
+                                      grp['match_type'], link_status_filter))
+                                st.rerun()
+                        else:
+                            if st.button("↩ Pending All", key=f"kg_pa_{_btn_key}"):
+                                execute("""
+                                    UPDATE cross_links SET status='pending_review', updated_at=NOW()
+                                    WHERE target_collection=%s AND target_identifier=%s
+                                    AND match_type=%s AND status='confirmed'
+                                """, (grp['target_collection'], grp['target_identifier'], grp['match_type']))
+                                st.rerun()
+
+                    with b2:
+                        if link_status_filter != "rejected":
+                            if st.button("✗ Reject All", key=f"kg_ra_{_btn_key}"):
+                                execute("""
+                                    UPDATE cross_links SET status='rejected', updated_at=NOW()
+                                    WHERE target_collection=%s AND target_identifier=%s
+                                    AND match_type=%s AND status=%s
+                                """, (grp['target_collection'], grp['target_identifier'],
+                                      grp['match_type'], link_status_filter))
+                                st.rerun()
+
+                    with b3:
+                        if st.button("✗ + Ignore term", key=f"kg_ia_{_btn_key}"):
+                            execute("""
+                                UPDATE cross_links SET status='rejected', updated_at=NOW()
+                                WHERE target_collection=%s AND target_identifier=%s
+                                AND match_type=%s
+                            """, (grp['target_collection'], grp['target_identifier'], grp['match_type']))
+                            hints = load_json(DOC_QUERY_HINTS_PATH, {})
+                            terms = set(hints.get("generic_terms", []))
+                            # Add the target identifier as ignored term
+                            terms.add(grp['target_identifier'].strip().lower())
+                            hints["generic_terms"] = sorted(terms)
+                            save_json(DOC_QUERY_HINTS_PATH, hints)
+                            st.rerun()
+
+    st.divider()
+
+    # ── Build section ─────────────────────────────────────────────────────
+    st.markdown("### Build Cross-Links + Concept Vectors")
+    build_c1, build_c2 = st.columns([1, 2])
+    with build_c1:
+        build_source = st.selectbox(
+            "Source collection",
+            sorted(collections_cfg.keys()),
+            key="kg_build_source"
+        )
+    with build_c2:
+        build_targets = st.multiselect(
+            "Target collections (leave empty for all others)",
+            [c for c in sorted(collections_cfg.keys()) if c != build_source],
+            key="kg_build_targets"
+        )
+
+    st.divider()
+    st.markdown("#### Danger Zone")
+    del_c1, del_c2, del_c3 = st.columns(3)
+    with del_c1:
+        if st.button("🗑 Delete ALL cross-links", key="kg_del_all_links"):
+            if st.session_state.get("kg_confirm_delete"):
+                _kg_execute("DELETE FROM cross_links", ())
+                st.success("All cross-links deleted.")
+                st.session_state["kg_confirm_delete"] = False
+                st.rerun()
+            else:
+                st.session_state["kg_confirm_delete"] = True
+                st.warning("Click again to confirm deletion of ALL cross-links.")
+    with del_c2:
+        if st.button("🗑 Delete ALL concept vectors", key="kg_del_all_cv"):
+            if st.session_state.get("kg_confirm_delete_cv"):
+                _kg_execute("DELETE FROM concept_vectors", ())
+                st.success("All concept vectors deleted.")
+                st.session_state["kg_confirm_delete_cv"] = False
+                st.rerun()
+            else:
+                st.session_state["kg_confirm_delete_cv"] = True
+                st.warning("Click again to confirm deletion of ALL concept vectors.")
+    with del_c3:
+        _del_col = st.selectbox(
+            "Delete for collection",
+            [""] + sorted(collections_cfg.keys()),
+            key="kg_del_col_select"
+        )
+        if _del_col and st.button("🗑 Delete for collection", key="kg_del_col_btn"):
+            _kg_execute("DELETE FROM cross_links WHERE source_collection = %s", (_del_col,))
+            _kg_execute("DELETE FROM concept_vectors WHERE collection = %s", (_del_col,))
+            st.success(f"Deleted cross-links and concept vectors for {_del_col}.")
+            st.rerun()
+
+    st.divider()
+
+    if st.button("Build Cross-Links + Concept Vectors", key="kg_build_btn"):
+        from core.cross_link_discoverer import discover_cross_links
+        from core.cross_link_store import ensure_cross_links_table, save_cross_link_candidates
+        from core.concept_vector_builder import build_concept_vectors
+
+        ensure_cross_links_table()
+        targets = build_targets or None
+
+        with st.spinner(f"Discovering links from {build_source}..."):
+            candidates = discover_cross_links(build_source, target_collections=targets)
+            result = save_cross_link_candidates(candidates)
+
+        with st.spinner(f"Building concept vectors for {build_source}..."):
+            _kg_execute("DELETE FROM concept_vectors WHERE collection = %s", (build_source,))
+            n_vectors = build_concept_vectors(build_source)
+
+        st.success(f"Cross-links: found {len(candidates)} candidates — saved {result['saved']}, skipped {result['skipped']}. Concept vectors: {n_vectors} built.")

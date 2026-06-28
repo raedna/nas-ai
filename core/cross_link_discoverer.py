@@ -1,4 +1,20 @@
+import re
 from core.db import fetchall
+
+
+def _meaningful_context(text, term):
+    """CL-02: True only if `term` appears as a whole word inside enough surrounding
+    text to be a real discussion, not a bare list entry or passing reference."""
+    if not text or not term:
+        return False
+    pat = re.compile(r'(?<![A-Za-z0-9])' + re.escape(term) + r'(?![A-Za-z0-9])', re.I)
+    for m in pat.finditer(text):
+        window = text[max(0, m.start() - 60): m.end() + 60]
+        others = [w for w in re.findall(r'[A-Za-z0-9]+', window)
+                  if w.lower() != term.lower()]
+        if len(others) >= 8:
+            return True
+    return False
 
 
 def discover_cross_links(source_collection, target_collections=None):
@@ -127,7 +143,7 @@ def discover_cross_links(source_collection, target_collections=None):
                 )
 
                 for term in mention_terms:
-                    if not term or len(term) < 4:
+                    if not term or len(term) < 8:   # CL-01: was < 4 — cut short generic terms
                         continue
                     if term.isdigit():
                         continue
@@ -137,7 +153,8 @@ def discover_cross_links(source_collection, target_collections=None):
                         SELECT DISTINCT
                             payload->>'identifier' AS identifier,
                             payload->>'primary_name' AS primary_name,
-                            payload->>'source_file' AS source_file
+                            payload->>'source_file' AS source_file,
+                            COALESCE(payload->>'description', payload->>'text', '') AS ctx
                         FROM chunks
                         WHERE collection_name = %s
                         AND payload->>'description' ILIKE %s
@@ -145,6 +162,10 @@ def discover_cross_links(source_collection, target_collections=None):
                     """, (target, f"%{term}%"))
 
                     for m in mentions:
+                        # CL-02: require the term to sit in real surrounding context,
+                        # not a bare list/reference entry.
+                        if not _meaningful_context(m.get("ctx"), term):
+                            continue
                         t_id = (m.get("source_file") or m.get("identifier") or m.get("primary_name")) if _target_chunked else (m.get("identifier") or m.get("primary_name"))
                         term_len = len(term)
                         if term_len >= 13:

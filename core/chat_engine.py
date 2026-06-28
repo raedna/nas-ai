@@ -58,7 +58,7 @@ DEBUG = False
 def select_collections(question: str, history: list, available_collections: list) -> list:
     """
     3-tier collection routing:
-    Tier 1 — identifier/filename direct DB match
+    Tier 1 — identifier/filename direct DB matchc
     Tier 2 — concept vector cluster LLM routing
     Tier 3 — fallback to first available collection
     """
@@ -81,9 +81,10 @@ def select_collections(question: str, history: list, available_collections: list
     #_tags = re.findall(r'\btag\s+(\d+)\b', question, re.IGNORECASE)
     _identifiers = _filenames #+ _tags
 
+    _tier1_hits = []
     for _id in _identifiers:
         for _col in available_collections:
-            if _col in seen:
+            if _col in _tier1_hits:
                 continue
             _hit = _fetchall(
                 """SELECT 1 FROM chunks
@@ -93,10 +94,9 @@ def select_collections(question: str, history: list, available_collections: list
                 (_col, _id)
             )
             if _hit:
-                selected.append(_col)
-                seen.add(_col)
+                _tier1_hits.append(_col)
 
-    # Also add collections linked via confirmed cross-links for found identifiers
+    # Also add collections linked via confirmed cross-links
     for _id in _identifiers:
         linked = _fetchall(
             """SELECT DISTINCT target_collection FROM cross_links
@@ -106,12 +106,11 @@ def select_collections(question: str, history: list, available_collections: list
         )
         for row in linked:
             col = row["target_collection"]
-            if col in available_collections and col not in seen:
-                selected.append(col)
-                seen.add(col)
+            if col in available_collections and col not in _tier1_hits:
+                _tier1_hits.append(col)
 
-    if len(selected) >= 2:
-        return selected[:3]
+    # Don't return early — let Tier 2 LLM determine ordering
+    # Tier 1 hits will be merged after Tier 2
 
     # --- Tier 2: concept vector cluster LLM routing ---
     history_text = "\n".join([
@@ -186,6 +185,12 @@ Respond with JSON only:
             if c in available_collections and c not in seen:
                 selected.append(c)
                 seen.add(c)
+
+    # Merge Tier 1 hits that Tier 2 missed (preserve Tier 2 ordering)
+    for _col in _tier1_hits:
+        if _col not in seen:
+            selected.append(_col)
+            seen.add(_col)
 
     if selected:
         return selected[:3]
@@ -446,13 +451,31 @@ def chat_turn(question: str, history: list, available_collections: list) -> dict
     collection = query_run.get("collection")
 
     # Split related sections: high-confidence → merge into answer, low-confidence → show as related
+    import json as _json
+    try:
+        with open(COLLECTIONS_PATH, 'r') as _f:
+            _coll_cfg_chat = _json.load(_f)
+    except Exception:
+        _coll_cfg_chat = {}
+
+    def _is_structured_collection(col):
+        from core.db import fetchall as _fа
+        rows = _fа(
+            "SELECT DISTINCT payload->>'doc_type' AS dt FROM chunks WHERE collection_name = %s LIMIT 5",
+            (col,)
+        )
+        doc_types = {r['dt'] for r in rows if r['dt']}
+        return doc_types == {'structured'} or doc_types == {'structured', None}
+
     high_confidence = [
         s for s in all_related
         if s.get("confidence", 0) >= RELATED_MERGE_THRESHOLD
+        and not (s.get("match_type") == "concept" and _is_structured_collection(s.get("collection", "")))
     ]
     related_sections = [
         s for s in all_related
         if s.get("confidence", 0) < RELATED_MERGE_THRESHOLD
+        and not (s.get("match_type") == "concept" and _is_structured_collection(s.get("collection", "")))
     ]
 
     merged_image_payload = None

@@ -4,6 +4,7 @@
   "aliases": ["alias", "abbrname", "shortname"],
   "description": ["description", "definition", "explanation", "resolution"],
   "type": ["type"],
+  "tags": ["tags", "kbtags", "keywords", "labels"],
   "enum_value": ["value", "code", "enum"],
   "enum_name": ["symbolicname", "label"],
   "reference_identifier": ["associateddatatag", "parent", "parentid", "ref", "reference"]
