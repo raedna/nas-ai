@@ -233,7 +233,13 @@ def _build_groups(collection):
 # ---------------------------------------------------------------------------
 # CV-04: relabel filename/generic group_values from anchor texts via LLM
 # ---------------------------------------------------------------------------
+_BOOLEANISH = {"yes", "no", "true", "false", "none", "na", "n/a", "tbd", "null", "y", "n"}
+
+
 def _looks_generic_group_value(gv, group_field):
+    """A group_value that makes a poor 'related topic' label and should be relabeled
+    by the LLM from anchor texts — filenames, boolean/flag values, very short codes,
+    pure numbers, and configured generic terms."""
     import re
     g = str(gv or "").strip()
     if not g:
@@ -241,6 +247,12 @@ def _looks_generic_group_value(gv, group_field):
     if group_field == 'source_file':
         return True
     if re.match(r'.+\.[A-Za-z0-9]{1,6}$', g):              # filename-like
+        return True
+    if len(g) <= 3:                                        # NO, FX, tag, QA, UAT-ish stubs
+        return True
+    if g.lower() in _BOOLEANISH:                           # boolean/flag column values
+        return True
+    if g.replace("-", "").replace(".", "").isdigit():     # pure numeric / version-ish
         return True
     from core.query_helpers import load_doc_query_hints
     return g.lower() in {t.lower() for t in load_doc_query_hints().get("generic_terms", [])}

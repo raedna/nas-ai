@@ -535,6 +535,12 @@ def run_query_with_method(
     # Pre-normalization filename detection — before normalize_simple_text strips dots
     import re
     _filename_matches = re.findall(r'\b([a-zA-Z0-9_\-]+\.[a-zA-Z0-9]{2,5})\b', question)
+    # Drop domain/URL-like matches (e.g. omnivista.com) — they're not file identifiers
+    # and would otherwise trigger a dead-end identifier lookup.
+    _DOMAIN_TLDS = {"com", "org", "net", "io", "gov", "edu", "co", "uk", "ai",
+                    "biz", "info", "us", "ca", "dev", "app"}
+    _filename_matches = [m for m in _filename_matches
+                         if m.rsplit(".", 1)[-1].lower() not in _DOMAIN_TLDS]
     if _filename_matches:
         from core.retrieval.db_retrieval import get_by_identifier, fetchall
         for _fname in _filename_matches:
@@ -645,6 +651,12 @@ def run_query_with_method(
                 }
 
             else:
+                # Filename detected but not found. If the query is a sentence (the
+                # filename was incidental), don't dead-end — fall through to semantic
+                # search below. Only show the "did you mean" suggestion for short,
+                # filename-style lookups.
+                if len(question.split()) > 4:
+                    break  # fall through to the semantic / lexical path
                 try:
                     _similar = fetchall("""
                         SELECT DISTINCT

@@ -208,7 +208,7 @@ def run_parallel_queries(collections: list, question: str) -> dict:
 
     if len(collections) == 1:
         result = run_query_with_method(
-            collections[0], question, limit=10,
+            collections[0], question, limit=25,
             show_exact_links=True, show_related_topics=True,
             skip_planner=True, force_answer=True
         )
@@ -220,7 +220,7 @@ def run_parallel_queries(collections: list, question: str) -> dict:
         futures = {
             executor.submit(
                 run_query_with_method,
-                col, question, "best", 10, True, True, True, True
+                col, question, "best", 25, True, True, True, True
             ): col
             for col in collections
         }
@@ -283,7 +283,14 @@ def extract_focus_terms(history, last_n=3):
             for m in matches:
                 if m not in terms:
                     terms.append(m)
-    
+
+    # Drop domain/URL-like tokens (e.g. omnivista.com) — they leak from prior-answer
+    # content and get mistaken for file identifiers when injected into the query.
+    _tld = {"com", "org", "net", "io", "gov", "edu", "co", "uk", "ai",
+            "biz", "info", "us", "ca", "dev", "app"}
+    terms = [t for t in terms
+             if not ("." in t and t.rsplit(".", 1)[-1].lower() in _tld)]
+
     return terms
 
 
