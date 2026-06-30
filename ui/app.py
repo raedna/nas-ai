@@ -13,7 +13,7 @@ import sys
 # Allow `python ui/app.py` from anywhere by putting the repo root on the path.
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from nicegui import ui  # noqa: E402
+from nicegui import ui, app  # noqa: E402
 from ui.ask import render_ask_panel  # noqa: E402
 from ui.chat import render_chat_panel  # noqa: E402
 from ui.collections_view import render_collections_panel  # noqa: E402
@@ -32,14 +32,22 @@ TABS = [
 @ui.page("/")
 def index():
     ui.colors(primary="#1F4E79")
+    # Remember the last-selected tab across reloads/reconnects so a dropped
+    # websocket (switching apps / laptop sleep) doesn't dump the user back on
+    # Collections. Stored per-user in a signed cookie via app.storage.user.
+    saved_tab = app.storage.user.get("active_tab", "Collections")
+    if saved_tab not in TABS:
+        saved_tab = "Collections"
+
     # Tabs live INSIDE the fixed header so they stay visible while scrolling a tab.
     with ui.header().classes("items-center q-pa-sm"):
         ui.label("NAS AI").classes("text-xl font-bold")
         ui.label("Offline AI Knowledge Retrieval").classes("text-xs opacity-70 ml-2 mr-4")
         with ui.tabs().props("inline-label dense") as tabs:
             tab_refs = {name: ui.tab(name) for name in TABS}
+    tabs.on_value_change(lambda e: app.storage.user.update(active_tab=e.value))
 
-    with ui.tab_panels(tabs, value=tab_refs["Collections"]).classes("w-full"):
+    with ui.tab_panels(tabs, value=tab_refs[saved_tab]).classes("w-full"):
         for name in TABS:
             with ui.tab_panel(tab_refs[name]):
                 if name == "Collections":
@@ -60,4 +68,8 @@ def index():
                     ui.label(f"{name} — coming soon").classes("text-gray-500 p-4")
 
 
-ui.run(title="NAS AI", port=8080, reload=False, show=True)
+# storage_secret enables app.storage.user (signed cookie).
+# reconnect_timeout is generous so briefly switching away from the tab doesn't
+# trigger a full page reload when the websocket reconnects.
+ui.run(title="NAS AI", port=8080, reload=False, show=True,
+       storage_secret="nas-ai-local-ui", reconnect_timeout=600)
