@@ -5,3 +5,4 @@ schemas/*.json
 config/schema_overrides.json
 .DS_Store
 ~$S-AI_Technical_Manual_v2.docx
+.DS_Store
