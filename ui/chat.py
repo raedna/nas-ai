@@ -54,6 +54,8 @@ def render_chat_panel():
             return
 
         content = resp.get("content", "") if isinstance(resp, dict) else str(resp)
+        if not isinstance(content, str):
+            content = str(content)  # never store non-string in history (slice-safety)
         payload = resp.get("answer_payload") if isinstance(resp, dict) else None
         history.append({"role": "assistant", "content": content})
 

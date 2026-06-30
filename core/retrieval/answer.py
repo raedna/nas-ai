@@ -176,6 +176,14 @@ def synthesize_answer(payload: Dict, roles: List[str], collection_name: str) -> 
         elif description:
             lines.append(f"\nDescription: {description}")
 
+        # Surface aliases ("Also known as" — e.g. a record's PB / original filename),
+        # which were previously dropped from structured answers.
+        aliases = payload.get("aliases") or []
+        if isinstance(aliases, list) and aliases:
+            lines.append("Also known as: " + ", ".join(str(a) for a in aliases))
+        elif isinstance(aliases, str) and aliases.strip():
+            lines.append("Also known as: " + aliases.strip())
+
         type_value = payload.get("type")
         if type_value and type_value != "structured":
             lines.append(f"\nType: {type_value}")

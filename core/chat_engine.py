@@ -16,15 +16,68 @@ GROUNDED_SYSTEM_PROMPT = """You are NAS-AI, an intelligent offline assistant for
 CRITICAL RULES — you MUST follow these exactly:
 1. The RETRIEVED DATA block below is the authoritative source. You MUST present it to the user.
 2. Copy field names, file names, identifiers, and values VERBATIM from the retrieved data — never rename, paraphrase, or substitute them.
-3. If the retrieved data says "Moore file name: gsact.txt", you output exactly "Moore file name: gsact.txt" — never change it.
+3. If the retrieved data says "<field>: <value>", you output exactly "<field>: <value>" — never change the field name or its value.
 4. You may add a brief intro sentence (e.g. "Here is what I found:") and a brief closing if helpful.
 5. Do NOT add any information not present in the retrieved data.
 6. Do NOT use your training knowledge to fill gaps — if it is not in the retrieved data, say so.
 7. Never mention that you are an AI language model — you are NAS-AI."""
 
+DOC_GROUNDED_SYSTEM_PROMPT = """You are NAS-AI, an intelligent offline assistant for financial and astronomical operations.
+
+Answer the user's question using ONLY the RETRIEVED DATA below. Do not use outside knowledge.
+
+The retrieved data is a document or procedure. Give a CONCISE, DIRECT answer to the specific question:
+- Lead with the answer in 1-4 sentences, or a short list of just the relevant steps.
+- Quote the specific relevant lines/values verbatim from the document.
+- Do NOT reproduce the entire document — include only what answers the question.
+- If the answer is not in the retrieved data, say so plainly.
+Never mention that you are an AI language model — you are NAS-AI."""
+
 # Related sections with similarity >= this are merged into the main answer.
 # Below this threshold they appear as collapsible "Related" items.
 RELATED_MERGE_THRESHOLD = 0.80
+
+
+def _result_to_text(result) -> str:
+    """Coerce a retrieval result into a string. Discovery/list and analytics queries
+    return a dict (e.g. {total_matches, results:[...]}); chat content must always be a
+    string, or later turns crash when history text is sliced ('unhashable type: slice')."""
+    if result is None:
+        return "No answer found."
+    if isinstance(result, str):
+        return result
+    if isinstance(result, dict):
+        if isinstance(result.get("results"), list):
+            items = result["results"]
+            total = result.get("total_matches", len(items))
+            lines = [f"Found {total} item(s):"]
+            for it in items:
+                if isinstance(it, dict):
+                    name = (it.get("identifier") or it.get("primary_name")
+                            or it.get("title") or "")
+                    prev = str(it.get("preview") or "").strip().replace("\n", " ")
+                    lines.append(f"- {name}" + (f": {prev[:160]}" if prev else ""))
+                else:
+                    lines.append(f"- {it}")
+            return "\n".join(lines)
+        if isinstance(result.get("result"), (str, dict, list)):
+            return _result_to_text(result.get("result"))
+        return str(result)
+    if isinstance(result, list):
+        return "\n".join(str(x) for x in result)
+    return str(result)
+
+
+def classify_answer_kind(method, answer_payload) -> str:
+    """structured (render verbatim) vs doc (concise focused synthesis). Shared by the
+    Chat and Ask surfaces so document answers are concise in both."""
+    dtype = str((answer_payload or {}).get("doc_type") or "")
+    method = str(method or "")
+    if dtype == "structured" or any(
+            k in method for k in ("structured", "namespace", "identifier", "enum")):
+        return "structured"
+    return "doc"
+
 
 def detect_chat_intent(question: str, history: list) -> dict:
     """Determine if question needs retrieval or is conversational."""
@@ -263,37 +316,6 @@ def run_parallel_queries(collections: list, question: str) -> dict:
     best_result["related_sections"] = merged_related
     return best_result
 
-def extract_focus_terms(history, last_n=3):
-    """Extract focus terms from recent conversation history."""
-    import re
-    terms = []
-    
-    # Patterns to extract
-    patterns = [
-        r'\b([a-zA-Z0-9_\-]+\.[a-zA-Z0-9]{2,5})\b',  # filenames
-        r'\btag\s+(\d+)\b',                              # FIX tags
-        r'\b([A-Z][A-Z0-9_]{3,})\b',                    # ALL_CAPS identifiers
-        r'\b(Goldman|JPMorgan|Citi|CSFB|Barclays|UBS|Morgan|Chase|BONY)\b',  # broker names
-    ]
-    
-    for msg in history[-last_n:]:
-        text = msg.get("content", "")
-        for pattern in patterns:
-            matches = re.findall(pattern, text, re.IGNORECASE)
-            for m in matches:
-                if m not in terms:
-                    terms.append(m)
-
-    # Drop domain/URL-like tokens (e.g. omnivista.com) — they leak from prior-answer
-    # content and get mistaken for file identifiers when injected into the query.
-    _tld = {"com", "org", "net", "io", "gov", "edu", "co", "uk", "ai",
-            "biz", "info", "us", "ca", "dev", "app"}
-    terms = [t for t in terms
-             if not ("." in t and t.rsplit(".", 1)[-1].lower() in _tld)]
-
-    return terms
-
-
 _CONTEXTUALIZE_FORMAT = {
     "type": "json_schema",
     "json_schema": {
@@ -323,6 +345,21 @@ def _fast_model():
         return None
 
 
+def _has_explicit_identifier(question: str) -> bool:
+    """True if the question already names a concrete identifier — a number/code
+    (e.g. 'tag 22'), a filename ('gsact.txt'), or an ALL-CAPS code. Such a question
+    is self-contained for retrieval and must NOT be rewritten/expanded from history
+    (the rewrite tends to append prior-answer qualifiers and break the lookup).
+    Generic pattern matching — no hardcoded entities."""
+    import re
+    q = question or ""
+    return bool(
+        re.search(r"\b\d{2,}\b", q)                       # tag/code numbers (>=2 digits)
+        or re.search(r"\b[\w\-]+\.[A-Za-z0-9]{2,5}\b", q)  # filenames
+        or re.search(r"\b[A-Z][A-Z0-9_]{3,}\b", q)         # ALL-CAPS codes
+    )
+
+
 def contextualize_query(question: str, history: list) -> dict:
     """Decide whether `question` is a follow-up and, if so, rewrite it into a
     self-contained query using recent history. New/standalone questions are
@@ -334,6 +371,13 @@ def contextualize_query(question: str, history: list) -> dict:
     recent = [m for m in (history or []) if m.get("role") in ("user", "assistant")]
     if not recent:
         return {"is_followup": False, "standalone_query": question, "reason": "no history"}
+
+    # A question that already contains its own explicit identifier is self-contained;
+    # do NOT let the rewrite expand it with prior-answer qualifiers (the 'what values
+    # can tag 22 have' -> '... for SecurityIDSource' over-firing that broke retrieval).
+    if _has_explicit_identifier(question):
+        return {"is_followup": False, "standalone_query": question,
+                "reason": "self-contained (explicit identifier)"}
 
     # Compact, truncated history so a long prior answer can't dominate the prompt.
     hist_lines = []
@@ -347,7 +391,7 @@ def contextualize_query(question: str, history: list) -> dict:
         "knowledge base. Decide if the latest message depends on the previous turns.\n\n"
         "DEFAULT to is_followup=false. Only set is_followup=true when the latest message "
         "CANNOT be understood on its own — i.e. it uses a pronoun ('it', 'that', 'they'), "
-        "is elliptical ('what about X', 'and Citi?', 'the second one'), or omits its subject "
+        "is elliptical ('what about X', 'and the other one?', 'the second one'), or omits its subject "
         "entirely. If the message already names its own subject/topic/field, it is standalone "
         "EVEN IF a previous turn was about something related.\n\n"
         "When is_followup=false: return standalone_query EQUAL to the latest message, "
@@ -355,13 +399,14 @@ def contextualize_query(question: str, history: list) -> dict:
         "When is_followup=true: rewrite into a complete question by pulling ONLY the missing "
         "subject from previous turns. Never append unrelated keywords or dump prior answer "
         "text.\n\n"
-        "Examples:\n"
-        "- prior 'what files does Goldman send' + 'what about Citi' -> "
-        "is_followup=true, 'what files does Citi send'.\n"
-        "- prior 'sftp folder for gsact.txt' + 'what is the ask price field' -> "
-        "is_followup=false, 'what is the ask price field' (DO NOT add 'for gsact.txt').\n"
-        "- prior 'what is tag 22' + 'steps for manual file loading in recon' -> "
-        "is_followup=false, 'steps for manual file loading in recon'.\n\n"
+        "Examples (generic):\n"
+        "- prior 'what files does PROVIDER_A send' + 'what about PROVIDER_B' -> "
+        "is_followup=true, 'what files does PROVIDER_B send' (only the subject changed).\n"
+        "- prior 'location for FILE_X' + 'what is the PRICE field' -> "
+        "is_followup=false, 'what is the PRICE field' (it names its own subject; DO NOT "
+        "attach FILE_X).\n"
+        "- prior 'what is CODE_123' + 'steps for TASK_Y' -> "
+        "is_followup=false, 'steps for TASK_Y' (a new self-contained topic).\n\n"
         "Return only the JSON object."
     )
     user = f"Previous turns:\n{hist_text}\n\nLatest message: {question}"
@@ -431,19 +476,36 @@ def _response_is_faithful(response: str, retrieved_answer: str) -> bool:
     return matched >= max(1, int(len(key_terms) * 0.7))
 
 
-def generate_conversational_response(question: str, history: list, retrieved_answer: str = None, primary_answer: str = None) -> str:
+def generate_conversational_response(question: str, history: list, retrieved_answer: str = None,
+                                     primary_answer: str = None, answer_kind: str = None) -> str:
     """
     Generate a response.
-    - With retrieved_answer: uses GROUNDED_SYSTEM_PROMPT + low temperature + faithfulness guard.
-    - Without retrieved_answer: uses CHAT_SYSTEM_PROMPT for free-form conversation.
+    - retrieved_answer + answer_kind == "structured": GROUNDED prompt, reproduce field
+      values verbatim, faithfulness guard ON.
+    - retrieved_answer + answer_kind == "doc": DOC_GROUNDED prompt — concise, focused
+      answer drawn from the document; faithfulness guard OFF (a concise answer
+      intentionally omits most of the document text).
+    - No retrieved_answer: CHAT_SYSTEM_PROMPT free-form conversation.
     """
-    system_prompt = GROUNDED_SYSTEM_PROMPT if retrieved_answer else CHAT_SYSTEM_PROMPT
+    is_doc = (answer_kind == "doc")
+    if not retrieved_answer:
+        system_prompt = CHAT_SYSTEM_PROMPT
+    elif is_doc:
+        system_prompt = DOC_GROUNDED_SYSTEM_PROMPT
+    else:
+        system_prompt = GROUNDED_SYSTEM_PROMPT
 
     messages = []
     for m in history[-5:]:
         messages.append({"role": m["role"], "content": m["content"]})
 
-    if retrieved_answer:
+    if retrieved_answer and is_doc:
+        user_content = (
+            f"Question: {question}\n\n"
+            f"RETRIEVED DATA (answer the question concisely from this; quote only the "
+            f"relevant lines, do not reproduce the whole document):\n{retrieved_answer}"
+        )
+    elif retrieved_answer:
         user_content = (
             f"{question}\n\n"
             f"RETRIEVED DATA (present verbatim — do not rename or paraphrase field values):\n"
@@ -466,17 +528,17 @@ def generate_conversational_response(question: str, history: list, retrieved_ans
         resp = requests.post(url, json=payload, timeout=60)
         resp.raise_for_status()
         llm_response = resp.json()["choices"][0]["message"]["content"].strip()
-        # Faithfulness guard: check against primary answer only, not appended context
+        # Faithfulness guard only for structured/verbatim answers — a concise doc
+        # answer legitimately drops most of the source text, so don't enforce it there.
         _baseline = primary_answer or retrieved_answer
-        _faithful = _response_is_faithful(llm_response, _baseline) if _baseline else True
+        if is_doc:
+            _faithful = True
+        else:
+            _faithful = _response_is_faithful(llm_response, _baseline) if _baseline else True
         if DEBUG:
-            print("DEBUG faithful:", _faithful)
-            print("DEBUG baseline terms:", _extract_key_terms(_baseline or ""))
-            print("DEBUG llm_response snippet:", llm_response[:200])
+            print("DEBUG answer_kind:", answer_kind, "faithful:", _faithful)
         if _baseline and not _faithful:
             return _baseline
-        if DEBUG:
-            print("DEBUG final content snippet:", llm_response[:300])
         return llm_response
 
     except Exception:
@@ -534,15 +596,21 @@ def chat_turn(question: str, history: list, available_collections: list) -> dict
     # Step 3: retrieve answer (parallel across selected collections)
     query_run = run_parallel_queries(collections, standalone_question)
     if DEBUG:
-        print("DEBUG augmented_question:", augmented_question)
+        print("DEBUG standalone_question:", standalone_question)
         print("DEBUG query_run related:", [(s.get('collection'), s.get('confidence'), bool(s.get('anchor_chunk_ids'))) for s in query_run.get('related_sections', [])])
-    primary_answer = query_run.get("result", "No answer found.")
+    # Always a string — discovery/analytics results are dicts; stringify so chat
+    # content never becomes a dict (which later crashes history slicing).
+    primary_answer = _result_to_text(query_run.get("result", "No answer found."))
     retrieved = primary_answer
     all_related = query_run.get("related_sections", [])
     if DEBUG:
         print("DEBUG all_related:", [(s.get('collection'), s.get('confidence')) for s in all_related])
         print("DEBUG collections selected:", collections)
     collection = query_run.get("collection")
+
+    # Answer kind drives synthesis: structured records render verbatim (faithfulness
+    # guard on); document/procedural answers get a concise, focused synthesis.
+    answer_kind = classify_answer_kind(query_run.get("method"), query_run.get("answer_payload"))
 
     # Split related sections: high-confidence → merge into answer, low-confidence → show as related
     import json as _json
@@ -614,15 +682,11 @@ def chat_turn(question: str, history: list, available_collections: list) -> dict
     if primary_answer and "No answer found" in primary_answer:
         response = "I couldn't find specific information about that in my knowledge base. Could you provide more details or rephrase the question?"
     else:
-        response = generate_conversational_response(question, effective_history, retrieved_answer=retrieved, primary_answer=primary_answer)
-    if high_confidence and extra_parts:
-        formatted_parts = []
-        for part in extra_parts:
-            # Remove the [Additional context from X — Y]: label, keep only the content
-            lines = part.split("\n", 1)
-            content = lines[1].strip() if len(lines) > 1 else lines[0]
-            formatted_parts.append(content)
-        response = response + "\n\n---\n" + "\n\n---\n".join(formatted_parts)
+        response = generate_conversational_response(
+            question, effective_history, retrieved_answer=retrieved,
+            primary_answer=primary_answer, answer_kind=answer_kind)
+    # Step 1 (retrieval-quality rework): related previews are NO LONGER appended into
+    # the answer body — that was concatenating whole, often unrelated, articles.
 
     print("DEBUG merged_image_payload:", merged_image_payload is not None)
     print("DEBUG query_run answer_payload:", bool(query_run.get("answer_payload")))
@@ -633,7 +697,7 @@ def chat_turn(question: str, history: list, available_collections: list) -> dict
         "method": "retrieval",
         "collection": collection,
         "collections_queried": query_run.get("collections_queried", [collection]),
-        "related_sections": related_sections,
+        "related_sections": [],  # Step 1: related/enrichment noise suppressed by default
         "raw_answer": primary_answer,
         "answer_payload": query_run.get("answer_payload") if query_run.get("answer_payload") and (query_run.get("answer_payload") or {}).get("embedded_image_paths") else (merged_image_payload or None)
     }

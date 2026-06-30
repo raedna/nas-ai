@@ -5,6 +5,7 @@ from nicegui import ui, run
 
 from core.ui_data import collection_stats
 from core.retrieval.router import run_query_with_method
+from core.chat_engine import classify_answer_kind, generate_conversational_response
 from ui.render import render_answer, build_image_items
 
 
@@ -30,8 +31,9 @@ def render_ask_panel():
         q = ui.input(placeholder="Ask a question…").props("outlined dense clearable").classes("flex-grow")
         ask_btn = ui.button("Ask").props("unelevated")
     with ui.row().classes("gap-4 items-center"):
-        show_links = ui.checkbox("Exact cross-links", value=True)
-        show_topics = ui.checkbox("Related topics", value=True)
+        # Off by default (Step 1: enrichment is opt-in; related/concept sections were noise).
+        show_links = ui.checkbox("Exact cross-links", value=False)
+        show_topics = ui.checkbox("Related topics", value=False)
         meta = ui.label("").classes("text-xs text-gray-500")
 
     answer_box = ui.column().classes("w-full mt-2")
@@ -60,6 +62,19 @@ def render_ask_panel():
         result = resp.get("result") if isinstance(resp, dict) else resp
         meta.text = f"method: {resp.get('method', '?')}" if isinstance(resp, dict) else ""
         payload = resp.get("answer_payload") if isinstance(resp, dict) else None
+
+        # Doc/procedural answers: focus them (concise answer from the document) instead
+        # of dumping the whole entry — same synthesis Chat uses. Structured answers and
+        # discovery/analytics dicts are left as-is.
+        if isinstance(resp, dict) and isinstance(result, str) and result.strip():
+            if classify_answer_kind(resp.get("method"), payload) == "doc":
+                try:
+                    result = await run.io_bound(partial(
+                        generate_conversational_response, q.value.strip(), [],
+                        retrieved_answer=result, primary_answer=result, answer_kind="doc"))
+                except Exception:
+                    pass  # fall back to the full text on any synthesis error
+
         render_answer(answer_box, result, build_image_items(payload), show_ocr=True)
         _related(related_box, resp.get("related_sections") if isinstance(resp, dict) else [])
 

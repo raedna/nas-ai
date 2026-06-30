@@ -33,6 +33,10 @@ SCENARIOS = {
         "sftp folder for gsact.txt",
         "what is the ask price field",            # new, bbg_fields — not recon
     ],
+    "D. discovery / list + count in chat": [
+        "what are the recon files for Goldman",   # discovery_list — should LIST files, not hedge
+        "how many recon files does Goldman have",  # discovery_count / analytics
+    ],
 }
 
 
