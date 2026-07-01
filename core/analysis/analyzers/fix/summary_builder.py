@@ -1,11 +1,24 @@
 from typing import Any, Dict
 
+def _display_message_type(message_type: str) -> str:
+    if not message_type:
+        return "FIX message"
+
+    # ExecutionReport -> Execution Report
+    spaced = ""
+    for i, ch in enumerate(message_type):
+        if i > 0 and ch.isupper() and not message_type[i - 1].isupper():
+            spaced += " "
+        spaced += ch
+
+    return spaced
+
 
 def build_fix_summary(business_object: Dict[str, Any]) -> str:
     message = business_object.get("message", {})
     trade = business_object.get("trade", {})
     order = business_object.get("order", {})
-    parties = business_object.get("parties", {})
+    parties = business_object.get("parties") or []
 
     message_type = message.get("type") or "FIX message"
     side = trade.get("side")
@@ -18,7 +31,7 @@ def build_fix_summary(business_object: Dict[str, Any]) -> str:
 
     parts = []
 
-    parts.append(f"This is a FIX {message_type}.")
+    parts.append(f"This is a FIX {_display_message_type(message_type)}.")
 
     trade_bits = []
 
@@ -32,7 +45,7 @@ def build_fix_summary(business_object: Dict[str, Any]) -> str:
         sentence = "It reports"
 
         if side:
-            sentence += f" a {side.lower()}"
+            sentence += f" {side.lower()} execution"
 
         if symbol:
             sentence += f" for {symbol}"
@@ -61,10 +74,25 @@ def build_fix_summary(business_object: Dict[str, Any]) -> str:
     if message.get("target"):
         parts.append(f"The target/counterparty is {message['target']}.")
 
-    if parties.get("party_ids"):
-        parts.append(f"Party IDs present: {', '.join(parties['party_ids'])}.")
+    if isinstance(parties, list) and parties:
+        party_phrases = []
 
-    if parties.get("party_roles"):
-        parts.append(f"Party roles present: {', '.join(parties['party_roles'])}.")
+        for party in parties:
+            if not isinstance(party, dict):
+                continue
+
+            party_id = party.get("party_id")
+            party_role_name = party.get("party_role_name")
+            party_role = party.get("party_role")
+
+            if party_id and party_role_name:
+                party_phrases.append(f"{party_role_name}: {party_id}")
+            elif party_id and party_role:
+                party_phrases.append(f"role {party_role}: {party_id}")
+            elif party_id:
+                party_phrases.append(str(party_id))
+
+        if party_phrases:
+            parts.append("Parties include " + ", ".join(party_phrases) + ".")
 
     return " ".join(parts)

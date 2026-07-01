@@ -6,3 +6,5 @@ config/schema_overrides.json
 .DS_Store
 ~$S-AI_Technical_Manual_v2.docx
 .DS_Store
+core/analysis/ocr/__init__.py
+/core/analysis/test_files
