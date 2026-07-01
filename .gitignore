@@ -10,3 +10,4 @@ core/analysis/ocr/__init__.py
 /core/analysis/test_files
 .DS_Store
 .DS_Store
+.nicegui/storage-user-98ec0bf6-f824-4a5c-9d56-b8cca8f857c6.json
