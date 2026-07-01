@@ -39,15 +39,24 @@ def _is_distinctive(term):
 def build_gazetteer(target_collections, generic):
     """term_lower -> {term, targets:[(collection, identifier, is_filename)]}."""
     gaz = {}
+    import json as _json
     for col in target_collections:
         rows = fetchall("""
             SELECT DISTINCT payload->>'identifier' AS identifier,
-                   payload->>'primary_name' AS primary_name
+                   payload->>'primary_name' AS primary_name,
+                   payload->>'aliases' AS aliases
             FROM chunks WHERE collection_name = %s
         """, (col,))
         for r in rows:
             ident = r.get('identifier')
-            for field in (ident, r.get('primary_name')):
+            _terms = [ident, r.get('primary_name')]
+            try:  # aliases ("Also known as" — e.g. the PB/broker filename)
+                _al = _json.loads(r.get('aliases') or '[]')
+                if isinstance(_al, list):
+                    _terms += [str(a) for a in _al]
+            except Exception:
+                pass
+            for field in _terms:
                 term = (field or '').strip()
                 if not term or term.lower() in generic or not _is_distinctive(term):
                     continue
@@ -81,16 +90,26 @@ def discover_identifier_mentions(source_collection, target_collections=None):
         r'(?<![A-Za-z0-9])(' + '|'.join(re.escape(t) for t in terms_sorted) + r')(?![A-Za-z0-9])',
         re.IGNORECASE)
 
-    src_rows = fetchall("""
-        SELECT payload->>'source_file' AS source_file,
+    # Chunked collections (e.g. obsidian: note_chunk_N) anchor on source_file; others
+    # (entity_row/structured like kb_docs, where every article shares one export file)
+    # anchor on the row identifier, so a mention is credited to the specific
+    # article/record — not the whole file (which mislabels the link).
+    _sample = fetchall("""SELECT payload->>'identifier' AS i FROM chunks
+                          WHERE collection_name = %s AND payload->>'identifier' IS NOT NULL
+                          LIMIT 5""", (source_collection,))
+    _chunked = any("_chunk_" in (r.get("i") or "") for r in _sample)
+    _id_expr = ("payload->>'source_file'" if _chunked
+                else "COALESCE(payload->>'identifier', payload->>'source_file')")
+    src_rows = fetchall(f"""
+        SELECT {_id_expr} AS sid,
                COALESCE(payload->>'text', payload->>'description', '') AS text
         FROM chunks
-        WHERE collection_name = %s AND payload->>'source_file' IS NOT NULL
+        WHERE collection_name = %s AND {_id_expr} IS NOT NULL
     """, (source_collection,))
 
     candidates, seen = [], set()
     for r in src_rows:
-        sf = (r.get('source_file') or '').strip()
+        sf = (r.get('sid') or '').strip()
         text = r.get('text') or ''
         if not sf or not text:
             continue

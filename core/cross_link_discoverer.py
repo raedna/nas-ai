@@ -48,7 +48,9 @@ def discover_cross_links(source_collection, target_collections=None):
             SELECT DISTINCT
                 payload->>'source_file' AS identifier,
                 payload->>'primary_name' AS primary_name,
-                payload->>'type' AS type_value
+                payload->>'type' AS type_value,
+                payload->>'category' AS category,
+                payload->>'reference_identifier' AS ref_id
             FROM chunks
             WHERE collection_name = %s
             AND payload->>'source_file' IS NOT NULL
@@ -58,7 +60,9 @@ def discover_cross_links(source_collection, target_collections=None):
             SELECT DISTINCT
                 payload->>'identifier' AS identifier,
                 payload->>'primary_name' AS primary_name,
-                payload->>'type' AS type_value
+                payload->>'type' AS type_value,
+                payload->>'category' AS category,
+                payload->>'reference_identifier' AS ref_id
             FROM chunks
             WHERE collection_name = %s
             AND payload->>'identifier' IS NOT NULL
@@ -70,12 +74,20 @@ def discover_cross_links(source_collection, target_collections=None):
         for src in source_rows:
             src_id = (src.get("identifier") or "").strip()
             src_name = (src.get("primary_name") or "").strip()
+            src_type = (src.get("type_value") or "").strip()
+            src_cat = (src.get("category") or "").strip()
+            src_ref = (src.get("ref_id") or "").strip()
             if not src_id:
                 continue
+            base = {
+                "source_collection": source_collection,
+                "source_identifier": src_id,
+                "target_collection": target,
+            }
 
-            # Strategy 1: exact identifier match — skip plain short numeric IDs
-            # (these are arbitrary sequence numbers in unrelated systems, e.g.
-            # FIX tag "79" vs KB article "79", not real matches)
+            # Strategy 1 — exact identifier: the (normalized) source ID appears in the
+            # target's identifier OR aliases. Auto-confirmed (1.0). Skip short numeric
+            # IDs (arbitrary sequence numbers across unrelated systems).
             if src_id.isdigit() and len(src_id) < 5:
                 exact = []
             else:
@@ -83,104 +95,51 @@ def discover_cross_links(source_collection, target_collections=None):
                     SELECT DISTINCT payload->>'identifier' AS identifier
                     FROM chunks
                     WHERE collection_name = %s
-                    AND payload->>'identifier' = %s
-                """, (target, src_id))
-
+                      AND (lower(payload->>'identifier') = lower(%s)
+                           OR payload->'aliases' ? %s)
+                """, (target, src_id, src_id))
             for e in exact:
-                candidates.append({
-                    "source_collection": source_collection,
-                    "source_identifier": src_id,
-                    "target_collection": target,
-                    "target_identifier": e["identifier"],
-                    "match_type": "exact_identifier",
-                    "confidence": 1.0,
-                })
+                candidates.append({**base, "target_identifier": e["identifier"],
+                                   "match_type": "exact_identifier", "confidence": 1.0})
 
-            # Strategy 2: name similarity (only if no exact match and name exists)
-            if not exact and src_name:
+            # Strategy 2 — structured field reference: a reference_identifier-role field
+            # on the source points at a target ID/name. Auto-confirmed (0.95).
+            if src_ref and not (src_ref.isdigit() and len(src_ref) < 5):
+                refs = fetchall("""
+                    SELECT DISTINCT payload->>'identifier' AS identifier
+                    FROM chunks
+                    WHERE collection_name = %s
+                      AND (lower(payload->>'identifier') = lower(%s)
+                           OR lower(payload->>'primary_name') = lower(%s))
+                """, (target, src_ref, src_ref))
+                for r in refs:
+                    candidates.append({**base, "target_identifier": r["identifier"],
+                                       "match_type": "field_reference", "confidence": 0.95})
+
+            # Strategy 3 — name/trigram: NEVER auto-confirmed. Emit as pending ONLY when
+            # corroborated by a shared type or category. The corroboration is pushed into
+            # SQL so similarity() runs on the few matching rows, not the whole collection
+            # (and we skip entirely when the source has no type/category to corroborate on).
+            if not exact and src_name and len(src_name) >= 4 and (src_type or src_cat):
+                _sentinel = "__NAS_AI_NO_TYPE_OR_CATEGORY_MATCH__"
+
                 similar = fetchall("""
                     SELECT DISTINCT
                         payload->>'identifier' AS identifier,
                         similarity(payload->>'primary_name', %s) AS sim
                     FROM chunks
                     WHERE collection_name = %s
-                    AND payload->>'primary_name' IS NOT NULL
-                    AND similarity(payload->>'primary_name', %s) > 0.3
-                    ORDER BY sim DESC
-                    LIMIT 3
-                """, (src_name, target, src_name))
-
+                      AND payload->>'primary_name' IS NOT NULL
+                      AND (payload->>'type' = %s OR payload->>'category' = %s)
+                      AND similarity(payload->>'primary_name', %s) > 0.4
+                    ORDER BY sim DESC LIMIT 3
+                """, (src_name, target, src_type or _sentinel, src_cat or _sentinel, src_name))
                 for s in similar:
-                    candidates.append({
-                        "source_collection": source_collection,
-                        "source_identifier": src_id,
-                        "target_collection": target,
-                        "target_identifier": s["identifier"],
-                        "match_type": "name_similarity",
-                        "confidence": float(s["sim"]),
-                    })
+                    candidates.append({**base, "target_identifier": s["identifier"],
+                                       "match_type": "name_similarity",
+                                       "confidence": round(min(float(s["sim"]), 0.85), 3)})
 
-            # Strategy 3: mention matching — does source identifier or type
-            # appear as a substring in target collection's text content?
-            if not exact:
-                mention_terms = [src_id]
-                if src.get("type_value"):
-                    mention_terms.append(src["type_value"])
-
-                from core.query_helpers import load_doc_query_hints
-                generic_terms = set(load_doc_query_hints().get("generic_terms", []))
-
-                # Check once if target uses chunk-level identifiers
-                _target_sample = fetchall("""
-                    SELECT payload->>'identifier' AS identifier
-                    FROM chunks WHERE collection_name = %s
-                    AND payload->>'identifier' IS NOT NULL
-                    LIMIT 5
-                """, (target,))
-                _target_chunked = any(
-                    "_chunk_" in (r.get("identifier") or "")
-                    for r in _target_sample
-                )
-
-                for term in mention_terms:
-                    if not term or len(term) < 8:   # CL-01: was < 4 — cut short generic terms
-                        continue
-                    if term.isdigit():
-                        continue
-                    if term.strip().lower() in generic_terms:
-                        continue
-                    mentions = fetchall("""
-                        SELECT DISTINCT
-                            payload->>'identifier' AS identifier,
-                            payload->>'primary_name' AS primary_name,
-                            payload->>'source_file' AS source_file,
-                            COALESCE(payload->>'description', payload->>'text', '') AS ctx
-                        FROM chunks
-                        WHERE collection_name = %s
-                        AND payload->>'description' ILIKE %s
-                        LIMIT 5
-                    """, (target, f"%{term}%"))
-
-                    for m in mentions:
-                        # CL-02: require the term to sit in real surrounding context,
-                        # not a bare list/reference entry.
-                        if not _meaningful_context(m.get("ctx"), term):
-                            continue
-                        t_id = (m.get("source_file") or m.get("identifier") or m.get("primary_name")) if _target_chunked else (m.get("identifier") or m.get("primary_name"))
-                        term_len = len(term)
-                        if term_len >= 13:
-                            confidence = 0.70
-                        elif term_len >= 7:
-                            confidence = 0.55
-                        else:
-                            confidence = 0.45
-                        candidates.append({
-                            "source_collection": source_collection,
-                            "source_identifier": src_id,
-                            "target_collection": target,
-                            "target_identifier": t_id,
-                            "match_type": "mention",
-                            "confidence": round(confidence, 3),
-                        })
+            # Mentions: intentionally NOT emitted as cross-links (mostly-rejected noise).
+            # Reintroduce later as a separate, opt-in "mentions" hint if needed.
 
     return candidates
