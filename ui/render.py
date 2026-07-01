@@ -10,7 +10,7 @@ from pathlib import Path
 
 from nicegui import ui
 
-_MARKER = re.compile(r"\[Embedded image OCR from:\s*([^\]]+)\]")
+_MARKER = re.compile(r"\[(?:Embedded image OCR from|image):\s*([^\]]+)\]")
 
 
 def build_image_items(payload):

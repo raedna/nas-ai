@@ -59,7 +59,17 @@ def render_chat_panel():
         payload = resp.get("answer_payload") if isinstance(resp, dict) else None
         history.append({"role": "assistant", "content": content})
 
-        render_answer(card, content, build_image_items(payload), show_ocr=True)
+        kind = resp.get("answer_kind") if isinstance(resp, dict) else None
+        raw = resp.get("raw_answer") if isinstance(resp, dict) else None
+        if kind == "doc" and isinstance(raw, str) and raw.strip() and raw.strip() != content.strip():
+            # Concise answer, then the full entry (with its images) in an expander.
+            render_answer(card, content, [], show_ocr=True)
+            with card:
+                with ui.expansion("Show full entry").classes("w-full"):
+                    full = ui.column().classes("w-full")
+                    render_answer(full, raw, build_image_items(payload), show_ocr=True)
+        else:
+            render_answer(card, content, build_image_items(payload), show_ocr=True)
         with card:
             if isinstance(resp, dict) and resp.get("collection"):
                 ui.label(f"Source: {resp['collection']} · {resp.get('method', '')}").classes(

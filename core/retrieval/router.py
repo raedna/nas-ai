@@ -513,6 +513,35 @@ def route_query(
 # Main entry point — run_query_with_method
 # ---------------------------------------------------------------------------
 
+_HIJACK_STOP = {"what", "whats", "is", "are", "the", "a", "an", "for", "of", "to",
+                "in", "on", "do", "does", "i", "me", "my", "tell", "show", "about",
+                "can", "how", "please", "this", "that", "and", "with", "there",
+                "then", "so", "its", "it"}
+
+
+def _record_covers_question(question: str, fname: str, payload: Dict) -> bool:
+    """True if the question's focus terms are actually present in this record. Used to
+    stop a detected filename from hijacking a question whose real target (e.g. 'sFTP')
+    isn't in the record — in that case we fall through to normal retrieval."""
+    toks = re.findall(r"[a-z0-9]+", (question or "").lower())
+    fbase = (fname or "").lower()
+    focus = [t for t in toks if t not in _HIJACK_STOP and t not in fbase and len(t) > 2]
+    if not focus:
+        return True  # pure "what is <file>" — the record itself is the subject
+    parts = []
+    df = payload.get("description_fields") or {}
+    if isinstance(df, dict):
+        parts += list(df.keys()) + [str(v) for v in df.values()]
+    for k in ("primary_name", "type", "identifier", "description"):
+        if payload.get(k):
+            parts.append(str(payload[k]))
+    al = payload.get("aliases") or []
+    if isinstance(al, list):
+        parts += [str(a) for a in al]
+    hay = " ".join(parts).lower()
+    return any(t in hay for t in focus)
+
+
 def run_query_with_method(
     collection: str,
     question: str,
@@ -547,6 +576,10 @@ def run_query_with_method(
             _pts = get_by_identifier(collection, _fname)
             if _pts:
                 _payload = _pts[0].payload or {}
+                # Identifier-hijack guard: if the question's focus (e.g. "sFTP") isn't
+                # in this record, don't answer from it — fall through to retrieval.
+                if not _record_covers_question(question, _fname, _payload):
+                    continue
                 _payload["_question"] = question
                 _roles = _detect_requested_roles(question, {})
                 _answer = synthesize_answer(_payload, _roles, collection)

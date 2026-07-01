@@ -698,6 +698,7 @@ def chat_turn(question: str, history: list, available_collections: list) -> dict
         "collection": collection,
         "collections_queried": query_run.get("collections_queried", [collection]),
         "related_sections": [],  # Step 1: related/enrichment noise suppressed by default
+        "answer_kind": answer_kind,
         "raw_answer": primary_answer,
         "answer_payload": query_run.get("answer_payload") if query_run.get("answer_payload") and (query_run.get("answer_payload") or {}).get("embedded_image_paths") else (merged_image_payload or None)
     }

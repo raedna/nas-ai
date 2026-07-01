@@ -63,19 +63,28 @@ def render_ask_panel():
         meta.text = f"method: {resp.get('method', '?')}" if isinstance(resp, dict) else ""
         payload = resp.get("answer_payload") if isinstance(resp, dict) else None
 
-        # Doc/procedural answers: focus them (concise answer from the document) instead
-        # of dumping the whole entry — same synthesis Chat uses. Structured answers and
+        # Doc/procedural answers: focus them (concise answer from the document), then
+        # show the full entry (with images) in an expander below. Structured answers and
         # discovery/analytics dicts are left as-is.
-        if isinstance(resp, dict) and isinstance(result, str) and result.strip():
-            if classify_answer_kind(resp.get("method"), payload) == "doc":
-                try:
-                    result = await run.io_bound(partial(
-                        generate_conversational_response, q.value.strip(), [],
-                        retrieved_answer=result, primary_answer=result, answer_kind="doc"))
-                except Exception:
-                    pass  # fall back to the full text on any synthesis error
+        full_text = result
+        is_doc = (isinstance(resp, dict) and isinstance(result, str) and result.strip()
+                  and classify_answer_kind(resp.get("method"), payload) == "doc")
+        if is_doc:
+            try:
+                result = await run.io_bound(partial(
+                    generate_conversational_response, q.value.strip(), [],
+                    retrieved_answer=result, primary_answer=result, answer_kind="doc"))
+            except Exception:
+                is_doc = False  # fall back to full text inline on synthesis error
 
-        render_answer(answer_box, result, build_image_items(payload), show_ocr=True)
+        if is_doc and result.strip() != full_text.strip():
+            render_answer(answer_box, result, [], show_ocr=True)
+            with answer_box:
+                with ui.expansion("Show full entry").classes("w-full"):
+                    full = ui.column().classes("w-full")
+                    render_answer(full, full_text, build_image_items(payload), show_ocr=True)
+        else:
+            render_answer(answer_box, result, build_image_items(payload), show_ocr=True)
         _related(related_box, resp.get("related_sections") if isinstance(resp, dict) else [])
 
     ask_btn.on_click(do_ask)
