@@ -79,6 +79,54 @@ def _infer_enum_from_ocr_tail(tag_payload: dict, value_tail: str) -> dict:
 
     return {}
 
+def _is_allowed_custom_enum_value(tag_payload: Dict[str, Any], value: str) -> bool:
+    """
+    Detect dictionary-described custom enum ranges without hardcoding tag numbers.
+
+    Example descriptions may say values 4000+ are reserved for
+    user-defined or bilaterally agreed values.
+    """
+    try:
+        numeric_value = int(str(value).strip())
+    except Exception:
+        return False
+
+    enum_values = tag_payload.get("enum_values") or []
+
+    text_parts = [
+        str(tag_payload.get("description") or ""),
+        str(tag_payload.get("text") or ""),
+        str(tag_payload.get("notes") or ""),
+    ]
+
+    for enum_item in enum_values:
+        if isinstance(enum_item, dict):
+            text_parts.append(str(enum_item.get("description") or ""))
+            text_parts.append(str(enum_item.get("enum_name") or ""))
+
+    combined = " ".join(text_parts).lower()
+
+    custom_terms = [
+        "user defined",
+        "user-defined",
+        "bilaterally agreed",
+        "bilateral",
+        "mutually agreed",
+        "reserved",
+    ]
+
+    has_custom_language = any(term in combined for term in custom_terms)
+
+    # Common FIX wording: 4000+, 4000 and above, values >= 4000, etc.
+    allows_4000_plus = (
+        "4000+" in combined
+        or "4000 and above" in combined
+        or "4000 or above" in combined
+        or ">= 4000" in combined
+        or "greater than or equal to 4000" in combined
+    )
+
+    return has_custom_language and allows_4000_plus and numeric_value >= 4000
 
 def analyze_fix_message(raw: str) -> Dict[str, Any]:
     pairs = parse_fix_input(raw)
@@ -108,8 +156,10 @@ def analyze_fix_message(raw: str) -> Dict[str, Any]:
                 value = inferred_enum.get("enum_value", value)
                 enum_payload = inferred_enum
 
+        tag_warning = ""
+
         if not tag_payload:
-            warnings.append(f"No FIX field definition found for tag {tag}.")
+            tag_warning = f"Custom or unknown FIX tag {tag}: no dictionary definition found."
 
         # Enum validation
         enum_values = tag_payload.get("enum_values") or []
@@ -130,19 +180,29 @@ def analyze_fix_message(raw: str) -> Dict[str, Any]:
             elif enum_payload:
                 enum_valid = True
             else:
-                enum_valid = False
+                tag_description = str(tag_payload.get("description") or "").strip()
 
                 expected_preview = ", ".join(sorted(valid_enum_values)[:20])
                 if len(valid_enum_values) > 20:
                     expected_preview += ", ..."
 
-                enum_warning = (
-                    f"Value '{value}' is not valid for enum tag {tag} "
-                    f"({tag_payload.get('primary_name', '')}). "
-                    f"Expected one of: {expected_preview}"
-                )
+                if tag_description:
+                    enum_valid = "Review"
+                    enum_warning = (
+                        f"Value '{value}' is not listed in the enum dictionary for tag {tag} "
+                        f"({tag_payload.get('primary_name', '')}). "
+                        f"Check the tag description for allowed custom/range values. "
+                        f"Listed enum values include: {expected_preview}"
+                    )
+                else:
+                    enum_valid = False
+                    enum_warning = (
+                        f"Value '{value}' is not valid for enum tag {tag} "
+                        f"({tag_payload.get('primary_name', '')}). "
+                        f"Expected one of: {expected_preview}"
+                    )
 
-                warnings.append(enum_warning)
+                    warnings.append(enum_warning)
 
         decoded_rows.append({
             "tag": tag,
@@ -152,6 +212,9 @@ def analyze_fix_message(raw: str) -> Dict[str, Any]:
             "value_description": enum_payload.get("description", ""),
             "description": tag_payload.get("description", ""),
             "source": tag_payload.get("source_file", ""),
+            "tag_known": bool(tag_payload),
+            "tag_status": "Known" if tag_payload else "Custom/Unknown",
+            "tag_warning": tag_warning,
             "has_enums": has_enums,
             "enum_valid": enum_valid,
             "enum_warning": enum_warning,

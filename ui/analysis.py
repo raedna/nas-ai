@@ -498,11 +498,53 @@ def render_analysis_panel():
 
             rows = result.get("decoded_rows") or []
 
-            with ui.element("div").classes("w-full max-h-[500px] overflow-auto border rounded"):
-                ui.table(
+            review_rows = [
+                row for row in rows
+                if str(row.get("enum_valid", "")).lower() in {"false", "review", "parse review", "ocr review"}
+                or row.get("enum_warning")
+                or row.get("tag_warning")
+            ]
+
+            review_tags = []
+            for row in review_rows:
+                tag = str(row.get("tag", "")).strip()
+                if tag and tag not in review_tags:
+                    review_tags.append(tag)
+
+            if review_tags:
+                ui.label(
+                    "Check values for tags "
+                    + ", ".join(review_tags)
+                    + " in the Decoded Values table. Their values do not match listed dictionary values or need review."
+                ).classes("text-red-600 font-bold mt-4")
+
+            ui.add_head_html("""
+            <style>
+            .decoded-values-scroll .q-table__middle {
+                max-height: 650px;
+                overflow: auto;
+            }
+
+            .decoded-values-scroll thead tr th {
+                position: sticky;
+                top: 0;
+                z-index: 5;
+                background: white;
+            }
+
+            .decoded-values-scroll thead tr:first-child th {
+                top: 0;
+            }
+            </style>
+            """)
+
+            with ui.element("div").classes("w-full border rounded decoded-values-scroll"):
+                decoded_table = ui.table(
                     columns=[
                         {"name": "tag", "label": "Tag", "field": "tag", "align": "left"},
                         {"name": "tag_name", "label": "Tag Name", "field": "tag_name", "align": "left"},
+                        {"name": "tag_status", "label": "Tag Status", "field": "tag_status", "align": "left"},
+                        {"name": "tag_warning", "label": "Tag Warning", "field": "tag_warning", "align": "left"},
                         {"name": "value", "label": "Value", "field": "value", "align": "left"},
                         {"name": "value_name", "label": "Value Name", "field": "value_name", "align": "left"},
                         {"name": "has_enums", "label": "Has Enums", "field": "has_enums", "align": "left"},
@@ -515,6 +557,35 @@ def render_analysis_panel():
                     rows=rows,
                     pagination=False,
                 ).classes("w-full")
+
+                decoded_table.add_slot("body", r"""
+                <q-tr
+                  :props="props"
+                  :class="(
+                    props.row.enum_valid === false ||
+                    props.row.enum_valid === 'Review' ||
+                    props.row.enum_valid === 'Parse Review' ||
+                    props.row.enum_valid === 'OCR Review' ||
+                    props.row.enum_warning ||
+                    props.row.tag_warning
+                  ) ? 'text-red' : ''"
+                >
+                  <q-td
+                    v-for="col in props.cols"
+                    :key="col.name"
+                    :props="props"
+                    :style="(
+                      col.name === 'enum_warning' ||
+                      col.name === 'description' ||
+                      col.name === 'tag_warning'
+                    )
+                      ? 'max-width: 360px; min-width: 260px; white-space: normal; word-break: break-word; overflow-wrap: anywhere; vertical-align: top;'
+                      : 'white-space: nowrap; vertical-align: top;'"
+                  >
+                    {{ col.value }}
+                  </q-td>
+                </q-tr>
+                """)
 
             parties = business_object.get("parties") or []
 
