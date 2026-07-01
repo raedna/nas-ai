@@ -107,6 +107,25 @@ def run_ingest(name, force=False):
     return result
 
 
+def ingest_single_file(collection_name, file_path):
+    """Ingest one specific file into an existing collection, without touching the
+    collection's normal configured scan path(s). Used by Data Prep's "Save + Ingest".
+    Inherits the collection's real config (allowed_filetypes, etc.) but overrides the
+    scan path to just this file, so it never re-scans or force-clears the collection."""
+    from core.ingest_collection import ingest_collection
+    cfg = dict(get_collection_config(collection_name))
+    cfg["paths"] = [str(file_path)]
+    cfg.pop("path", None)
+    result = ingest_collection(collection_name=collection_name, collection_cfg=cfg, force_reingest=False)
+    try:
+        from core.background_runner import launch_cross_link_discovery
+        launch_cross_link_discovery(collection_name)
+    except Exception as e:
+        result = dict(result or {})
+        result["_bg_error"] = str(e)
+    return result
+
+
 def rebuild_links(name):
     """Launch cross-link discovery + concept-vector rebuild for a collection."""
     from core.background_runner import launch_cross_link_discovery

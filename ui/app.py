@@ -22,11 +22,14 @@ from ui.knowledge_graph import render_kg_panel  # noqa: E402
 from ui.debug import render_debug_panel  # noqa: E402
 from ui.sql_inspector import render_sql_inspector_panel  # noqa: E402
 from ui.analysis import render_analysis_panel
+from ui.validation import render_validation_panel  # noqa: E402
+from ui.system_config import render_system_config_panel  # noqa: E402
+from ui.data_prep import render_data_prep_panel  # noqa: E402
 
 # Tab order — query tabs first, admin next, debug/remaining after.
 TABS = [
     "Collections", "Ask", "Chat", "Analysis", "Ingestion", "Knowledge Graph", "Validation",
-    "Preview", "SQL Inspector", "System Config", "Data Prep", "Debug",
+    "SQL Inspector", "System Config", "Data Prep", "Debug",
 ]
 
 
@@ -65,6 +68,12 @@ def index():
                     render_kg_panel()
                 elif name == "SQL Inspector":
                     render_sql_inspector_panel()
+                elif name == "Validation":
+                    render_validation_panel()
+                elif name == "System Config":
+                    render_system_config_panel()
+                elif name == "Data Prep":
+                    render_data_prep_panel()
                 elif name == "Debug":
                     render_debug_panel()
                 else:

@@ -151,12 +151,15 @@ def render_ingestion_panel():
         refresh_status()
 
     def refresh_status():
-        rows = background_tasks(15)
-        for r in rows:
-            r["started_at"] = str(r.get("started_at") or "")
-            r["finished_at"] = str(r.get("finished_at") or "")
-        bg_table.rows = rows
-        bg_table.update()
+        try:
+            rows = background_tasks(15)
+            for r in rows:
+                r["started_at"] = str(r.get("started_at") or "")
+                r["finished_at"] = str(r.get("finished_at") or "")
+            bg_table.rows = rows
+            bg_table.update()
+        except RunTimeError:
+            pass # tab was closed/reloaded mid-tick; nothing to update
 
     refresh_status()
     ui.timer(5.0, refresh_status)  # live auto-refresh while a build runs
