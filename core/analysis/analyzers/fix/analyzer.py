@@ -1,7 +1,11 @@
 from typing import Any, Dict, List
-
+import re
 from core.analysis.input.fix_input_normalizer import parse_fix_input
-from core.analysis.knowledge.structured_lookup import lookup_fix_tag, lookup_fix_enum
+from core.analysis.knowledge.structured_lookup import (
+    lookup_fix_tag,
+    lookup_fix_enum,
+    lookup_fix_tag_by_name,
+)
 from core.analysis.analyzers.fix.business_object import build_fix_business_object
 from core.analysis.analyzers.fix.summary_builder import build_fix_summary
 from difflib import SequenceMatcher
@@ -32,6 +36,86 @@ def _similarity(a: str, b: str) -> float:
 
     return SequenceMatcher(None, a_clean, b_clean).ratio()
 
+def _infer_enum_from_value_or_row(
+    tag_payload: Dict[str, Any],
+    value: str,
+    raw_line: str = "",
+    clean_line: str = "",
+) -> Dict[str, Any]:
+    """
+    Repair enum values when OCR/table extraction captured the enum name
+    instead of the enum value, or when the enum value exists somewhere else
+    in the reconstructed row.
+
+    Examples:
+      54 Side BUY      -> 1 / Buy
+      54 Side 1 BUY    -> 1 / Buy
+    """
+    if not tag_payload:
+        return {}
+
+    enum_values = tag_payload.get("enum_values") or []
+    if not isinstance(enum_values, list) or not enum_values:
+        return {}
+
+    value_text = str(value or "").strip()
+    value_lower = value_text.lower()
+
+    # 1. If current value matches enum_name, map back to enum_value.
+    for enum_item in enum_values:
+        if not isinstance(enum_item, dict):
+            continue
+
+        enum_name = str(enum_item.get("enum_name") or "").strip()
+        enum_value = str(enum_item.get("enum_value") or "").strip()
+
+        if enum_name and value_lower == enum_name.lower():
+            return {
+                "enum_name": enum_item.get("enum_name", ""),
+                "enum_value": enum_item.get("enum_value", ""),
+                "description": enum_item.get("description", ""),
+                "ocr_inferred": True,
+                "ocr_score": 1.0,
+                "inferred_from": "enum_name",
+            }
+
+    # 2. If the reconstructed OCR row contains exactly one valid enum_value,
+    # use that. This handles rows like: 54 Side 1 BUY
+    row_text = f"{raw_line} {clean_line}".strip()
+    if not row_text:
+        return {}
+
+    row_tokens = {
+        token.strip()
+        for token in re.split(r"[\s|,;:\[\]\(\){}]+", row_text)
+        if token.strip()
+    }
+
+    matches = []
+
+    for enum_item in enum_values:
+        if not isinstance(enum_item, dict):
+            continue
+
+        enum_value = str(enum_item.get("enum_value") or "").strip()
+
+        if enum_value and enum_value in row_tokens:
+            matches.append(enum_item)
+
+    # Only auto-repair when there is exactly one possible enum value.
+    if len(matches) == 1:
+        enum_item = matches[0]
+
+        return {
+            "enum_name": enum_item.get("enum_name", ""),
+            "enum_value": enum_item.get("enum_value", ""),
+            "description": enum_item.get("description", ""),
+            "ocr_inferred": True,
+            "ocr_score": 1.0,
+            "inferred_from": "row_enum_value",
+        }
+
+    return {}
 
 def _infer_enum_from_ocr_tail(tag_payload: dict, value_tail: str) -> dict:
     """
@@ -138,11 +222,75 @@ def analyze_fix_message(raw: str) -> Dict[str, Any]:
         tag = item.get("tag", "")
         value = item.get("value", "")
 
+        ocr_tag_name = str(item.get("tag_name") or "").strip()
+
+        # Some OCR/table parser paths preserve the reconstructed row but not the tag name.
+        # Example:
+        #   clean_line = "6 BodyLength 222"
+        #   tag        = "6"
+        #   value      = "222"
+        # Recover "BodyLength" from the middle of the reconstructed row.
+        if not ocr_tag_name:
+            clean_line = str(item.get("clean_line") or item.get("raw_line") or "").strip()
+            parts = clean_line.split()
+            value_text = str(value or "").strip()
+
+            if len(parts) >= 3 and str(parts[0]).strip() == str(tag).strip() and value_text:
+                value_index = None
+
+                for idx in range(2, len(parts)):
+                    if parts[idx] == value_text:
+                        value_index = idx
+                        break
+
+                if value_index and value_index > 1:
+                    ocr_tag_name = " ".join(parts[1:value_index]).strip()
+
+        ocr_original_tag = tag
+        ocr_tag_repaired = False
+        ocr_repair_warning = ""
+
+        if ocr_tag_name:
+            tag_name_row = lookup_fix_tag_by_name(ocr_tag_name)
+            tag_name_payload = (tag_name_row or {}).get("payload") or {}
+            repaired_tag = str(tag_name_payload.get("identifier") or "").strip()
+
+            if repaired_tag and str(repaired_tag) != str(tag):
+                tag = repaired_tag
+                ocr_tag_repaired = True
+                ocr_repair_warning = (
+                    f"OCR tag repaired from {ocr_original_tag} to {repaired_tag} "
+                    f"based on tag name '{ocr_tag_name}'."
+                )
+
         tag_row = lookup_fix_tag(tag)
         enum_row = lookup_fix_enum(tag, value)
 
         tag_payload = _payload(tag_row)
         enum_payload = _enum_payload(enum_row)
+
+        enum_values = tag_payload.get("enum_values") or []
+        has_enums = isinstance(enum_values, list) and len(enum_values) > 0
+
+        value_tail = str(item.get("value_tail") or "").strip()
+
+        if value_tail and not has_enums:
+            value = f"{value} {value_tail}".strip()
+
+        # If OCR/table extraction captured the enum name instead of enum value,
+        # or if the enum value exists elsewhere in the reconstructed row,
+        # repair it using the dictionary.
+        if not enum_payload:
+            inferred_enum = _infer_enum_from_value_or_row(
+                tag_payload,
+                value,
+                item.get("raw_line", ""),
+                item.get("clean_line", ""),
+            )
+
+            if inferred_enum:
+                value = inferred_enum.get("enum_value", value)
+                enum_payload = inferred_enum
 
         # If OCR produced an invalid enum value, try dictionary-based repair
         # using the remaining OCR text from the row.
@@ -207,6 +355,9 @@ def analyze_fix_message(raw: str) -> Dict[str, Any]:
         decoded_rows.append({
             "tag": tag,
             "tag_name": tag_payload.get("primary_name", ""),
+            "ocr_original_tag": ocr_original_tag,
+            "ocr_tag_repaired": ocr_tag_repaired,
+            "ocr_repair_warning": ocr_repair_warning,
             "value": value,
             "value_name": enum_payload.get("enum_name", ""),
             "value_description": enum_payload.get("description", ""),
@@ -220,6 +371,7 @@ def analyze_fix_message(raw: str) -> Dict[str, Any]:
             "enum_warning": enum_warning,
             "ocr_inferred": enum_payload.get("ocr_inferred", False),
             "ocr_score": enum_payload.get("ocr_score", ""),
+
         })
 
     dictionary_hits = sum(1 for r in decoded_rows if r.get("tag_name"))

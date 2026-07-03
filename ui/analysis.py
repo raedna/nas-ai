@@ -182,7 +182,13 @@ def render_compare_result(result: dict):
     comparison_rows = result.get("comparison_rows") or []
 
     comparison_rows = [
-        {**row, "_seq": index}
+        {
+            **row,
+            "_seq": index,
+            "_tag_sort": int(str(row.get("tag", "999999")).split("#")[0])
+            if str(row.get("tag", "")).split("#")[0].isdigit()
+            else 999999,
+        }
         for index, row in enumerate(comparison_rows)
     ]
 
@@ -241,7 +247,7 @@ def render_compare_result(result: dict):
 
     columns = [
         {"name": "_seq", "label": "#", "field": "_seq", "align": "left", "sortable": True},
-        {"name": "display_key", "label": "Tag", "field": "display_key", "align": "left", "sortable": True},
+        {"name": "display_key", "label": "Tag", "field": "_tag_sort", "align": "left", "sortable": True},
         {"name": "tag_name", "label": "Tag Name", "field": "tag_name", "align": "left", "sortable": True},
         {"name": "category", "label": "Category", "field": "category", "align": "left", "sortable": True},
         {"name": "display_a", "label": "Message 1 Value", "field": "display_a", "align": "left", "sortable": True},
@@ -263,8 +269,6 @@ def render_compare_result(result: dict):
             rows=comparison_rows,
             row_key="key",
             pagination={
-                "sortBy": "_seq",
-                "descending": False,
                 "rowsPerPage": 0,
             },
         ).classes("w-full")
@@ -304,7 +308,7 @@ def render_compare_result(result: dict):
                   ? 'max-width: 260px; min-width: 160px; white-space: normal; word-break: break-word; overflow-wrap: anywhere; vertical-align: top; font-size: 12px;'
                   : 'white-space: nowrap; vertical-align: top;'"
           >
-            {{ col.value }}
+            {{ col.name === 'display_key' ? props.row.display_key : col.value }}
           </q-td>
         </q-tr>
         """)
@@ -683,7 +687,11 @@ def render_analysis_panel():
             rows = result.get("decoded_rows") or []
 
             rows = [
-                {**row, "_seq": index}
+                {
+                    **row,
+                    "_seq": index,
+                    "_tag_sort": int(str(row.get("tag", "999999")).split("#")[0]) if str(row.get("tag", "")).split("#")[0].isdigit() else 999999,
+                }
                 for index, row in enumerate(rows)
             ]
 
@@ -737,19 +745,19 @@ def render_analysis_panel():
                 decoded_table = ui.table(
                     columns=[
                         {"name": "_seq", "label": "#", "field": "_seq", "align": "left", "sortable": True},
-                        {"name": "tag", "label": "Tag", "field": "tag", "align": "left"},
-                        {"name": "tag_name", "label": "Tag Name", "field": "tag_name", "align": "left"},
-                        {"name": "tag_status", "label": "Tag Status", "field": "tag_status", "align": "left"},
+                        {"name": "tag", "label": "Tag", "field": "_tag_sort", "align": "left", "sortable": True},
+                        {"name": "tag_name", "label": "Tag Name", "field": "tag_name", "align": "left", "sortable": True},
+                        {"name": "tag_status", "label": "Tag Status", "field": "tag_status", "align": "left", "sortable": True},
                         {"name": "tag_warning", "label": "Tag Warning", "field": "tag_warning", "align": "left"},
                         {"name": "ocr_repair_warning", "label": "OCR Repair", "field": "ocr_repair_warning", "align": "left"},
-                        {"name": "value", "label": "Value", "field": "value", "align": "left"},
-                        {"name": "value_name", "label": "Value Name", "field": "value_name", "align": "left"},
-                        {"name": "has_enums", "label": "Has Enums", "field": "has_enums", "align": "left"},
-                        {"name": "enum_valid", "label": "Enum Valid", "field": "enum_valid", "align": "left"},
+                        {"name": "value", "label": "Value", "field": "value", "align": "left", "sortable": True},
+                        {"name": "value_name", "label": "Value Name", "field": "value_name", "align": "left", "sortable": True},
+                        {"name": "has_enums", "label": "Has Enums", "field": "has_enums", "align": "left", "sortable": True},
+                        {"name": "enum_valid", "label": "Enum Valid", "field": "enum_valid", "align": "left", "sortable": True},
                         {"name": "enum_warning", "label": "Enum Warning", "field": "enum_warning", "align": "left"},
                         {"name": "description", "label": "Description", "field": "description", "align": "left"},
-                        {"name": "ocr_inferred", "label": "OCR Inferred", "field": "ocr_inferred", "align": "left"},
-                        {"name": "ocr_score", "label": "OCR Score", "field": "ocr_score", "align": "left"},
+                        {"name": "ocr_inferred", "label": "OCR Inferred", "field": "ocr_inferred", "align": "left", "sortable": True},
+                        {"name": "ocr_score", "label": "OCR Score", "field": "ocr_score", "align": "left", "sortable": True},
                     ],
                     rows=rows,
                     pagination={
@@ -802,7 +810,7 @@ def render_analysis_panel():
                           ? 'max-width: 320px; min-width: 220px; white-space: normal; word-break: break-word; overflow-wrap: anywhere; vertical-align: top; font-size: 12px;'
                           : 'white-space: nowrap; vertical-align: top;'"
                   >
-                    {{ col.value }}
+                    {{ col.name === 'tag' ? props.row.tag : col.value }}
                   </q-td>
                 </q-tr>
                 """)

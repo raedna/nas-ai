@@ -51,6 +51,30 @@ def get_fix_enum_collections() -> List[str]:
     matches = _find_collections_by_hint("fix", "enum")
     return matches or get_fix_dictionary_collections()
 
+def lookup_fix_tag_by_name(tag_name: str) -> Optional[Dict[str, Any]]:
+    """
+    Look up a FIX dictionary field by primary_name.
+
+    Used mainly for OCR repair:
+    if OCR reads "6 BodyLength 242", dictionary can tell us
+    BodyLength is actually tag 9, not tag 6.
+    """
+    tag_name = str(tag_name or "").strip()
+
+    if not tag_name:
+        return None
+
+    collections = get_fix_dictionary_collections()
+
+    return fetchone("""
+        SELECT collection_name, payload
+        FROM chunks
+        WHERE collection_name = ANY(%s)
+          AND payload->>'source_file' = '_merged_fields'
+          AND payload->>'identifier_namespace' = 'tag'
+          AND lower(payload->>'primary_name') = lower(%s)
+        LIMIT 1
+    """, (collections, tag_name))
 
 def lookup_fix_tag(tag: str) -> Optional[Dict[str, Any]]:
     """

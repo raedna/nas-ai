@@ -106,58 +106,73 @@ def build_fix_business_object(decoded_rows: List[Dict[str, Any]]) -> Dict[str, A
             "body_length": _value(decoded_rows, "BodyLength"),
             "message_sequence_number": _value(decoded_rows, "MsgSeqNum"),
 
+            # Message routing
             "sender": _value(decoded_rows, "SenderCompID"),
             "target": _value(decoded_rows, "TargetCompID"),
             "on_behalf_of": _value(decoded_rows, "OnBehalfOfCompID"),
             "deliver_to": _value(decoded_rows, "DeliverToCompID"),
-
             "sender_location": _value(decoded_rows, "SenderLocationID"),
             "on_behalf_of_location": _value(decoded_rows, "OnBehalfOfLocationID"),
 
+            # Message timing / encoding
             "sending_time": _value(decoded_rows, "SendingTime"),
             "receive_date": _value(decoded_rows, "ReceiveDate"),
             "receive_time": _value(decoded_rows, "ReceiveTime"),
             "message_encoding": _value(decoded_rows, "MessageEncoding"),
         },
+
         "trade": {
+            # Execution direction / instrument
             "side": _value_name(decoded_rows, "Side") or _value(decoded_rows, "Side"),
+
+            # Security / instrument identifiers
             "symbol": _value(decoded_rows, "Symbol"),
             "security_id": _value(decoded_rows, "SecurityID"),
             "security_id_source": _value_name(decoded_rows, "SecurityIDSource") or _value(decoded_rows, "SecurityIDSource"),
+            "security_description": _value(decoded_rows, "SecurityDesc"),
+            "issuer": _value(decoded_rows, "Issuer"),
             "security_type": _value(decoded_rows, "SecurityType"),
             "security_sub_type": _value(decoded_rows, "SecuritySubType"),
             "security_exchange": _value(decoded_rows, "SecurityExchange"),
+            "maturity_date": _value(decoded_rows, "MaturityDate"),
+            "coupon_rate": _value(decoded_rows, "CouponRate"),
+            "contract_multiplier": _value(decoded_rows, "ContractMultiplier"),
 
+            # Quantities / prices
             "last_quantity": _value(decoded_rows, "LastQty"),
             "last_price": _value(decoded_rows, "LastPx"),
             "average_price": _value(decoded_rows, "AvgPx"),
             "cumulative_quantity": _value(decoded_rows, "CumQty"),
             "leaves_quantity": _value(decoded_rows, "LeavesQty"),
-
             "order_quantity": _value(decoded_rows, "OrderQty"),
             "order_price": _value(decoded_rows, "Price"),
             "currency": _value(decoded_rows, "Currency"),
 
+            # Dates / market
             "trade_date": _value(decoded_rows, "TradeDate"),
             "settlement_date": _value(decoded_rows, "SettlDate"),
             "settlement_type": _value_name(decoded_rows, "SettlType") or _value(decoded_rows, "SettlType"),
             "transaction_time": _value(decoded_rows, "TransactTime"),
-
             "last_market": _value(decoded_rows, "LastMkt"),
-            "coupon_rate": _value(decoded_rows, "CouponRate"),
-            "maturity_date": _value(decoded_rows, "MaturityDate"),
-            "contract_multiplier": _value(decoded_rows, "ContractMultiplier"),
         },
+
         "order": {
+            # Order / execution identifiers
             "client_order_id": _value(decoded_rows, "ClOrdID"),
             "secondary_client_order_id": _value(decoded_rows, "SecondaryClOrdID"),
             "order_id": _value(decoded_rows, "OrderID"),
             "secondary_order_id": _value(decoded_rows, "SecondaryOrderID"),
             "execution_id": _value(decoded_rows, "ExecID"),
             "execution_ref_id": _value(decoded_rows, "ExecRefID"),
+            "execution_broker": _value(decoded_rows, "ExecBroker"),
+
+            # Status
             "execution_type": _value_name(decoded_rows, "ExecType") or _value(decoded_rows, "ExecType"),
             "order_status": _value_name(decoded_rows, "OrdStatus") or _value(decoded_rows, "OrdStatus"),
+
+            # Client / account
             "account": _value(decoded_rows, "Account"),
         },
+
         "parties": parties,
     }
