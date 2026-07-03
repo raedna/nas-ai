@@ -4,6 +4,7 @@ import json
 from nicegui import ui
 
 from core.analysis.analyzers.fix.analyzer import analyze_fix_message
+from core.analysis.analyzers.fix.comparator import compare_fix_messages
 from IMAGES.image_parser import parse_image
 from PDF.pdf_parser import parse_pdf
 import base64
@@ -11,6 +12,7 @@ from fastapi import Request
 from nicegui import app
 from core.analysis.ocr.rapidocr_adapter import ocr_image_with_rapidocr
 from core.analysis.ocr.pdf_rapidocr_adapter import ocr_pdf_with_rapidocr
+
 
 @app.post("/analysis/clipboard-image-ocr")
 async def clipboard_image_ocr(request: Request):
@@ -173,6 +175,139 @@ def _extract_text_from_uploaded_file(tmp_path: str, suffix: str) -> str:
         )
     )
 
+def render_compare_result(result: dict):
+    relationship = result.get("relationship") or {}
+    counts = result.get("difference_counts_by_category") or {}
+    difference_rows = result.get("difference_rows") or []
+    comparison_rows = result.get("comparison_rows") or []
+
+    comparison_rows = [
+        {**row, "_seq": index}
+        for index, row in enumerate(comparison_rows)
+    ]
+
+    ui.label("Comparison Summary").classes("text-lg font-bold")
+    ui.markdown(result.get("summary") or "No summary generated.").classes(
+        "p-3 bg-gray-100 rounded w-full"
+    )
+
+    with ui.card().classes("w-full mt-4"):
+        ui.label("Relationship").classes("text-md font-bold")
+
+        rel = relationship.get("relationship") or "Unknown"
+        interpretation = relationship.get("interpretation") or ""
+        reasons = relationship.get("reasons") or []
+        time_diff = relationship.get("time_difference_seconds")
+
+        ui.label(f"Relationship: {rel}")
+
+        if rel == "Weak / unrelated":
+            ui.label(
+                "These messages do not appear to belong to the same order/trade sequence. "
+                "The table below is a raw tag-by-tag comparison, not an execution lifecycle comparison."
+            ).classes("text-red-600 font-bold")
+
+        if reasons:
+            ui.label("Reasons: " + ", ".join(str(r) for r in reasons))
+
+        if interpretation:
+            ui.label("Interpretation: " + interpretation)
+
+        if time_diff is not None:
+            ui.label(f"Time difference: {time_diff} seconds")
+
+        if relationship.get("routing_reversed"):
+            ui.label("Routing: reversed").classes("text-orange-700 font-bold")
+        else:
+            ui.label("Routing: not reversed")
+
+    if counts:
+        with ui.card().classes("w-full mt-4"):
+            ui.label("Difference Counts").classes("text-md font-bold")
+            count_text = " | ".join(
+                f"{category}: {count}"
+                for category, count in sorted(counts.items())
+            )
+            ui.label(count_text)
+
+    ui.label("Compared Values").classes("text-lg font-bold mt-4")
+
+    if not comparison_rows:
+        ui.label("No compared values found.").classes("text-orange-700")
+        return
+
+    if not difference_rows:
+        ui.label("No differences found. Showing all compared tags below.").classes("text-green-700")
+
+    columns = [
+        {"name": "_seq", "label": "#", "field": "_seq", "align": "left", "sortable": True},
+        {"name": "display_key", "label": "Tag", "field": "display_key", "align": "left", "sortable": True},
+        {"name": "tag_name", "label": "Tag Name", "field": "tag_name", "align": "left", "sortable": True},
+        {"name": "category", "label": "Category", "field": "category", "align": "left", "sortable": True},
+        {"name": "display_a", "label": "Message 1 Value", "field": "display_a", "align": "left", "sortable": True},
+        {"name": "display_b", "label": "Message 2 Value", "field": "display_b", "align": "left", "sortable": True},
+        {"name": "status", "label": "Status", "field": "status", "align": "left", "sortable": True},
+        {"name": "warning_a", "label": "Message 1 Warning", "field": "warning_a", "align": "left", "sortable": True},
+        {"name": "warning_b", "label": "Message 2 Warning", "field": "warning_b", "align": "left", "sortable": True},
+    ]
+
+    ui.label(
+        "Default order follows Message 1 sequence. Click column headers to sort."
+    ).classes("text-sm text-gray-500")
+
+    reset_sort_button = ui.button("Reset sorting").props("outline size=sm")
+
+    with ui.element("div").classes("w-full border rounded decoded-values-scroll"):
+        compare_table = ui.table(
+            columns=columns,
+            rows=comparison_rows,
+            row_key="key",
+            pagination={
+                "sortBy": "_seq",
+                "descending": False,
+                "rowsPerPage": 0,
+            },
+        ).classes("w-full")
+
+        def reset_compare_sorting():
+            compare_table.rows = sorted(
+                comparison_rows,
+                key=lambda row: row.get("_seq", 0),
+            )
+            compare_table.pagination = {
+                "sortBy": "_seq",
+                "descending": False,
+                "rowsPerPage": 0,
+            }
+            compare_table.update()
+
+        reset_sort_button.on_click(reset_compare_sorting)
+
+        compare_table.add_slot("body", r"""
+        <q-tr
+          :props="props"
+          :class="props.row.status !== 'Same' ? 'text-red' : ''"
+        >
+          <q-td
+            v-for="col in props.cols"
+            :key="col.name"
+            :props="props"
+            :style="(
+              col.name === 'warning_a' ||
+              col.name === 'warning_b'
+            )
+              ? 'max-width: 160px; min-width: 90px; white-space: normal; word-break: break-word; overflow-wrap: anywhere; vertical-align: top; font-size: 11px;'
+              : (
+                  col.name === 'display_a' ||
+                  col.name === 'display_b'
+                )
+                  ? 'max-width: 260px; min-width: 160px; white-space: normal; word-break: break-word; overflow-wrap: anywhere; vertical-align: top; font-size: 12px;'
+                  : 'white-space: nowrap; vertical-align: top;'"
+          >
+            {{ col.value }}
+          </q-td>
+        </q-tr>
+        """)
 
 def render_analysis_panel():
     ui.label("Analysis Engine").classes("text-xl font-bold mb-2")
@@ -187,14 +322,27 @@ def render_analysis_panel():
         label="Analyzer",
     ).props("outlined").classes("w-64")
 
+    analysis_mode = ui.select(
+        ["Single Message", "Compare Messages"],
+        value="Single Message",
+        label="Analysis Mode",
+    ).classes("w-64")
+
     raw_input = ui.textarea(
         label="FIX message / extracted OCR text",
         placeholder="Paste FIX message, OCR text, or upload image/PDF...",
     ).props("outlined").classes("w-full mt-4 analysis-fix-input max-h-64 overflow-auto")
 
+    compare_input_box = ui.textarea(
+        label="Message B / Compare Against",
+        placeholder="Paste the second FIX message here for comparison...",
+    ).classes("w-full")
+
+    compare_input_box.visible = False
+
     result_area = ui.column().classes("w-full mt-4")
 
-    async def handle_analysis_upload(e):
+    async def handle_analysis_upload(e, target_box=None):
         print("=== ANALYSIS UPLOAD CALLED ===", flush=True)
 
         try:
@@ -222,7 +370,9 @@ def render_analysis_panel():
                 ui.notify("No text was extracted from the uploaded file.", type="warning")
                 return
 
-            raw_input.value = extracted_text
+            target = target_box or raw_input
+            target.value = extracted_text
+            target.update()
             result_area.clear()
             ui.notify("Text extracted. Review it, then click Analyze.", type="positive")
 
@@ -231,16 +381,33 @@ def render_analysis_panel():
             print(f"=== ANALYSIS UPLOAD FAILED: {ex} ===", flush=True)
 
     ui.upload(
-        label="Upload screenshot/image or PDF",
-        on_upload=handle_analysis_upload,
+        label="Upload Message A screenshot/image or PDF",
+        on_upload=lambda e: handle_analysis_upload(e, target_box=raw_input),
         auto_upload=True,
         max_files=1,
     ).props("accept=image/*,.pdf").classes("w-full mt-2")
 
+    upload_b = ui.upload(
+        label="Upload Message B screenshot/image or PDF",
+        on_upload=lambda e: handle_analysis_upload(e, target_box=compare_input_box),
+        auto_upload=True,
+        max_files=1,
+    ).props("accept=image/*,.pdf").classes("w-full mt-2")
+
+    upload_b.visible = False
+
+    def update_analysis_mode_visibility():
+        is_compare = analysis_mode.value == "Compare Messages"
+        compare_input_box.visible = is_compare
+        upload_b.visible = is_compare
+
+    analysis_mode.on_value_change(lambda _: update_analysis_mode_visibility())
+    update_analysis_mode_visibility()
+
     ui.html("""
-    <div id="analysis-screenshot-paste-box"
-         tabindex="0"
-         style="
+    <div id="analysis-screenshot-paste-box-a"
+        tabindex="0"
+        style="
             border: 2px dashed #aaa;
             border-radius: 8px;
             padding: 18px;
@@ -250,35 +417,92 @@ def render_analysis_panel():
             cursor: pointer;
             background: #fafafa;
          ">
-        Click here, then paste screenshot with Cmd+V / Ctrl+V
+        Click here, then paste Message A screenshot with Cmd+V / Ctrl+V
+    </div>
+
+    <div id="analysis-screenshot-paste-box-b"
+        tabindex="0"
+        style="
+            border: 2px dashed #aaa;
+            border-radius: 8px;
+            padding: 18px;
+            margin-top: 12px;
+            text-align: center;
+            color: #666;
+            cursor: pointer;
+            background: #fafafa;
+         ">
+        Click here, then paste Message B screenshot with Cmd+V / Ctrl+V
     </div>
     """).classes("w-full")
 
     ui.add_body_html("""
     <script>
     setTimeout(() => {
-        const box = document.getElementById('analysis-screenshot-paste-box');
-        if (!box) return;
+        const boxA = document.getElementById('analysis-screenshot-paste-box-a');
+        const boxB = document.getElementById('analysis-screenshot-paste-box-b');
 
-        let pasteBoxActive = false;
+        if (!boxA && !boxB) return;
 
-        function setPasteBoxIdle() {
-            pasteBoxActive = false;
-            box.style.borderColor = '#aaa';
-            box.style.background = '#fafafa';
-            box.innerText = 'Click here, then paste screenshot with Cmd+V / Ctrl+V';
+        let activeBox = null;
+
+        function idleText(box) {
+            if (box.id === 'analysis-screenshot-paste-box-b') {
+                return 'Click here, then paste Message B screenshot with Cmd+V / Ctrl+V';
+            }
+            return 'Click here, then paste Message A screenshot with Cmd+V / Ctrl+V';
         }
 
-        function setPasteBoxActive() {
-            pasteBoxActive = true;
+        function setPasteBoxIdle(box) {
+            if (!box) return;
+            box.style.borderColor = '#aaa';
+            box.style.background = '#fafafa';
+            box.innerText = idleText(box);
+        }
+
+        function isCompareMode() {
+            const text = document.body.innerText || '';
+            return text.includes('Compare Messages') && text.includes('Message B / Compare Against');
+        }
+
+        function updateBoxVisibility() {
+            if (!boxB) return;
+
+            const messageBTextareaVisible = Array.from(document.querySelectorAll('textarea')).some(t => {
+                const label = t.closest('.q-field')?.innerText || '';
+                return label.includes('Message B') && t.offsetParent !== null;
+            });
+
+            boxB.style.display = messageBTextareaVisible ? 'block' : 'none';
+        }
+
+        function setAllIdle() {
+            activeBox = null;
+            updateBoxVisibility();
+            setPasteBoxIdle(boxA);
+            setPasteBoxIdle(boxB);
+        }
+
+        function setPasteBoxActive(box) {
+            activeBox = box;
             box.focus();
             box.style.borderColor = '#1976d2';
             box.style.background = '#eef6ff';
             box.innerText = 'Paste now with Cmd+V / Ctrl+V';
         }
 
-        async function setTextareaValue(text) {
-            let textarea = document.querySelector('textarea.analysis-fix-input');
+        async function setTextareaValue(text, target) {
+            let textarea = null;
+
+            if (target === 'b') {
+                const textareas = Array.from(document.querySelectorAll('textarea'));
+                textarea = textareas.find(t => {
+                    const label = t.closest('.q-field')?.innerText || '';
+                    return label.includes('Message B');
+                });
+            } else {
+                textarea = document.querySelector('textarea.analysis-fix-input');
+            }
 
             if (!textarea) {
                 const textareas = Array.from(document.querySelectorAll('textarea'));
@@ -286,7 +510,7 @@ def render_analysis_panel():
             }
 
             if (!textarea) {
-                alert('Could not find analysis input box.');
+                alert('Could not find target analysis input box.');
                 return;
             }
 
@@ -295,19 +519,31 @@ def render_analysis_panel():
             textarea.dispatchEvent(new Event('change', { bubbles: true }));
         }
 
-        box.addEventListener('click', (event) => {
-            event.stopPropagation();
-            setPasteBoxActive();
-        });
+        function wireBox(box) {
+            if (!box) return;
+
+            box.addEventListener('click', (event) => {
+                event.stopPropagation();
+                setInterval(updateBoxVisibility, 500);
+                setAllIdle();
+                setPasteBoxActive(box);
+            });
+        }
+
+        wireBox(boxA);
+        wireBox(boxB);
 
         document.addEventListener('click', (event) => {
-            if (!box.contains(event.target)) {
-                setPasteBoxIdle();
+            if (
+                (!boxA || !boxA.contains(event.target)) &&
+                (!boxB || !boxB.contains(event.target))
+            ) {
+                setAllIdle();
             }
         });
 
         document.addEventListener('paste', async (event) => {
-            if (!pasteBoxActive) return;
+            if (!activeBox) return;
 
             const items = event.clipboardData && event.clipboardData.items;
             if (!items) {
@@ -319,9 +555,9 @@ def render_analysis_panel():
                 if (item.type && item.type.startsWith('image/')) {
                     event.preventDefault();
 
-                    box.innerText = 'Running OCR on pasted screenshot...';
-                    box.style.borderColor = '#f59e0b';
-                    box.style.background = '#fff7ed';
+                    activeBox.innerText = 'Running OCR on pasted screenshot...';
+                    activeBox.style.borderColor = '#f59e0b';
+                    activeBox.style.background = '#fff7ed';
 
                     const file = item.getAsFile();
                     const reader = new FileReader();
@@ -342,25 +578,27 @@ def render_analysis_panel():
 
                             if (!result.ok) {
                                 alert('OCR failed: ' + (result.error || 'Unknown error'));
-                                setPasteBoxActive();
+                                setPasteBoxActive(activeBox);
                                 return;
                             }
 
                             if (!result.text) {
                                 alert('No OCR text was extracted from the pasted screenshot.');
-                                setPasteBoxActive();
+                                setPasteBoxActive(activeBox);
                                 return;
                             }
 
-                            await setTextareaValue(result.text);
+                            const target = activeBox.id === 'analysis-screenshot-paste-box-b' ? 'b' : 'a';
 
-                            box.innerText = 'OCR text inserted. Review it, then click Analyze.';
-                            box.style.borderColor = '#16a34a';
-                            box.style.background = '#f0fdf4';
+                            await setTextareaValue(result.text, target);
+
+                            activeBox.innerText = 'OCR text inserted. Review it, then click Analyze.';
+                            activeBox.style.borderColor = '#16a34a';
+                            activeBox.style.background = '#f0fdf4';
 
                         } catch (err) {
                             alert('OCR request failed: ' + err);
-                            setPasteBoxActive();
+                            setPasteBoxActive(activeBox);
                         }
                     };
 
@@ -371,6 +609,8 @@ def render_analysis_panel():
 
             alert('No image found in clipboard.');
         });
+
+        setAllIdle();
     }, 500);
     </script>
     """)
@@ -382,13 +622,29 @@ def render_analysis_panel():
             ui.notify("Analyzer not implemented yet.", type="warning")
             return
 
-        result = analyze_fix_message(raw_input.value or "")
+        raw_a = raw_input.value or ""
+
+        if analysis_mode.value == "Compare Messages":
+            raw_b = compare_input_box.value or ""
+
+            if not raw_a.strip() or not raw_b.strip():
+                ui.notify("Please provide both Message A and Message B for comparison.", color="warning")
+                return
+
+            result = compare_fix_messages(raw_a, raw_b)
+        else:
+            if not raw_a.strip():
+                ui.notify("Please provide a FIX message or OCR text to analyze.", color="warning")
+                return
+
+            result = analyze_fix_message(raw_a)
 
         with result_area:
+            if result.get("input_type") == "fix_compare":
+                render_compare_result(result)
+                return
+
             ui.label("Plain-English Summary").classes("text-lg font-bold")
-            ui.markdown(result.get("summary") or "No summary generated.").classes(
-                "p-3 bg-gray-100 rounded w-full"
-            )
 
             ui.label(
                 f"Parsed tags: {result.get('parsed_count', 0)} | "
@@ -422,81 +678,14 @@ def render_analysis_panel():
                     pagination=10,
                 ).classes("w-full max-h-80 overflow-auto")
 
-            #key_rows = []
-#
-            #message = business_object.get("message") or {}
-            #trade = business_object.get("trade") or {}
-            #order = business_object.get("order") or {}
-#
-            #def add_key(section, field, value):
-            #    if value not in (None, ""):
-            #        key_rows.append({
-            #            "section": section,
-            #            "field": field,
-            #            "value": value,
-            #        })
-
-            #add_key("Message", "Message Type", message.get("type"))
-            #add_key("Message", "Begin String", message.get("begin_string"))
-            #add_key("Message", "Sequence Number", message.get("message_sequence_number"))
-            #add_key("Message", "Sender", message.get("sender"))
-            #add_key("Message", "Target", message.get("target"))
-            #add_key("Message", "On Behalf Of", message.get("on_behalf_of"))
-            #add_key("Message", "Deliver To", message.get("deliver_to"))
-            #add_key("Message", "Sender Location", message.get("sender_location"))
-            #add_key("Message", "On Behalf Of Location", message.get("on_behalf_of_location"))
-            #add_key("Message", "Sending Time", message.get("sending_time"))
-            #add_key("Message", "Message Encoding", message.get("message_encoding"))
-#
-            #add_key("Trade", "Side", trade.get("side"))
-            #add_key("Trade", "Symbol", trade.get("symbol"))
-            #add_key("Trade", "Security ID", trade.get("security_id"))
-            #add_key("Trade", "Security ID Source", trade.get("security_id_source"))
-            #add_key("Trade", "Security Type", trade.get("security_type"))
-            #add_key("Trade", "Last Quantity", trade.get("last_quantity"))
-            #add_key("Trade", "Last Price", trade.get("last_price"))
-            #add_key("Trade", "Average Price", trade.get("average_price"))
-            #add_key("Trade", "Cumulative Quantity", trade.get("cumulative_quantity"))
-            #add_key("Trade", "Leaves Quantity", trade.get("leaves_quantity"))
-            #add_key("Trade", "Order Quantity", trade.get("order_quantity"))
-            #add_key("Trade", "Order Price", trade.get("order_price"))
-            #add_key("Trade", "Currency", trade.get("currency"))
-            #add_key("Trade", "Trade Date", trade.get("trade_date"))
-            #add_key("Trade", "Settlement Date", trade.get("settlement_date"))
-            #add_key("Trade", "Settlement Type", trade.get("settlement_type"))
-            #add_key("Trade", "Transaction Time", trade.get("transaction_time"))
-            #add_key("Trade", "Last Market", trade.get("last_market"))
-            #add_key("Trade", "Coupon Rate", trade.get("coupon_rate"))
-            #add_key("Trade", "Maturity Date", trade.get("maturity_date"))
-            #add_key("Trade", "Contract Multiplier", trade.get("contract_multiplier"))
-#
-            #add_key("Order", "Client Order ID", order.get("client_order_id"))
-            #add_key("Order", "Secondary Client Order ID", order.get("secondary_client_order_id"))
-            #add_key("Order", "Order ID", order.get("order_id"))
-            #add_key("Order", "Secondary Order ID", order.get("secondary_order_id"))
-            #add_key("Order", "Execution ID", order.get("execution_id"))
-            #add_key("Order", "Execution Ref ID", order.get("execution_ref_id"))
-            #add_key("Order", "Execution Type", order.get("execution_type"))
-            #add_key("Order", "Order Status", order.get("order_status"))
-            #add_key("Order", "Account", order.get("account"))
-#
-            #if key_rows:
-            #    ui.label("Key Fields").classes("text-lg font-bold mt-4")
-#
-            #    ui.table(
-            #        columns=[
-            #            {"name": "section", "label": "Section", "field": "section", "align": "left"},
-            #            {"name": "field", "label": "Field", "field": "field", "align": "left"},
-            #            {"name": "value", "label": "Value", "field": "value", "align": "left"},
-            #        ],
-            #        rows=key_rows,
-            #        row_key="field",
-            #        pagination=15,
-            #    ).classes("w-full max-h-96 overflow-auto")
-
             ui.label("Decoded Values").classes("text-lg font-bold mt-4")
 
             rows = result.get("decoded_rows") or []
+
+            rows = [
+                {**row, "_seq": index}
+                for index, row in enumerate(rows)
+            ]
 
             review_rows = [
                 row for row in rows
@@ -538,13 +727,21 @@ def render_analysis_panel():
             </style>
             """)
 
+            ui.label(
+                "Default order follows the message sequence. Click column headers to sort."
+            ).classes("text-sm text-gray-500")
+
+            reset_decoded_sort_button = ui.button("Reset sorting").props("outline size=sm")
+
             with ui.element("div").classes("w-full border rounded decoded-values-scroll"):
                 decoded_table = ui.table(
                     columns=[
+                        {"name": "_seq", "label": "#", "field": "_seq", "align": "left", "sortable": True},
                         {"name": "tag", "label": "Tag", "field": "tag", "align": "left"},
                         {"name": "tag_name", "label": "Tag Name", "field": "tag_name", "align": "left"},
                         {"name": "tag_status", "label": "Tag Status", "field": "tag_status", "align": "left"},
                         {"name": "tag_warning", "label": "Tag Warning", "field": "tag_warning", "align": "left"},
+                        {"name": "ocr_repair_warning", "label": "OCR Repair", "field": "ocr_repair_warning", "align": "left"},
                         {"name": "value", "label": "Value", "field": "value", "align": "left"},
                         {"name": "value_name", "label": "Value Name", "field": "value_name", "align": "left"},
                         {"name": "has_enums", "label": "Has Enums", "field": "has_enums", "align": "left"},
@@ -555,8 +752,26 @@ def render_analysis_panel():
                         {"name": "ocr_score", "label": "OCR Score", "field": "ocr_score", "align": "left"},
                     ],
                     rows=rows,
-                    pagination=False,
+                    pagination={
+                        "sortBy": "_seq",
+                        "descending": False,
+                        "rowsPerPage": 0,
+                    },
                 ).classes("w-full")
+
+                def reset_decoded_sorting():
+                    decoded_table.rows = sorted(
+                        rows,
+                        key=lambda row: row.get("_seq", 0),
+                    )
+                    decoded_table.pagination = {
+                        "sortBy": "_seq",
+                        "descending": False,
+                        "rowsPerPage": 0,
+                    }
+                    decoded_table.update()
+
+                reset_decoded_sort_button.on_click(reset_decoded_sorting)
 
                 decoded_table.add_slot("body", r"""
                 <q-tr
@@ -567,7 +782,8 @@ def render_analysis_panel():
                     props.row.enum_valid === 'Parse Review' ||
                     props.row.enum_valid === 'OCR Review' ||
                     props.row.enum_warning ||
-                    props.row.tag_warning
+                    props.row.tag_warning ||
+                    props.row.ocr_repair_warning
                   ) ? 'text-red' : ''"
                 >
                   <q-td
@@ -575,12 +791,16 @@ def render_analysis_panel():
                     :key="col.name"
                     :props="props"
                     :style="(
-                      col.name === 'enum_warning' ||
-                      col.name === 'description' ||
-                      col.name === 'tag_warning'
+                      col.name === 'ocr_repair_warning' ||
+                      col.name === 'tag_warning' ||
+                      col.name === 'enum_warning'
                     )
-                      ? 'max-width: 360px; min-width: 260px; white-space: normal; word-break: break-word; overflow-wrap: anywhere; vertical-align: top;'
-                      : 'white-space: nowrap; vertical-align: top;'"
+                      ? 'max-width: 160px; min-width: 90px; white-space: normal; word-break: break-word; overflow-wrap: anywhere; vertical-align: top; font-size: 11px;'
+                      : (
+                          col.name === 'description'
+                        )
+                          ? 'max-width: 320px; min-width: 220px; white-space: normal; word-break: break-word; overflow-wrap: anywhere; vertical-align: top; font-size: 12px;'
+                          : 'white-space: nowrap; vertical-align: top;'"
                   >
                     {{ col.value }}
                   </q-td>
@@ -614,6 +834,11 @@ def render_analysis_panel():
 
     def clear_analysis():
         raw_input.value = ""
+        raw_input.update()
+
+        compare_input_box.value = ""
+        compare_input_box.update()
+
         result_area.clear()
 
     with ui.row().classes("mt-3 gap-2"):

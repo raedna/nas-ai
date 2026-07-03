@@ -120,7 +120,7 @@ def _field_groups(collection):
 
 
 def _parse_kb_tags(raw):
-    """kb_tags payload is a JSON list; tolerate string/CSV too."""
+    """tags payload is a JSON list; tolerate string/CSV too."""
     if not raw:
         return []
     if isinstance(raw, list):
@@ -142,7 +142,7 @@ def _entity_row_groups(collection):
     from core.query_helpers import load_doc_query_hints
 
     rows = fetchall("""
-        SELECT id, payload->>'kb_tags' AS kb_tags,
+        SELECT id, payload->>'tags' AS kb_tags,
                COALESCE(payload->>'text', payload->>'description', '') AS text,
                embedding
         FROM chunks
@@ -174,7 +174,7 @@ def _entity_row_groups(collection):
 
     if tier2:
         _assign_tier2_topic_groups(tier2, groups)           # CV-03
-    return groups, 'kb_tags'
+    return groups, 'tags'
 
 
 def _assign_tier2_topic_groups(tier2_objs, groups):

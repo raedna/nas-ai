@@ -31,8 +31,6 @@ from core.query_helpers import (
     load_doc_query_hints,
 )
 from core.field_map_loader import load_field_maps
-from core.structured_query_planner import plan_structured_query
-from core.structured_plan_executor import execute_structured_plan
 from core.local_llm_client import load_nlp_config
 
 # Retrieval sub-modules
@@ -45,6 +43,7 @@ from core.retrieval.structured import (
     structured_points_by_primary_name,
     relationship_lookup,
 )
+
 from core.retrieval.lexical import (
     lexical_short_query_search,
     lexical_structured_search,
@@ -549,7 +548,6 @@ def run_query_with_method(
     limit: int = 25,
     show_exact_links: bool = True,
     show_related_topics: bool = True,
-    skip_planner: bool = False,
     force_answer: bool = False,
 ) -> Dict:
     """
@@ -833,44 +831,7 @@ def run_query_with_method(
                 }
 
     # ------------------------------------------------------------------
-    # 4. Structured query planner  (NLP-driven structured lookup)
-    # ------------------------------------------------------------------
-    structured_plan = None
-
-    planner_cfg = _get_structured_planner_config()
-    planner_enabled = bool(planner_cfg.get("enabled", True)) and not skip_planner
-    planner_execute = bool(planner_cfg.get("execute", False))
-    planner_dry_run = bool(planner_cfg.get("dry_run", True))
-    planner_min_confidence = float(planner_cfg.get("min_confidence", 0.7))
-
-    if planner_enabled:
-        structured_plan = plan_structured_query(question, dry_run=planner_dry_run)
-
-        if (
-            structured_plan.get("enabled")
-            and planner_execute
-            and not structured_plan.get("dry_run", True)
-            and structured_plan.get("confidence", 0) >= planner_min_confidence
-        ):
-            structured_result = execute_structured_plan(collection, structured_plan)
-
-            if structured_result.get("matched"):
-                return {
-                    "method": "structured_query_plan",
-                    "reason": structured_plan.get("reason"),
-                    "plan": structured_plan,
-                    "executor_debug_items": structured_result.get("executor_debug_items", []),
-                    "result": structured_result.get("answer"),
-                }
-
-    # ------------------------------------------------------------------
     # 5. Discovery  (count / list queries)
-    #    Handled by the discovery engine, which counts via the retrieval
-    #    machinery (reliable numbers, smoke-validated). The text-to-SQL
-    #    analytics engine is intentionally NOT auto-dispatched here: it guessed
-    #    wrong columns and returned bad counts (e.g. "0 Goldman files" because
-    #    it filtered the wrong field). Analytics remains available explicitly in
-    #    the SQL Inspector tab.
     # ------------------------------------------------------------------
     if intent["mode"] in ("discovery_count", "discovery_list"):
         return run_discovery_with_method(collection, question, limit=limit)
@@ -929,25 +890,6 @@ def run_query_with_method(
                         "preview": _ldesc
                     })
 
-            # CL-04: one hop along confirmed wikilinks from first-hop targets
-            _seen_hop = {(s["collection"], s.get("source_file") or s["title"])
-                         for s in _related_sections}
-            for _l in _links:
-                for _hl in get_cross_links_for_identifier(
-                        _l["target_collection"], _l["target_identifier"], status="confirmed"):
-                    if _hl["target_collection"] == collection and _hl["target_identifier"] == _identifier:
-                        continue
-                    _hk = (_hl["target_collection"], _hl["target_identifier"])
-                    if _hk in _seen_hop:
-                        continue
-                    _seen_hop.add(_hk)
-                    _sec = _build_section_for_link(_hl)
-                    if _sec:
-                        _sec["match_type"] = "wikilink_hop"
-                        _sec["confidence"] = round(
-                            min(_sec["confidence"], _l.get("confidence", 1.0)) * 0.9, 3)
-                        _related_sections.append(_sec)
-
         if show_related_topics and _chunk_id:
             _concept_links = find_concept_links(collection, _chunk_id)
             _seen = {(_s["collection"], _s["title"]) for _s in _related_sections}
@@ -955,8 +897,8 @@ def run_query_with_method(
                 _key = (_cl["target_collection"], _cl["group_value"])
                 if _key not in _seen:
                     _seen.add(_key)
-                    _anchor_texts = _cl.get("anchor_texts") or []
                     _anchor_chunk_ids = _cl.get("anchor_chunk_ids") or []
+                    _anchor_texts = _cl.get("anchor_texts") or []
                     if _anchor_chunk_ids:
                         from core.db import fetchall as _fetchall
                         _full_row = _fetchall(
@@ -983,11 +925,7 @@ def run_query_with_method(
         "related_sections": _related_sections,
     }
 
-    if structured_plan:
-        response["structured_plan_dry_run"] = structured_plan
-
     return response
-
 
 # ---------------------------------------------------------------------------
 # Debug entry point — mirrors debug_route_query in query_router.py

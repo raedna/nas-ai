@@ -36,7 +36,6 @@
     "enabled": true,
     "model": "BAAI/bge-reranker-large",
     "apply_to_doc_types": [
-      "entity_row",
       "procedural",
       "reference",
       "mixed"

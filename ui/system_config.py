@@ -35,72 +35,7 @@ def _save_json(path, obj):
 
 
 def render_system_config_panel():
-    _structured_planner_section()
-    ui.separator().classes("my-4")
     _system_settings_section()
-
-
-# ===========================================================================
-# Structured Planner
-# ===========================================================================
-def _structured_planner_section():
-    ui.label("Structured Planner").classes("text-lg font-bold")
-
-    nlp_cfg = _load_json(NLP_CONFIG_PATH, {})
-    planner_cfg = nlp_cfg.get("structured_planner", {})
-
-    enabled = ui.checkbox("Enable structured planner", value=bool(planner_cfg.get("enabled", True)))
-    ui.label("Allow the LLM planner to generate structured retrieval plans.").classes(
-        "text-xs text-gray-500 -mt-2 mb-1")
-
-    dry_run = ui.checkbox("Dry run only", value=bool(planner_cfg.get("dry_run", True)))
-    ui.label("Generate and show the plan, but do not let it produce the final answer.").classes(
-        "text-xs text-gray-500 -mt-2 mb-1")
-
-    execute = ui.checkbox("Allow planner execution", value=bool(planner_cfg.get("execute", False)))
-    ui.label("Allow the structured planner + executor to produce the final answer.").classes(
-        "text-xs text-gray-500 -mt-2 mb-1")
-
-    min_confidence = ui.number(
-        "Minimum planner confidence", value=float(planner_cfg.get("min_confidence", 0.7)),
-        min=0.0, max=1.0, step=0.05,
-    ).props("outlined dense").classes("w-64")
-
-    debug_raw = ui.checkbox("Debug raw LLM plan", value=bool(planner_cfg.get("debug_raw_plan", False)))
-    ui.label("Print/show raw LLM planner output for troubleshooting.").classes(
-        "text-xs text-gray-500 -mt-2 mb-2")
-
-    warn_box = ui.column().classes("w-full")
-
-    def _recompute_warnings():
-        warn_box.clear()
-        with warn_box:
-            if execute.value and dry_run.value:
-                ui.label("⚠ Planner execution is enabled, but dry-run is also enabled. "
-                          "Dry-run prevents final-answer execution.").classes("text-amber-700")
-            if execute.value and not dry_run.value:
-                ui.label("⚠ Planner execution is active. Structured planner results may "
-                          "become final answers.").classes("text-amber-700")
-
-    execute.on_value_change(lambda: _recompute_warnings())
-    dry_run.on_value_change(lambda: _recompute_warnings())
-    _recompute_warnings()
-
-    def do_save():
-        cfg = _load_json(NLP_CONFIG_PATH, {})
-        cfg.setdefault("structured_planner", {})
-        cfg["structured_planner"].update({
-            "enabled": enabled.value,
-            "dry_run": dry_run.value,
-            "execute": execute.value,
-            "min_confidence": min_confidence.value,
-            "debug_raw_plan": debug_raw.value,
-        })
-        _save_json(NLP_CONFIG_PATH, cfg)
-        ui.notify("Structured planner settings saved. Restart the UI if changes don't apply immediately.",
-                   type="positive")
-
-    ui.button("Save structured planner settings", on_click=do_save).props("unelevated").classes("mt-2")
 
 
 # ===========================================================================

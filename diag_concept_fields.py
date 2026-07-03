@@ -48,7 +48,7 @@ def main():
         print("doc_type:", [(jget(r, "dt"), jget(r, "n")) for r in dt])
 
         # presence + samples of the fields we care about
-        for fld in ("section_heading", "kb_tags", "folder_path", "category",
+        for fld in ("section_heading", "tags", "folder_path", "category",
                     "source_file", "identifier", "primary_name", "type",
                     "identifier_namespace"):
             present = fetchall("""

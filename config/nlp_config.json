@@ -5,9 +5,9 @@
     "timeout": 300
   },
   "structured_planner": {
-    "enabled": true,
+    "enabled": false,
     "dry_run": false,
-    "execute": true,
+    "execute": false,
     "min_confidence": 0.7,
     "debug_raw_plan": true
   }

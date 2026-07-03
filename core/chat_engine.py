@@ -262,8 +262,7 @@ def run_parallel_queries(collections: list, question: str) -> dict:
     if len(collections) == 1:
         result = run_query_with_method(
             collections[0], question, limit=25,
-            show_exact_links=True, show_related_topics=True,
-            skip_planner=True, force_answer=True
+            show_exact_links=True, show_related_topics=True,force_answer=True
         )
         result["collection"] = collections[0]
         return result

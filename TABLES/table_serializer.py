@@ -217,7 +217,7 @@ def _build_entity_row_doc(row, schema, source_file):
         "source_file": str(source_file),
         "doc_type": "entity_row",
         "aliases": aliases,
-        "kb_tags": kb_tags,
+        "tags": kb_tags,
     }
 
 

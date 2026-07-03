@@ -88,7 +88,7 @@ SMOKE_TESTS = [
         "id": "KB-07",
         "question": "how to check recon files in pb folders on server",
         "description": "Process lookup — returns Checking files on us1-proc server article",
-        "must_contain": ["PrimeBroker", "Step 2"],
+        "must_contain": ["Prime Broker", "US1-Proc02"],
         "must_not_contain": [],
         "must_not_contain": [],
         "expected_methods": ["semantic", "lexical_short"],

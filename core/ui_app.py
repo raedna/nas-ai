@@ -2301,33 +2301,8 @@ with tabs[3]:
                     with st.expander("Structured Namespace Lookup Debug", expanded=True):
                         st.json(query_run.get("namespace_debug") or {})
 
-                if "query_run" in locals() and query_run.get("structured_plan_dry_run"):
-                    with st.expander("Structured Planner Dry Run", expanded=True):
-                        st.json(query_run.get("structured_plan_dry_run") or {})
-
-                if selected_method == "structured_query_plan":
-                    with st.expander("Structured Query Plan", expanded=True):
-                        st.json(query_run.get("plan") or {})
-
-                    with st.expander("Structured Plan Executor Candidates", expanded=True):
-                        executor_items = query_run.get("executor_debug_items") or []
-
-                        if executor_items:
-                            st.dataframe(executor_items, width="stretch")
-                        else:
-                            st.info("No structured executor candidates were returned.")
-
-                    st.info(
-                        "Final answer was produced by structured_plan_executor. "
-                        "Semantic/rerank debug panels were not used for this answer."
-                    )
-
-                elif selected_method == "lexical_short" and debug_data:
-                    st.info(
-                        "Final answer was produced by lexical_short. "
-                        "The semantic/rerank debug panels are not used for this answer path."
-                    )
-
+                if selected_method == "lexical_short" and debug_data:
+                    
                     with st.expander("Lexical Short Candidates", expanded=True):
                         lexical_items = debug_data.get("lexical_short_items") or []
 
@@ -2555,64 +2530,6 @@ with tabs[5]:
 with tabs[6]:
     st.subheader("System Config")
 
-    st.markdown("### Structured Planner")
-
-    nlp_cfg = load_nlp_ui_config()
-    planner_cfg = nlp_cfg.get("structured_planner", {})
-
-    planner_enabled = st.checkbox(
-        "Enable structured planner",
-        value=bool(planner_cfg.get("enabled", True)),
-        help="Allow the LLM planner to generate structured retrieval plans."
-    )
-
-    planner_dry_run = st.checkbox(
-        "Dry run only",
-        value=bool(planner_cfg.get("dry_run", True)),
-        help="Generate and show the plan, but do not let it produce the final answer."
-    )
-
-    planner_execute = st.checkbox(
-        "Allow planner execution",
-        value=bool(planner_cfg.get("execute", False)),
-        help="Allow the structured planner + executor to produce the final answer."
-    )
-
-    planner_min_confidence = st.number_input(
-        "Minimum planner confidence",
-        min_value=0.0,
-        max_value=1.0,
-        value=float(planner_cfg.get("min_confidence", 0.7)),
-        step=0.05,
-    )
-
-    planner_debug_raw = st.checkbox(
-        "Debug raw LLM plan",
-        value=bool(planner_cfg.get("debug_raw_plan", False)),
-        help="Print/show raw LLM planner output for troubleshooting."
-    )
-
-    if planner_execute and planner_dry_run:
-        st.warning("Planner execution is enabled, but dry-run is also enabled. Dry-run prevents final-answer execution.")
-
-    if planner_execute and not planner_dry_run:
-        st.warning("Planner execution is active. Structured planner results may become final answers.")
-
-    if st.button("Save structured planner settings"):
-        nlp_cfg.setdefault("structured_planner", {})
-
-        nlp_cfg["structured_planner"].update({
-            "enabled": planner_enabled,
-            "dry_run": planner_dry_run,
-            "execute": planner_execute,
-            "min_confidence": planner_min_confidence,
-            "debug_raw_plan": planner_debug_raw,
-        })
-
-        save_nlp_ui_config(nlp_cfg)
-        st.success("Structured planner settings saved. Restart Streamlit if changes do not apply immediately.")
-
-    st.markdown("---")
     st.markdown("### Retrieval Settings")
 
     system_cfg_edit = load_json(SYSTEM_CONFIG_PATH, {})

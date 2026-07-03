@@ -15,4 +15,4 @@ print(f"cached schemas for {COLLECTION}: {[r['source_file_stem'] for r in rows]}
 execute("DELETE FROM schemas WHERE collection_name=%s", (COLLECTION,))
 print(f"deleted {len(rows)} cached schema row(s).")
 print("Now force-reingest kb_docs from the UI — it will re-infer the schema "
-      "(entity_row -> LLM, tags role detected) and populate kb_tags.")
+      "(entity_row -> LLM, tags role detected) and populate tags.")

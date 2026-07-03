@@ -57,11 +57,11 @@ def main():
     total = fetchall("SELECT COUNT(*) AS n FROM chunks WHERE collection_name='kb_docs'")[0]["n"]
     withtags = fetchall("""SELECT COUNT(*) AS n FROM chunks
         WHERE collection_name='kb_docs'
-          AND payload->>'kb_tags' IS NOT NULL
-          AND payload->>'kb_tags' NOT IN ('', '[]')""")[0]["n"]
+          AND payload->>'tags' IS NOT NULL
+          AND payload->>'tags' NOT IN ('', '[]')""")[0]["n"]
     print(f"  chunks with non-empty kb_tags: {withtags}/{total}")
-    samples = fetchall("""SELECT DISTINCT payload->>'kb_tags' AS t FROM chunks
-        WHERE collection_name='kb_docs' AND payload->>'kb_tags' NOT IN ('', '[]')
+    samples = fetchall("""SELECT DISTINCT payload->>'tags' AS t FROM chunks
+        WHERE collection_name='kb_docs' AND payload->>'tags' NOT IN ('', '[]')
         LIMIT 5""")
     for s in samples:
         print(f"    {s['t']}")
