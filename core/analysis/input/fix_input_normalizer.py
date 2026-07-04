@@ -88,6 +88,10 @@ def normalize_fix_input(raw: str) -> str:
     # Common real / escaped delimiters
     text = text.replace("\\x01", SOH)
     text = text.replace("^A", SOH)
+
+    # OCR often reads SOH as SOH, S0H, [S0H, etc.
+    text = re.sub(r"[\[\(\{]?\s*S[O0]H\s*[\]\)\}]?", SOH, text, flags=re.IGNORECASE)
+
     text = text.replace("|", SOH)
 
     # OCR / visible SOH variants

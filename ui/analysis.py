@@ -42,10 +42,6 @@ async def clipboard_image_ocr(request: Request):
             extracted_text = parsed.get("text", "")
 
             if extracted_text:
-                print("=== CLIPBOARD RAPIDOCR USED ===", flush=True)
-                print("=== CLIPBOARD OCR TEXT START ===", flush=True)
-                print(extracted_text, flush=True)
-                print("=== CLIPBOARD OCR TEXT END ===", flush=True)
 
                 return {
                     "ok": True,
@@ -185,6 +181,7 @@ def render_compare_result(result: dict):
         {
             **row,
             "_seq": index,
+            "_ignored": False,
             "_tag_sort": int(str(row.get("tag", "999999")).split("#")[0])
             if str(row.get("tag", "")).split("#")[0].isdigit()
             else 999999,
@@ -193,7 +190,10 @@ def render_compare_result(result: dict):
     ]
 
     ui.label("Comparison Summary").classes("text-lg font-bold")
-    ui.markdown(result.get("summary") or "No summary generated.").classes(
+
+    summary_text = str(result.get("summary") or "").strip()
+
+    ui.markdown(summary_text or "No summary generated.").classes(
         "p-3 bg-gray-100 rounded w-full"
     )
 
@@ -247,6 +247,7 @@ def render_compare_result(result: dict):
 
     columns = [
         {"name": "_seq", "label": "#", "field": "_seq", "align": "left", "sortable": True},
+        {"name": "_ignored", "label": "Ignore", "field": "_ignored", "align": "center"},
         {"name": "display_key", "label": "Tag", "field": "_tag_sort", "align": "left", "sortable": True},
         {"name": "tag_name", "label": "Tag Name", "field": "tag_name", "align": "left", "sortable": True},
         {"name": "category", "label": "Category", "field": "category", "align": "left", "sortable": True},
@@ -290,7 +291,7 @@ def render_compare_result(result: dict):
         compare_table.add_slot("body", r"""
         <q-tr
           :props="props"
-          :class="props.row.status !== 'Same' ? 'text-red' : ''"
+          :class="(props.row.status !== 'Same' && !props.row._ignored) ? 'text-red' : ''"
         >
           <q-td
             v-for="col in props.cols"
@@ -308,7 +309,14 @@ def render_compare_result(result: dict):
                   ? 'max-width: 260px; min-width: 160px; white-space: normal; word-break: break-word; overflow-wrap: anywhere; vertical-align: top; font-size: 12px;'
                   : 'white-space: nowrap; vertical-align: top;'"
           >
-            {{ col.name === 'display_key' ? props.row.display_key : col.value }}
+            <q-checkbox
+              v-if="col.name === '_ignored'"
+              v-model="props.row._ignored"
+              dense
+            />
+            <template v-else>
+              {{ col.name === 'display_key' ? props.row.display_key : col.value }}
+            </template>
           </q-td>
         </q-tr>
         """)
@@ -649,6 +657,16 @@ def render_analysis_panel():
                 return
 
             ui.label("Plain-English Summary").classes("text-lg font-bold")
+
+            summary_text = str(result.get("summary") or "").strip()
+
+            ui.textarea(
+                value=summary_text or "No summary generated.",
+            ).props(
+                "readonly outlined autogrow"
+            ).classes(
+                "w-full bg-gray-100"
+            )
 
             ui.label(
                 f"Parsed tags: {result.get('parsed_count', 0)} | "

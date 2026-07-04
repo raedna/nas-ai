@@ -158,8 +158,18 @@ def render_ingestion_panel():
                 r["finished_at"] = str(r.get("finished_at") or "")
             bg_table.rows = rows
             bg_table.update()
-        except RunTimeError:
+        except RuntimeError:
             pass # tab was closed/reloaded mid-tick; nothing to update
 
+    def safe_refresh_status():
+        try:
+            refresh_status()
+        except RuntimeError as ex:
+            if "parent slot of the element has been deleted" in str(ex):
+                return
+            raise
+        except Exception as ex:
+            print(f"=== INGESTION REFRESH FAILED: {ex} ===", flush=True)
+
     refresh_status()
-    ui.timer(5.0, refresh_status)  # live auto-refresh while a build runs
+    ui.timer(5.0, safe_refresh_status)  # live auto-refresh while a build runs

@@ -212,6 +212,53 @@ def _is_allowed_custom_enum_value(tag_payload: Dict[str, Any], value: str) -> bo
 
     return has_custom_language and allows_4000_plus and numeric_value >= 4000
 
+def _to_float(value):
+    value = str(value or "").strip()
+
+    if not value:
+        return None
+
+    try:
+        return float(value.replace(",", ""))
+    except ValueError:
+        return None
+
+
+def _validate_fix_quantities(business_object):
+    warnings = []
+
+    trade = business_object.get("trade") or {}
+
+    order_qty = _to_float(trade.get("order_quantity"))
+    cum_qty = _to_float(trade.get("cumulative_quantity"))
+    leaves_qty = _to_float(trade.get("leaves_quantity"))
+
+    if order_qty is None:
+        return warnings
+
+    if cum_qty is not None and cum_qty > order_qty:
+        warnings.append(
+            f"Quantity check failed: CumQty ({cum_qty:g}) is greater than OrderQty ({order_qty:g}). "
+            "Confirm the source message and check for OCR degradation."
+        )
+
+    if leaves_qty is not None and leaves_qty > order_qty:
+        warnings.append(
+            f"Quantity check failed: LeavesQty ({leaves_qty:g}) is greater than OrderQty ({order_qty:g}). "
+            "Confirm the source message and check for OCR degradation."
+        )
+
+    if cum_qty is not None and leaves_qty is not None:
+        expected_order_qty = cum_qty + leaves_qty
+
+        if abs(expected_order_qty - order_qty) > 0.0001:
+            warnings.append(
+                f"Quantity check failed: CumQty + LeavesQty ({cum_qty:g} + {leaves_qty:g} = {expected_order_qty:g}) "
+                f"does not equal OrderQty ({order_qty:g}). Confirm the source message and check for OCR degradation."
+            )
+
+    return warnings
+
 def analyze_fix_message(raw: str) -> Dict[str, Any]:
     pairs = parse_fix_input(raw)
 
@@ -380,6 +427,8 @@ def analyze_fix_message(raw: str) -> Dict[str, Any]:
 
     business_object = build_fix_business_object(decoded_rows)
     summary = build_fix_summary(business_object)
+    quantity_warnings = _validate_fix_quantities(business_object)
+    warnings.extend(quantity_warnings)
 
     return {
         "input_type": "fix",

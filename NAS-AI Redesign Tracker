@@ -9,27 +9,23 @@
 
 ---
 
-## System State (current)
+## System State (current — 2026-07-04)
 
 | Component | Status |
 |---|---|
 | LM Studio (Mac M1 Pro) | Running — serves embeddings + LLM |
 | Embeddings model | `text-embedding-bge-large-en-v1.5` (1024 dims) |
-| LLM model | `meta-llama-3.1-8b-instruct` |
-| Qdrant (NAS) | Running at `100.123.16.57:6333` — admin UI only |
+| LLM model | Qwen 2.5 14B (upgraded from meta-llama-3.1-8b-instruct) |
 | ai-pgvector (NAS) | Running at port 5433, db=nasai — PRIMARY STORE |
-| ai-redis (NAS) | Installed, not used |
-| Streamlit UI | Working — PostgreSQL-native; Qdrant references removed from delete UI |
-| FIX collection (`xml_test`) | Re-ingested 2026-06-18 — 13/13 smoke tests passing |
-| BBG collection (`bbg_fields`) | Re-ingested 2026-06-18 — 7/7 smoke tests passing |
-| KB docs (`kb_docs`) | Re-ingested 2026-06-18 — 10/10 smoke tests passing |
-| Obsidian (`obsidian`) | Re-ingested 2026-06-24 — OCR inline dump removed from text field; cross-link + concept vectors rebuilt |
-| recon_assist_file | Re-ingested 2026-06-18 — 10/10 smoke tests passing |
-| PDF (`pdf_test`) | Ingested 2026-06-18 — 66 chunks (63 readable + 3 OCR). Parsers verified. |
-| Images (`image_test`) | Ingested 2026-06-18 — 3 chunks. OCR working (pytesseract). Auto doc_type detection working. |
-| DOCX (`docx_test`) | Ingested 2026-06-18 — 11 chunks. Section headings preserved as primary_name. |
-| Astro (`astro_test`) | Ingested 2026-06-18 — 3 chunks (2 FITS + 1 XISF). RA/Dec/camera/exposure extracted from FITS headers. XISF has image geometry only — no astrometric metadata. |
-| Astro catalog (`astro_catalog`) | Ingested 2026-06-18 — 13,336 chunks. OpenNGC + Messier merged via Data Prep tab. Schema: identifier=ngc_id, primary_name=comments, aliases=messier_id, type=type. |
+| UI framework | Migrated from Streamlit (`ui_app.py`) to NiceGUI (`ui/app.py` + panel modules: `ask.py`, `chat.py`, `collections_view.py`, `knowledge_graph.py`, `system_config.py`, `validation.py`, `data_prep.py`, `preview.py`, `sql_inspector.py`, `ingestion.py`, `analysis.py`, `debug.py`, `render.py`) |
+| FIX collection (`xml_test`) | 13/13 smoke tests passing |
+| BBG collection (`bbg_fields`) | Test subset (730/69k rows) — full ingest pending |
+| KB docs (`kb_docs`) | 348 chunks (178 active articles, inactive filtered) — 10/10 smoke tests passing |
+| Obsidian (`obsidian`) | 729 mixed + 37 narrative + 62 procedural + 71 reference chunks — smoke tests passing |
+| recon_assist_file | 89 chunks — 10/10 smoke tests passing |
+| astro_catalog | 13,336 chunks (OpenNGC + Messier merged via Data Prep) |
+| Structured query planner | **Removed entirely** — was always dry-run, added latency with zero benefit |
+| BGE reranker | Disabled for `entity_row` doc_type — was demoting correct KB results when given 25 candidates |
 
 ---
 
@@ -37,84 +33,68 @@
 
 | ID | Area | Description | Status |
 |---|---|---|---|
-| RET-010 | Structured planner | Ranking balance for phrases like "executing broker" in long descriptions. | Mitigated via synonyms.json |
-| CODE-005 | xml_serializer.py | Function-level state (`_all_rows`, `_files_seen`) for cross-file buffering — corrupts silently on crash. | ⏳ Pending |
-| CODE-008 | ui_app.py | Collection management UI delete was using Qdrant REST API. | ✅ Resolved 2026-06-17 — Delete Collection UI now uses PostgreSQL directly via delete_pg_collection(). |
-| CODE-009 | ui_app.py | Force re-ingest does not always delete existing DB rows. | ✅ Resolved 2026-06-17 — recreate_collection() already correctly clears files + chunks in Postgres. Log message updated. |
-| CODE-010 | ingestion | Collection name mismatch between UI and PostgreSQL collections table causes ForeignKeyViolation. | ⏳ Pending |
-| CODE-011 | schema_loader.py | Schema files stored on disk — should migrate to PostgreSQL schemas table. | ⏳ Pending |
-| CODE-012 | ui_app.py | Ask/Chat tabs need a "Clear cache" button | ⏳ Pending |
-| CODE-013 | ui_app.py | BM25/lexical candidates not shown in debug panel | ⏳ Pending |
-| CODE-014 | ui_app.py | System Config tab shows embeddings model but not LLM model — add LLM model + base_url + timeout fields writing to nlp_config.json | ⏳ Pending |
-| CODE-015 | db schema | files table missing last_ingested column — needed for tracking when files were last processed | ⏳ Pending |
-| CODE-016 | doc_serializer.py | OCR text stored inline in chunk `text` field (after `[Embedded image OCR from: marker]`) as well as in `embedded_image_ocr_map` — caused raw OCR garbage to appear in chat previews and LLM context. | ✅ Resolved 2026-06-24 — marker retained, OCR dump removed from `text` field. Obsidian re-ingested. |
-| CODE-017 | chat_engine.py | `generate_conversational_response` used single `SYSTEM_PROMPT` for both grounded and conversational responses — LLM would paraphrase/rename field values. | ✅ Resolved 2026-06-24 — split into `CHAT_SYSTEM_PROMPT` and `GROUNDED_SYSTEM_PROMPT`; temperature lowered to 0.2 for grounded responses. |
-| CODE-018 | chat_engine.py | Faithfulness guard fell back to full `retrieved` string (including appended context blocks) when LLM failed check — exposed `[Additional context from...]` labels to user. | ✅ Resolved 2026-06-24 — `primary_answer` tracked separately; faithfulness baseline and fallback both use `primary_answer` only. |
-| CODE-019 | local_llm_client.py | `call_local_llm_json` had no try/except — any LLM failure crashed `select_collections` and `detect_chat_intent`. | ✅ Resolved 2026-06-24 — wrapped in try/except, returns `None` on failure; callers already handle `None`. |
-| DISPLAY-001 | ui_app.py | Two-tier table header (role name row 1, source column names grouped beneath) NOT supported by st.dataframe — needs HTML render or AgGrid. Deferred until final UI pinned. Single-mapped role relabeling (identifier→real field name, aliases→Prime Broker file name) now works via payload fields. | ⏳ Deferred |
-| DISCOVERY-001 | discovery.py | discovery_count returns correct count but no record list. Root cause: BM25 body scoring doesn't surface category-matched notes well. Real fix: metadata query path (Phase 4.6). | ⏳ Pending — blocked on metadata query path |
-| DISCOVERY-002 | discovery.py | Discovery count (39) vs DB ground truth (41) — different counting methods. Will resolve with metadata query path. | ⏳ Pending |
-| STAGE0-001 | discovery.py | Bare category query "Moore" routes to answer instead of discovery. Real fix: metadata query path (Phase 4.6). | ⏳ Pending — blocked on metadata query path |
-| OBS-001 | doc_serializer.py | Obsidian over-chunking: NAS AI RAG Creation with Github 20260426.md (44KB) → 246 chunks. Low priority. | ⏳ Low priority |
-| ASTRO-001 | astro_parser.py | Filename parser misreads target when frame type prefix absent (M42_2.0s → target=2.0s instead of M42). Fix: add alternate filename pattern with target at position 0. | ⏳ Pending — Phase 3.6.6 |
-| ASTRO-002 | astro_parser.py | XISF (PixInsight processed files) have image geometry only — no astrometric metadata (no RA/Dec/Object). target extracted from filename only. | ⏳ Low priority — XISF naming convention to be standardized |
-| ASTRO-003 | astro_serializer.py | primary_name for astro files without FITS OBJECT keyword falls back to filename-parsed target, which may be wrong (see ASTRO-001). Fix after ASTRO-001. | ⏳ Pending |
-| PENDING-001 | retrieval | Cross-link testing: recon_assist_file ↔ kb_docs — architecture designed (Phase 3.5), NER-based tagging at ingest time. Build after full dataset ingestion complete. | ⏳ Pending — Phase 3.5 |
-| DB-001 | PostgreSQL trigger | chunks_tsv_update trigger: slash-delimited category paths (e.g. "Industry/Airlines") tokenize as compound token — "airlines" not searchable. | ✅ Resolved 2026-06-17 — trigger updated to replace / with space before tsvector build. All collections rebuilt. |
-| DB-002 | nlp_generator.py | type_value not included in build_structured_nlp_text — type-based queries (e.g. "what string fields") return 0 BM25 matches. | ✅ Resolved 2026-06-17 — type_value now added to parts in build_structured_nlp_text. |
+| RET-010 | Structured planner | Ranking balance for phrases like "executing broker" in long descriptions. | Resolved — planner removed entirely (see CODE-030) |
+| CODE-005 | xml_serializer.py | Function-level state (`_all_rows`, `_files_seen`) for cross-file buffering — corrupts silently on crash. | Pending |
+| CODE-010 | ingestion | Collection name mismatch between UI and PostgreSQL collections table causes ForeignKeyViolation. | Pending |
+| CODE-012 | ui | Ask/Chat tabs need a "Clear cache" button | Pending |
+| CODE-013 | ui | BM25/lexical candidates not shown in debug panel | Pending |
+| CODE-014 | ui | System Config tab shows embeddings model but not LLM model — add LLM model + base_url + timeout fields | Pending |
+| CODE-015 | db schema | files table missing last_ingested column | Pending |
+| CODE-020 | concept_vector_builder.py | Single-file/entity_row collections grouped by source_file — useless labels | **Resolved** — CV-01/02/03/04 (see below) |
+| CODE-021 | related_titles_linker.py | Obsidian wikilinks not persisted to cross_links table | **Resolved** — 43 wikilinks confirmed |
+| CODE-022 | ui / knowledge_graph.py | No Knowledge Graph UI | **Resolved** — full tab built: graph, concept clusters, cross-link review (grouped by target), build, danger zone |
+| CODE-023 | chat_engine.py | Multi-item queries ("tags 453, 452, and 448") only retrieve one item | Pending — LLM extracts identifier list, fan out parallel queries, merge results |
+| CODE-024 | recon_assist_file | 14 chunks with NULL identifier due to merged cells in source Excel | Pending — use Data Prep ffill |
+| CODE-025 | ui_data_prep.py | Data Prep tab only accepts CSV — add Excel (.xlsx) upload with sheet selector + forward-fill | Pending |
+| CODE-026 | ui_data_prep.py | Add PostgreSQL chunk editor — load collection chunks, edit payload fields inline, save with confirmation | Pending |
+| CODE-027 | chat_engine.py | Tier 1 identifier match in `select_collections` overrode Tier 2 LLM ordering entirely, ignoring procedural intent | **Resolved** — Tier 1 hits now merged AFTER Tier 2 ordering, not returned early |
+| CODE-028 | chat_engine.py | `augment_query_with_focus` injected stale history terms into self-contained follow-up questions | **Resolved** — skips injection when question has its own filename/tag identifiers |
+| CODE-029 | chat_engine.py | Hallucination when `primary_answer` = "No answer found" — LLM fabricated plausible-looking content | **Resolved** — skip LLM entirely, return clean "couldn't find" message |
+| CODE-030 | structured_query_planner.py, structured_plan_executor.py, router.py, ui/system_config.py, chat_engine.py | Structured query planner always ran in dry-run mode (never executed), added LLM call latency with zero functional benefit | **Resolved** — both files deleted, all references removed from router.py, ui/system_config.py, chat_engine.py |
+| CODE-031 | system.json | BGE reranker (`apply_to_doc_types` included `entity_row`) demoted correct top-RRF-ranked KB article when given 25 candidates (e.g. promoted `1.0 - RECON Mappings` over `2.3 Logging in to sFTP` despite RRF score 10x lower) | **Resolved** — removed `entity_row` from `bge_reranker.apply_to_doc_types`; RRF ranking alone is more reliable for kb_docs |
+| DISPLAY-001 | ui | Two-tier table header not supported by st.dataframe — needs HTML render or AgGrid | Deferred |
+| DISCOVERY-001 | discovery.py | discovery_count returns correct count but no record list | Pending — blocked on metadata query path |
+| OBS-001 | doc_serializer.py | Obsidian over-chunking on large notes (44KB → 246 chunks) | Low priority |
+| ASTRO-001 | astro_parser.py | Filename parser misreads target when frame type prefix absent (M42_2.0s → target=2.0s instead of M42) | Pending — Phase 3.6.6 |
+| ASTRO-002 | astro_parser.py | XISF files have image geometry only — no astrometric metadata | Low priority |
+| ASTRO-003 | astro_serializer.py | primary_name for astro files without FITS OBJECT keyword falls back to filename-parsed target (see ASTRO-001) | Pending |
+| DB-001 | PostgreSQL trigger | Slash-delimited category paths tokenize as compound token | Resolved |
+| DB-002 | nlp_generator.py | type_value not included in build_structured_nlp_text | Resolved |
 
-
-IDAreaDescriptionStatusCODE-020concept_vector_builder.pySingle-file collections (recon_assist_file, kb_docs) group by source_file — all chunks get same label, producing useless routing descriptions like "covers [RECON_Moore-PB Mapping_100225.xlsx]". Should group by type field for structured collections.⏳ Pending — next fixCODE-021cross_link_discoverer.pyObsidian related_titles (wikilinks extracted at ingestion) never persisted to cross_links table — same-collection note relationships not queryable as confirmed links.⏳ PendingCODE-022ui_app.pyNo UI to view concept vectors or relationship graph between collections. Cross-link review sections still in Collections tab — should move to dedicated Knowledge Graph tab (repurposing Filetypes tab).⏳ Pending
-
-
-
-**Retired issues (resolved):**
-- RET-011 — FIX-01 enum suppression: fixed in Phase 1
-- CODE-001 — `scroll(limit=5000)`: eliminated by RRF/pgvector in Phase 2/3
-- CODE-002 — hardcoded collection name: eliminated in retrieval package
-- CODE-003 — Qdrant client at import time: eliminated
-- CODE-004 — `run_query_with_method` / `route_query` overlap: resolved in router.py
-- CODE-007 — collection state JSON: eliminated — state now in PostgreSQL `files` table. Legacy `collection_state/*.json` files on disk are Qdrant-era and should be ignored/removed to avoid confusion.
+**Retired issues (fully resolved, no longer tracked in detail):**
+RET-011, CODE-001–004, CODE-007–009, CODE-016–019, DISCOVERY-002, STAGE0-001, PENDING-001 (superseded by CL-03/CL-05 below)
 
 **Key learnings (debugging):**
-- **psycopg2 percent-escaping:** `%` in `ILIKE '%term%'` collides with psycopg2 parameter substitution → "IndexError: tuple index out of range". Must use `%%`. Never suppress stderr when diagnosing queries.
-- **Objective testing discipline:** always define known-correct ground truth before testing.
-- **`detect_ask_intent` vs `llm_detect_intent`:** hardcoded version is fallback only — all live call sites use LLM version.
-- **Smoke test hardcoded values are fragile:** BBG-07 had hardcoded count "150" that broke on re-ingest. Use "match" / "0 match" pattern instead.
-- **tsvector tokenization:** slash-delimited strings (e.g. "Category/Subcategory") tokenize as compound tokens — individual words not matchable. Always preprocess to replace / with space before building tsvector.
-- **nlp_text completeness:** if a payload field isn't in nlp_text, BM25 can't find it. Verify all searchable fields are included in nlp_generator.py output.
-- **XISF vs FITS metadata:** FITS capture files have rich astrometric headers (RA, Dec, OBJECT, camera, exposure). XISF processed files (PixInsight output) typically have image geometry only. Don't assume astro metadata is present — always check format first.
-- **Astro filename conventions vary:** Different capture software uses different filename patterns. Always prioritize FITS header fields over filename parsing. Filename parsing is a fallback only.
-- **Catalog joins need normalization before fuzzy:** For structured IDs (NGC numbers), normalize first (strip spaces, lowercase, add prefix) before comparing. True fuzzy matching (rapidfuzz) reserved for name/description fields where spelling variation is genuine.
-- **LLM max_tokens budget:** when `retrieved` context grows (primary answer + merged high-confidence previews), `max_tokens=1024` causes the LLM to truncate before covering all content. Increase to 2048 for grounded responses with multi-source context.
-- **Faithfulness guard scope:** guard must check against `primary_answer` only, not the full `retrieved` string that includes appended context — otherwise extra terms from merged sections cause false failures and raw context blocks leak to the user.
-- **OCR inline in text field:** ingestion was storing OCR text both inline in `text` (after the marker) AND in `embedded_image_ocr_map`. The inline copy causes garbage in chat previews and LLM context. Fix at source (doc_serializer.py) and re-ingest — don't try to strip downstream.
+- psycopg2 `%` escaping in ILIKE needs `%%`.
+- Always define known-correct ground truth before testing.
+- Smoke test hardcoded values are fragile — use "match"/"0 match" pattern.
+- tsvector tokenization: preprocess slashes to spaces before building.
+- nlp_text completeness: if a payload field isn't in nlp_text, BM25 can't find it. **Verified this session: `nlp_text` is a dedicated PostgreSQL column (full chunk text), separate from `payload->>'nlp_text'` which is always empty — do not confuse the two when debugging BM25.**
+- XISF vs FITS: FITS has rich astrometric headers, XISF (PixInsight output) typically doesn't.
+- Astro filename conventions vary — prioritize FITS header fields over filename parsing.
+- Catalog joins: normalize before fuzzy matching (strip spaces, lowercase, add prefix).
+- LLM max_tokens: increase to 2048 for grounded responses with multi-source context.
+- Faithfulness guard scope: must check against `primary_answer` only, not full `retrieved` string.
+- OCR inline in text field causes garbage in chat previews — store only in `embedded_image_ocr_map`.
+- **Reranker candidate-set size matters**: BGE reranker gave correct ranking with 10 candidates but wrong ranking with 25 candidates for the same query — always test rerankers at the actual production `top_k`, not a smaller sample.
+- **`doc_type` is a weak proxy for "how should I group this"** — two collections can share `doc_type=entity_row` (kb_docs, astro_catalog) but need completely different grouping strategies. Route on the *actual presence* of a usable field (tags %, type diversity, folder depth) rather than doc_type category.
+- **Local 14B-class LLMs are unreliable at semantic label deduplication** — even with an explicit guarded prompt (environment/stage warnings, "when unsure don't merge"), Qwen 2.5 14B produced merges like `QA Archive → PROD Archive` and `Repo Collateral → Recon Missing Files`. This class of judgment task needs either a larger model or a different (embedding-similarity-gated) approach — revisit in Phase 5.
+- **Mention-based cross-linking was removed, not just tuned** — broker/client names (Goldman, Moore, CITI) are too short and too common to serve as reliable mention-match anchors across collections. The current discoverer only does exact-identifier and name-similarity matching; true cross-collection linking for free-text mentions needs NER (CL-03), not string matching.
+- **Wikilinks ≠ cross-collection links** — obsidian's `[[wikilinks]]` only capture note-to-note relationships inside the same collection. They do not and cannot bridge from a structured collection (recon_assist_file) into obsidian; that gap is only closed by NER-based tagging (CL-03/CL-05) or a confirmed identifier match already present in cross_links.
 
 ---
 
 ## Roadmap
 
 ### Phase 1 — Stabilize FIX retrieval ✅ COMPLETE
-| Step | Description | Status |
-|---|---|---|
-| 1.1–1.9 | FIX smoke test + 6 retrieval fixes | ✅ Done — 6/6 passed |
 
 ### Phase 1b — FIX version separation
 | Step | Description | Status |
 |---|---|---|
-| 1b.1 | Add `fix_version` field to XML serializer payload | ⏳ Pending |
-| 1b.2–1b.4 | Version-aware smoke test + answers + comparison queries | ⏳ Pending |
-| Note | FIX has 4.2 and 4.4 files; version in source_file name. Stage 0 to extract version; retrieval to filter by source_file ILIKE '%FIX44%'. Generalizes to BBG versioned exports. | — |
-
----
+| 1b.1 | Add `fix_version` field to XML serializer payload | Pending |
+| 1b.2–1b.4 | Version-aware smoke test + answers + comparison queries | Pending |
 
 ### Phase 2 — PostgreSQL as primary store ✅ COMPLETE
-| Step | Description | Status |
-|---|---|---|
-| 2.1–2.7 | Deploy PostgreSQL, schema, ingestion | ✅ Done |
-| 2.8 | Split query_router into retrieval package (10 files) | ✅ Done |
-| 2.9–2.11 | ui_app cutover, smoke tests 23/23 + 6/6 | ✅ Done |
-| 2.12–2.13 | Retire old engines + qdrant_client | ✅ Done |
 
 **Retrieval package (`core/retrieval/`):**
 
@@ -126,550 +106,192 @@ IDAreaDescriptionStatusCODE-020concept_vector_builder.pySingle-file collections 
 | `semantic.py` | pgvector similarity search |
 | `crosslink.py` | Relationships, enum lookups, doc chunk enrichment |
 | `discovery.py` | Count / list queries + LLM intent classification |
-| `reranker.py` | Scoring (used for non-structured doc types only) |
+| `reranker.py` | BGE + LLM reranking (entity_row excluded from BGE as of CODE-031) |
 | `answer.py` | Answer synthesis, display labels |
-| `router.py` | Entry point — RRF-based retrieval, confidence threshold |
-| `__init__.py` | Package exports |
+| `router.py` | Entry point — RRF-based retrieval, confidence threshold. **Structured planner branch removed (CODE-030)** |
 
----
-
-### Phase 3 — BBG ingestion and retrieval ← CURRENT FOCUS
+### Phase 3 — BBG ingestion and retrieval
 
 | Step | Description | Status |
 |---|---|---|
-| 3.1–3.7 | BBG ingest + routing fixes + 6/6 smoke tests | ✅ Done |
-| 3.8 | Hybrid RRF search (BM25 + pgvector + trigram) in PostgreSQL | ✅ Done |
-| 3.8.1 | `search_rrf` in db_retrieval.py — single SQL query | ✅ Done |
-| 3.8.2 | `ts_rank_cd` for cover density ranking | ✅ Done |
-| 3.8.3 | Trigram signal with `pg_trgm` + namespace filter | ✅ Done |
-| 3.8.4 | Synonym expansion with multi-variant BM25 queries | ✅ Done |
-| 3.8.5 | Confidence threshold (config-driven) — top 5 fallback | ✅ Done |
-| 3.8.6 | `collection_has_enums` — skip reverse enum for BBG | ✅ Done |
-| 3.9 | Extended FIX smoke tests — 13/13 passed | ✅ Done |
-| 3.10 | Fix force re-ingest (CODE-009) | ✅ Resolved — recreate_collection() correct |
-| 3.11 | Fix collection name mismatch (CODE-010) | ⏳ Pending |
-| 3.12 | Ingest full BBG dataset | ⏳ Pending |
-| 3.13 | Re-run BBG smoke tests against full dataset | ⏳ Pending |
-| 3.14 | ui_app.py — migrate collection management to PostgreSQL (CODE-008) | ✅ Resolved 2026-06-17 |
-| 3.15 | Obsidian folder-as-category (category + folder_path, searchable) | ✅ Done 2026-06-16 |
-| 3.16 | LLM intent prompt — discovery_list for note/doc phrasings | ✅ Done 2026-06-16 |
-| 3.17 | Per-note dedup in discovery results | ✅ Done 2026-06-16 |
-| 3.18 | RECON structured record answer formatting (labeled key-value pairs) | ✅ Done 2026-06-15 |
-| 3.19 | RECON schema-driven alias column header in ranked table | ✅ Done 2026-06-15 |
-| 3.20 | Cross-link testing: recon_assist_file ↔ kb_docs (PENDING-001) | ⏳ Pending — next major focus |
-| 3.21 | Replace field_maps.json role detection with LLM intent extraction | ✅ Done 2026-06-16 |
-| 3.22 | Retire query_terms.json intent_routing patterns | ✅ Done 2026-06-16 |
-| 3.23 | Schema-driven discovery table headers (identifier_field, primary_name_field) | ✅ Done 2026-06-17 |
-| 3.24 | primary_name_field threaded through XML pipeline (link_index→normalizer→xml_serializer) | ✅ Done 2026-06-17 |
-| 3.25 | type_field added to all table_serializer builders | ✅ Done 2026-06-17 |
-| 3.26 | type_value added to build_structured_nlp_text (BM25-searchable) | ✅ Done 2026-06-17 |
-| 3.27 | PostgreSQL tsvector trigger: slash→space preprocessing for category paths | ✅ Done 2026-06-17 |
-| 3.28 | Obsidian inline images + expandable OCR display | ✅ Done 2026-06-24 |
-| 3.29 | Discovery ILIKE name fallback for short/uppercase tokens | ✅ Done 2026-06-16 |
-| 3.30 | Word-boundary keyword matching in role detection | ✅ Done 2026-06-16 (superseded by 3.21) |
-| 3.31 | Shared payload enrichment utility (core/payload_utils.py) | ✅ Done 2026-06-18 |
-| 3.32 | type_field added to XML pipeline (link_index→normalizer→xml_serializer) | ✅ Done 2026-06-18 |
-| 3.33 | enrich_payload_with_common_fields() called in PDF, image, astro serializers | ✅ Done 2026-06-18 |
-| 3.34 | PDF parser + serializer verified (readable + OCR modes) | ✅ Done 2026-06-18 |
-| 3.35 | Image parser + serializer verified (OCR via pytesseract) | ✅ Done 2026-06-18 |
-| 3.36 | Astro parser + serializer verified (FITS/XISF metadata extraction) | ✅ Done 2026-06-18 |
-| 3.37 | Ingest full PDF collection — verify payload fields + smoke test | ⏳ Pending |
-| 3.38 | Ingest full image collection — verify payload fields + smoke test | ⏳ Pending |
-| 3.39 | Ingest full astro collection — verify payload fields + smoke test | ⏳ Pending |
-| 3.40 | Inline images in Obsidian/docs Ask tab answer (with expandable OCR) | ✅ Done 2026-06-22 (see 3.47) |
-| 3.41 | Data Prep tab (Phase 3.6) — build UI for file merge/clean before ingest | ✅ Done 2026-06-18 |
-| 3.42 | Astro catalog ingest (OpenNGC + Messier merged via Data Prep tab) | ✅ Done 2026-06-18 |
-| 3.43 | Astro cross-link tagger — RA/Dec proximity + name/alias matching | ⏳ Pending |
-| 3.44 | LLM schema inference: add column population count to prompt (fix identifier vs aliases confusion) | ⏳ Pending |
-| 3.45 | Cross-link builder: Option C (manual trigger button in Collections tab) | ✅ Done 2026-06-22 |
-| 3.46 | Cross-link builder: Option B (background thread triggered after each ingest) | ✅ Done 2026-06-24 — `launch_cross_link_discovery` via `background_runner.py`; status banner shown in Ask + Chat tabs |
-| 3.47 | Inline images in Ask tab with expandable OCR (Obsidian + docs) | ✅ Done 2026-06-22 |
-| 3.48 | Run full smoke test suite after today's changes | ✅ Done 2026-06-22 — all pass except OBS-01 (bad test, content never existed) |
-| 3.49 | schemas/ folder retired — all schemas now in PostgreSQL | ✅ Done 2026-06-18 |
+| 3.1–3.9 | BBG ingest, RRF hybrid search, extended FIX smoke tests | Done |
+| 3.11 | Fix collection name mismatch (CODE-010) | Pending |
+| 3.12–3.13 | Ingest full BBG dataset (69k rows) + re-run smoke tests | Pending |
+| 3.15–3.30 | Obsidian folder-as-category, LLM intent routing, schema-driven headers, payload enrichment utility, all serializer verification | Done |
+| 3.37–3.39 | Ingest full PDF / image / astro collections + smoke test | Pending |
+| 3.43 | Astro cross-link tagger — RA/Dec proximity + name/alias matching | Pending |
+| 3.44 | LLM schema inference: add column population count to prompt | Pending |
+| 3.45–3.46 | Cross-link builder manual trigger + background auto-trigger after ingest | Done |
 
-**Key architectural decisions made in Phase 3:**
-- RRF (Reciprocal Rank Fusion) replaces separate BM25+semantic merge — single PostgreSQL query
-- `ts_rank_cd` (cover density) replaces `ts_rank` — rewards proximity of query terms
-- Trigram (`pg_trgm`) added as third RRF signal for name similarity
-- `identifier_namespace` filter applied when query contains "tag"/"component"
-- Confidence threshold (default 0.105, in `system.json`) — below threshold returns top 5 with "no exact match" message
-- Python reranker skipped for structured collections — RRF handles ranking
-- `quant` removed from synonyms.json (was breaking BM25 queries)
-- Docs have no schema files (unlike XML/tables) — doc collections use folder structure as category
-- Discovery list/count correct for content queries — vault analytics need metadata query path (Phase 4.6)
-- LLM intent now returns role + target — replaces field_maps.json keyword matching
-- LLM intent prompt: singular "tag"/"field" = answer; plural "tags"/"fields" = discovery_list
-- Discovery table headers: derived from payload fields (identifier_field, primary_name_field) — no hardcoding
-- All structured serializers store primary_name_field and type_field in payload
-- tsvector trigger preprocesses slashes to spaces for correct tokenization
-- Shared payload enrichment (payload_utils.py) adds category, folder_path, primary_name_field, type_field to all serializer outputs — foundation for cross-linking
-- Discovery table headers derived from payload fields (identifier_field, primary_name_field) — no hardcoding; works for all collections
-- Schema storage: PostgreSQL schemas table is primary store; disk JSON files are legacy backup only; LLM inference runs when no schema exists anywhere
-- Link index skipped for tables > 2,000 rows — O(n²) cross-referencing only appropriate for small structured reference datasets (FIX, RECON)
-- Cross-link builder: Option C (manual trigger) then Option B (background thread after ingest) — not synchronous during ingestion
-- Batch embedding: batch_size=32 for LM Studio stability with BGE-large
-- PDF/image/astro parsers all functional; ingest verified against test files
-- OCR text stored in `embedded_image_ocr_map` only — removed from inline `text` field to prevent garbage in LLM context and chat previews
+**Key architectural decisions (Phase 3, cumulative):**
+- RRF (BM25 + pgvector + trigram) replaces separate merge — single PostgreSQL query, is the primary retrieval path for all non-structured-lookup queries.
+- Confidence threshold (`system.json`, default 0.105) scoped to `doc_type == "structured"` only — below threshold returns top-5 "no exact match" instead of a wrong single answer.
+- BGE reranker applies to `procedural`, `reference`, `mixed` doc_types only — **not** `entity_row` (CODE-031).
+- Structured query planner — **removed entirely** (CODE-030). RRF + reranker path handles all query types now.
+- Schema storage: PostgreSQL `schemas` table is the only store (disk JSON retired).
+- Domain-specific collections (RECON) need manual schema correction — LLM/heuristic inference reliably fails on business-specific column names like "Moore file name" vs "Tidal Job Name".
 
 ---
 
 ### Phase 3.5 — Cross-Collection Linking (NER-based)
 
-Design agreed 2026-06-18. Build after full dataset ingestion and all file types verified.
+**Status: design confirmed, not yet built.** Current cross-link discoverer (`cross_link_discoverer.py`) only supports:
+1. Exact identifier match (confidence 1.0, skips short numeric IDs)
+2. Name/primary_name trigram similarity (>0.3)
+3. `_meaningful_context()` guard — a candidate mention must appear with ≥8 other distinct words in a 120-char window to count (CL-02, already implemented)
 
-**Architecture:**
-- Tag chunks with shared entity references at ingest time (not query time)
-- NER approach: pattern matching + keyword scan against live Postgres entity dictionary (self-building)
-- Validated against actual collection values — no hardcoding of specific names
-- Tags stored in chunk payload permanently (e.g. `recon_refs`, `fix_tag_refs`)
-- Query time: O(1) payload lookup → fetch linked records → Stage 3 unified synthesis
+**Mention-based matching is intentionally disabled** — broker/client names (Goldman, Moore, CITI) are too short/common and produced too much noise (161 low-confidence `recon_assist_file → obsidian` links, most false positives from the word "Goldman" appearing in unrelated OCR text). Confirmed via direct inspection: `gsact.txt → 4.2 Checking Files` link existed with zero actual mention of `gsact.txt` in the target note — the match fired on the word "Goldman" (source `type` field) appearing elsewhere in that note.
 
-**Entity types to recognize:**
-- Recon filenames (`gsact.txt` etc.) → validated against `recon_assist_file.identifier`
-- PB filenames → validated against `recon_assist_file.aliases`
-- Client/broker names (Goldman etc.) → validated against `recon_assist_file.type` + `primary_name`
-- Tidal job names → validated against `recon_assist_file.primary_name`
-- FIX tags → validated against `xml_test.identifier`
-
-**Config:** `config/cross_links.json` — defines source/target collection pairs, ref_field name,
-and match_fields (pattern-based or keyword-based). `keyword:true` entries build entity dictionary
-from live Postgres values at ingest time — self-building, always current.
-
-**Also in this phase — FIX message interpretation (text input):**
-User pastes raw FIX message text → system parses tag=value pairs, looks up each tag in xml_test,
-composes plain English summary ("This is an Execution Report, qty=500, price=102.50...").
-Text input version buildable now. Image input needs vision model (Phase 5.M7).
-
-**Also in this phase — Missing file check:**
-User pastes list of filenames that arrived OK; system returns files in recon collection NOT in
-the list, with key details. Implement in Chat tab (not Streamlit widget). Uses Postgres NOT IN
-query against identifier + aliases fields.
-
-**Prerequisites before building:**
-- Full dataset ingestion complete (all file types, all collections)
-- All smoke tests passing on full datasets
+This is why `recon_assist_file → obsidian` and `obsidian → recon_assist_file` currently have **zero** confirmed cross-links (verified this session — `discover_cross_links('recon_assist_file', ['obsidian'])` returns 0 candidates under the current strategy set). True cross-linking here requires NER:
 
 | Step | Description | Status |
 |---|---|---|
-| 3.5.1 | `config/cross_links.json` — KB↔recon link definition with all match fields | ⏳ Pending |
-| 3.5.2 | `core/cross_link_tagger.py` — NER tagger, builds entity dict from Postgres at ingest | ⏳ Pending |
-| 3.5.3 | `doc_serializer.py` — hook tagger into chunking pipeline post-chunk | ⏳ Pending |
-| 3.5.4 | `router.py` — query-time ref tag lookup + linked record fetch | ⏳ Pending |
-| 3.5.5 | Stage 3 synthesis — unified LLM answer from multi-source context | ⏳ Pending |
-| 3.5.6 | Re-ingest kb_docs + obsidian with NER tagging active | ⏳ Pending |
-| 3.5.7 | Ground-truth test: KB article + Goldman recon records surface together | ⏳ Pending |
-| 3.5.8 | Extend to FIX cross-links (KB articles referencing FIX tags) | ⏳ Pending |
-| 3.5.9 | FIX message interpretation — text input → plain English summary | ⏳ Pending |
-| 3.5.10 | Missing file check — Chat tab, Postgres NOT IN query | ⏳ Pending |
+| 3.5.1 | `config/cross_links.json` — KB↔recon link definition with all match fields | Pending |
+| 3.5.2 | `core/cross_link_tagger.py` — NER tagger, builds entity dict from Postgres at ingest | Pending |
+| 3.5.3 | `doc_serializer.py` — hook tagger into chunking pipeline post-chunk | Pending |
+| 3.5.4 | `router.py` — query-time ref tag lookup + linked record fetch | Pending |
+| 3.5.5 | Stage 3 synthesis — unified LLM answer from multi-source context | Pending |
+| 3.5.6 | Re-ingest kb_docs + obsidian with NER tagging active | Pending |
+| 3.5.7 | Ground-truth test: KB article + Goldman recon records surface together | Pending |
+| 3.5.8 | Extend to FIX cross-links | Pending |
+| 3.5.9 | FIX message interpretation — text input → plain English summary | Pending |
+| 3.5.10 | Missing file check — Chat tab, Postgres NOT IN query | Pending |
 
 ---
 
 ### Phase 3.6 — Data Preparation Tab
-
-New UI tab in Streamlit for file preparation before ingestion. CSV-first; XLSX with sheet selection as follow-up if needed.
-
-**Capabilities:**
-- Load 1-2 CSV files, preview first 20 rows, show column names + sample values
-- Column operations: rename, derive (expression-based e.g. prefix+column), drop columns, filter rows
-- Two-file join: select key columns from each file, join type (left/inner/outer)
-- Key normalization before join: strip spaces, lowercase, add/remove prefix (handles "NGC 1976" vs "1976" vs "ngc1976")
-- Fuzzy matching via `rapidfuzz` for name/description columns — configurable threshold slider (70-100%)
-- Preview merged result (first 50 rows)
-- Export cleaned CSV — download or save to path for direct ingestion
-
-**First use case:** Merge Messier CSV + OpenNGC CSV on ngc_id → unified `astro_catalog` ready for ingestion, then cross-link to astro image files via RA/Dec proximity and name matching.
-
-**Dependencies:** pandas (existing), rapidfuzz (`pip install rapidfuzz`)
-
 | Step | Description | Status |
 |---|---|---|
-| 3.6.1 | Data Prep tab UI — file upload, preview, column ops | ✅ Done 2026-06-18 |
-| 3.6.2 | Two-file join with key normalization | ✅ Done 2026-06-18 |
-| 3.6.3 | Fuzzy matching (rapidfuzz) with threshold slider | ✅ Done 2026-06-18 |
-| 3.6.4 | Export cleaned CSV | ✅ Done 2026-06-18 |
-| 3.6.5 | Merge Messier + OpenNGC → ingest as `astro_catalog` | ✅ Done 2026-06-18 |
-| 3.6.6 | Astro filename parser fix — target extraction without frame type prefix | ⏳ Pending |
-| 3.6.7 | RA/Dec cross-link tagger — match astro files to catalog within 0.5° tolerance | ⏳ Pending |
-| 3.6.8 | Name/alias cross-link — match filename tokens against catalog common names | ⏳ Pending |
-
-| ID | Area | Description | Status |
-| CODE-025 | ui_data_prep.py | Data Prep tab only accepts CSV — add Excel (.xlsx) upload with sheet selector and forward-fill option for merged cells | ⏳ Pending |
-| CODE-026 | ui_data_prep.py | Add PostgreSQL chunk editor — load collection chunks, edit payload fields inline, save with confirmation. Needed for fixing ingestion errors without full re-ingest | ⏳ Pending
+| 3.6.1–3.6.5 | Data Prep tab, two-file join, fuzzy matching, export, Messier+OpenNGC merge | Done |
+| 3.6.6 | Astro filename parser fix — target extraction without frame type prefix | Pending |
+| 3.6.7 | RA/Dec cross-link tagger — match astro files to catalog within 0.5° tolerance | Pending |
+| 3.6.8 | Name/alias cross-link — match filename tokens against catalog common names | Pending |
+| 3.6.9 | Excel (.xlsx) upload with sheet selector + forward-fill for merged cells (CODE-025) | Pending |
+| 3.6.10 | PostgreSQL chunk editor for fixing ingestion errors (CODE-026) | Pending |
 
 ---
 
 ### Phase 4 — MCP Server + Metadata Query Path
 | Step | Description | Status |
 |---|---|---|
-| 4.1–4.5 | Design + implement + smoke test MCP server (local + online modes) | ⏳ Pending |
-| 4.6 | Metadata query path — direct Postgres queries for vault analytics | ⏳ Pending |
-| 4.7 | Open WebUI evaluation as replacement for Streamlit UI | ⏳ Pending |
+| 4.1–4.5 | Design + implement + smoke test MCP server (local + online modes) | Pending |
+| 4.6 | Metadata query path — direct Postgres queries for vault analytics | Pending |
+| 4.7 | Open WebUI evaluation | Pending |
 
-**MCP has two distinct potential roles — disambiguate before building:**
-- MCP as **ingestion source** — server pulls from Halo / Confluence / Snowflake and feeds rows into the existing ingestion pipeline (plugs in at the ingestion-adapter boundary alongside file parsers). This is the primary MCP role for NAS-AI.
-- MCP as **query interface** — exposes NAS-AI retrieval as an MCP server so external tools (Open WebUI, Claude, other agents) can query the knowledge base. Secondary role; build after system is proven.
-- These are separate pieces of work; may want both, but build/scope one at a time.
-
-**Metadata query path (4.6) — design agreed 2026-06-16:**
-- Vault analytics queries ("how many Moore notes", "which notes are in Moore") should NOT go through BM25/RAG — need direct Postgres queries against metadata fields.
-- Stage 0 LLM adds a `metadata_query: true/false` flag. If true + discovery → route to direct Postgres metadata query. If false → existing BM25/RRF path unchanged.
-- Content queries ("show all files by Goldman", "what tags contain price") always `metadata_query: false`.
-- Validation test suite (pre-implementation): (1) "show all files by Goldman" stays content-discovery; (2) "how many Moore notes" returns exact count (41); (3) "which notes are in Moore" returns distinct note list; (4) "how many tags contain price" stays existing path.
-
-**Open WebUI evaluation (4.7) — design discussion 2026-06-16:**
-- Fully local — connects to LM Studio via OpenAI-compatible API, no external AI.
-- If NAS-AI exposes MCP server, Open WebUI can connect and provide polished chat interface.
-- Decision point: evaluate when NAS-AI MCP server is ready.
-- **Standing constraint: NAS-AI is fully local. No external AI or cloud model connections, ever.**
-
-**Deployment / hosting (agreed 2026-06-15, refined 2026-06-16):**
-- Target: multiple users on Azure Virtual Desktop (AVD), same tenant. Data-AVD and login-AVD likely DISTINCT.
-- AVD-hosting dissolves "compiled installer" concern — provision-once, users open in browser.
-- NAS remains always-available dev/fallback environment.
-
-**Data sources:**
-- Current: file ingestion (XML, XLSX, CSV, Markdown).
-- Future: Halo + Confluence (API access confirmed) + Snowflake.
-- Keep ingestion-source boundary clean — new sources plug in as adapters.
+**Standing constraint: NAS-AI is fully local. No external AI or cloud model connections, ever.**
 
 ---
 
 ### Phase 5 — Advanced features
-- FIX message parser → English sentence synthesis
-- Astrophotography metadata search (FITS at scale)
-- Adaptive ingestion (no pre-defined schema required)
-- Cross-collection retrieval
-- Schema files migrated to PostgreSQL (CODE-011)
-- `ts_rank_cd` weights array tuning for position-based boosting
-- Query expansion via LLM before search
-- FIX version-aware queries (Phase 1b) — version in source_file name; Stage 0 extracts version; filter by source_file ILIKE '%FIX44%'
-- Folder/category-scoped discovery (search by Moore/CRD subfolder) — Option B preferred (structured filter WHERE folder_path LIKE 'Moore/CRD%'). Deferred until metadata query path (4.6) validated.
-
 | Step | Description | Status |
 |---|---|---|
-| 5.S1 | LLM-driven schema inference — replace structured_roles.json with LLaMA 8B semantic role assignment | ⏳ Pending |
+| 5.S1 | LLM-driven schema inference — already done (structured_roles.json replaced by LLM role assignment) | Done |
+| 5.M1–5.M7 | Model routing (assign different LLMs per doc_type/query_type in LM Studio) | Pending |
+| 5.NEW | Revisit CV-03b label consolidation with larger/better model — current Qwen 2.5 14B over-merges distinct topics even with a guarded prompt | Pending |
 
 ---
 
-## Change Log
-
-| Date | Step | What changed | Files touched | Result |
-|---|---|---|---|---|
-| 2026-06-09 | 1.1–1.9 | Phase 1 FIX fixes | `query_router.py`, `xml_serializer.py`, `config/synonyms.json` | 6/6 smoke tests |
-| 2026-06-09 | 2.1–2.12 | PostgreSQL migration + retrieval package | `core/retrieval/` (10 files), `core/ui_app.py` | 23/23 + 6/6 |
-| 2026-06-10 | 2.12 hotfix | FIX-05 regression fix | `core/retrieval/router.py`, `config/query_terms.json` | 6/6 |
-| 2026-06-10 | 2.13 | Retire qdrant_client.py | `core/structured_plan_executor.py` | No regressions |
-| 2026-06-10 | 3.1–3.7 | BBG ingest + routing fixes | `core/retrieval/router.py`, `discovery.py`, `answer.py`, `lexical.py`, `reranker.py`, `db_retrieval.py`, `nlp_generator.py`, `config/query_terms.json` | FIX 7/7, BBG 6/6 |
-| 2026-06-10 | 3.8 | RRF hybrid search + trigram + ts_rank_cd + confidence threshold | `core/retrieval/db_retrieval.py`, `core/retrieval/router.py`, `core/retrieval/lexical.py`, `config/synonyms.json`, `config/system.json` | FIX 13/13, BBG 6/6 |
-| 2026-06-10 | UI | Partial ui_app.py migration to PostgreSQL | `core/ui_app.py` | Collections/Ask/Preview/Validation tabs use PostgreSQL |
-| 2026-06-15 | 3.18–3.19 | RECON structured-record answer formatting + schema-driven alias header | `TABLES/table_serializer.py`, `core/retrieval/answer.py`, `core/ui_app.py` | FIX 13/13, BBG 7/7, KB 10/10 |
-| 2026-06-16 | 3.15–3.17 | Obsidian folder-as-category + LLM intent prompt + per-note dedup | `DOCS/doc_serializer.py`, `core/ingest_collection.py`, `core/retrieval/discovery.py` | All suites green |
-| 2026-06-16 | 3.21–3.22 | Replace field_maps.json role detection with LLM; retire query_terms intent_routing | `core/retrieval/discovery.py`, `config/query_terms.json` | FIX 13/13, BBG 7/7, KB 10/10, RECON 10/10, OBS 10/10 |
-| 2026-06-17 | 3.23–3.27 | Schema-driven table headers; primary_name_field + type_field in all serializers; type_value in nlp_text; tsvector slash fix | `core/ui_app.py`, `TABLES/table_serializer.py`, `core/link_index.py`, `core/normalizer.py`, `XML/xml_serializer.py`, `core/nlp_generator.py`, PostgreSQL trigger | FIX 13/13, BBG 7/7, KB 10/10, RECON 10/10, OBS 10/10 |
-| 2026-06-17 | 3.14/CODE-008 | Delete Collection UI migrated to PostgreSQL; force re-ingest log updated | `core/ui_app.py` | delete_pg_collection() confirmed working |
-| 2026-06-18 | 3.23 (cont) | Schema-driven table headers: identifier_field + primary_name_field read from payload; alias label from schema. Discovery table shows real column names for all collections. | `core/ui_app.py` | FIX shows Tag/Name headers correctly |
-| 2026-06-18 | 3.31–3.33 | Shared payload enrichment utility; type_field in XML pipeline; enrich called in PDF/image/astro serializers | `core/payload_utils.py` (new), `core/normalizer.py`, `XML/xml_serializer.py`, `PDF/pdf_serializer.py`, `IMAGES/image_serializer.py`, `ASTRO/astro_serializer.py` | All compile; category/folder_path verified on nested paths |
-| 2026-06-18 | 3.34–3.36 | PDF, image, astro parsers + serializers verified against real test files | — | Readable PDF: 63 chunks; OCR PDF: 3 chunks; Image OCR: working; FITS: 34 metadata fields |
-| 2026-06-18 | 3.41 | Data Prep tab built — CSV load, column ops, two-file join, key normalization, fuzzy matching, post-join coalesce, export | `core/ui_data_prep.py` (new), `core/ui_app.py` | Messier + OpenNGC merged and exported |
-| 2026-06-18 | 3.42 | Astro catalog ingested (OpenNGC + Messier, 13,336 chunks) | `astro_catalog` collection | Schema fixed: ngc_id=identifier, comments=primary_name, messier_id=aliases |
-| 2026-06-18 | LLM schema | LLM-driven schema inference built — 3-tier: PostgreSQL → disk → LLM → heuristic | `core/schema_inference.py`, `TABLES/schema_inference_table.py`, `core/schema_loader.py` | LLM now infers schema on first ingest; schemas stored in PostgreSQL; schemas/ folder retired |
-| 2026-06-18 | PERF-001 | build_link_index skipped for tables > 2,000 rows — fixes O(n²) hang on large catalogs | `TABLES/table_serializer.py` | Astro catalog serialization now completes in seconds |
-| 2026-06-18 | EMBED-001 | Batch embedding batch_size reduced 64→32 for LM Studio stability | `core/embedder.py` | — |
-| 2026-06-18 | Schemas | All schemas migrated from disk JSON files to PostgreSQL schemas table | `core/schema_inference.py`, `core/schema_loader.py`, `core/ui_app.py` | schemas/ folder can be deleted; delete button added to Validation tab |
-| 2026-06-18 | 3.37–3.39 | PDF, image (JPG/PNG), DOCX, FITS, XISF all ingested via Streamlit UI | pdf_test, image_test, docx_test, astro_test collections | All file types ingesting correctly. Astro filename parsing gaps logged (ASTRO-001/002/003). |
-| 2026-06-18 | Design | Cross-linking architecture agreed (Phase 3.5): NER-based tagging at ingest, entity dict from Postgres, config-driven collection pairs, no hardcoding | — | Design complete; build after full dataset ingest |
-| 2026-06-18 | Design | Data Prep tab agreed (Phase 3.6): CSV join/merge/clean UI with key normalization + fuzzy matching (rapidfuzz). First use: merge Messier + OpenNGC CSVs for astro_catalog | — | Design complete; build next session |
-| 2026-06-24 | R1 Chat tab | Chat tab built: multi-turn history, intent detection, collection routing, grounded LLM responses | `core/chat_engine.py` (new), `core/ui_app.py` | R1 working — natural language chat with retrieval |
-| 2026-06-24 | Hallucination fix | Split SYSTEM_PROMPT into CHAT_SYSTEM_PROMPT + GROUNDED_SYSTEM_PROMPT; temperature 0.7→0.2 for grounded; faithfulness guard added (`_response_is_faithful`) — falls back to raw answer if LLM drops >30% of key terms | `core/chat_engine.py` | Field values (filenames, IDs) now reproduced verbatim |
-| 2026-06-24 | R2 Multi-collection | `select_collections` (1–3 ranked collections via LLM), `run_parallel_queries` (ThreadPoolExecutor fan-out), winner selection skips "No record found" results | `core/chat_engine.py` | Correct collection wins even when others return no match |
-| 2026-06-24 | High-confidence merge | Related sections ≥0.75 confidence merged into LLM context as additional grounded data; <0.75 shown as collapsible related items; `primary_answer` tracked separately as faithfulness baseline and fallback | `core/chat_engine.py` | Obsidian + KB context included in answer without leaking labels |
-| 2026-06-24 | Inline images chat | Chat tab renders images inline via `answer_payload` from best-result anchor chunk; mirrors Ask tab image rendering exactly | `core/ui_app.py`, `core/chat_engine.py` | Images from merged high-confidence sections resolve correctly |
-| 2026-06-24 | OCR inline fix | Removed OCR text dump from chunk `text` field in doc_serializer.py — marker retained, OCR content stored only in `embedded_image_ocr_map` | `DOCS/doc_serializer.py` | No more OCR garbage in chat previews or LLM context |
-| 2026-06-24 | Obsidian re-ingest | Obsidian re-ingested after OCR inline fix; cross-link discovery + concept vector rebuild triggered automatically in background | `obsidian` collection | Clean text fields; background rebuild confirmed running |
-| 2026-06-24 | Background status | Cross-link discovery background status banner added to Chat tab (mirrors Ask tab) | `core/ui_app.py` | Banner shows during background rebuild, disappears when done |
-| 2026-06-24 | local_llm_client fix | `call_local_llm_json` wrapped in try/except — returns None on failure instead of raising | `core/local_llm_client.py` | Prevents chat turn crash on LLM timeout or malformed response |
-| 2026-06-24 | max_tokens increase | `generate_conversational_response` max_tokens increased 1024→2048 for grounded responses with multi-source context | `core/chat_engine.py` | LLM no longer truncates when primary answer + merged context exceeds 1024 tokens |
-
-
-Fix concept vector grouping for structured collections — _get_group_field in concept_vector_builder.py (CODE-020)
-Persist obsidian related_titles wikilinks to cross_links table as confirmed links (CODE-021)
-Build Knowledge Graph tab — network graph (plotly), concept vector viewer, move cross-link review sections (CODE-022)
-R3 — clarifying questions when retrieval returns no answer
-OBS-01 smoke test fix
-Validation tab — show ALL source columns not just mapped ones
-Full BBG dataset ingest
-
----
-
-## Smoke Test Results
-
-### All suites — 2026-06-18 ALL PASSING (verified after full re-ingest + new file type additions)
-⚠️ Re-verification needed after 2026-06-24 changes (doc_serializer OCR fix, chat_engine, ui_app)
-- FIX: 13/13
-- BBG: 7/7
-- KB: 10/10
-- RECON: 10/10
-- OBS: 10/10 (OBS-01 bad test — needs rewrite against real vault content)
-
-### FIX Smoke Test (2026-06-10) 13/13 passed
-
-| ID | Question | Method | Pass? |
-|---|---|---|---|
-| FIX-01 | what is tag 22 | structured_namespace_lookup | ✅ |
-| FIX-02 | what values can tag 22 have | structured_namespace_lookup | ✅ |
-| FIX-03 | what tag is exec broker | semantic | ✅ |
-| FIX-04 | what tag is execution broker | semantic | ✅ |
-| FIX-05 | what tag can have a value ISIN | reverse_enum_lookup | ✅ |
-| FIX-06 | what tags contain security | discovery_list | ✅ |
-| FIX-07 | what tags contain broker | discovery_list | ✅ |
-| FIX-08 | which tag is order quantity | semantic | ✅ |
-| FIX-09 | which tag is cum qty | semantic | ✅ |
-| FIX-10 | what is last quantity | semantic | ✅ |
-| FIX-11 | which tag is exec qty | semantic | ✅ (no ExecQty in FIX — returns "no exact match") |
-| FIX-12 | which tag is exec quantity | semantic | ✅ (no ExecQty in FIX — returns "no exact match") |
-| FIX-13 | which tag is targetcompid | semantic | ✅ |
-
-### BBG Smoke Test 7/7 passed
-
-| ID | Question | Method | Pass? |
-|---|---|---|---|
-| BBG-01 | what is PX_ASK | semantic | ✅ |
-| BBG-02 | what is the description of ARD_OPERATING_EXP_PER_ASM_ASK | semantic | ✅ |
-| BBG-03 | what type is PX_ASK | semantic | ✅ |
-| BBG-04 | what fields contain ask price | discovery_list | ✅ |
-| BBG-05 | what fields are in category airlines | discovery_list | ✅ |
-| BBG-06 | what string fields are available | discovery_list | ✅ |
-| BBG-07 | how many fields contain ask price | discovery_count | ✅ |
-
----
-
-## Phase 5 Addition — Model Routing
-
-### Concept
-Route different query types and doc types to different LLM/embedding models loaded in LM Studio.
-
-### Proposed Model Assignments
-
-| Query/Doc Type | Recommended Model | Reason |
-|---|---|---|
-| structured (FIX, BBG) | LLaMA 3.1 8B or smaller | Simple lookup, no deep reasoning needed |
-| entity_row (KB, Obsidian) | Qwen3-32B | Longer text, needs reasoning to extract right answer |
-| procedural/reference (docs, PDF) | Qwen3-32B | Multi-paragraph reasoning, section navigation |
-| image | Qwen2-VL or LLaVA | Vision model for OCR, image description |
-| astro (FITS) | Qwen3-32B | Metadata reasoning |
-| structured query planner | Qwen3-32B | Complex NLP plan generation |
-| chat tab | Qwen3-32B | Multi-turn reasoning |
-
-### Implementation Steps (Phase 5)
-
-| Step | Description | Status |
-|---|---|---|
-| 5.M1 | Add model config to system.json — map doc_type/query_type to model name + endpoint | ⏳ Pending |
-| 5.M2 | Update System Config UI tab — allow defining loaded models, assign per doc_type | ⏳ Pending |
-| 5.M3 | Update local_llm_client.py — accept model parameter, route to correct LM Studio endpoint | ⏳ Pending |
-| 5.M4 | Update router.py — pass doc_type to LLM calls | ⏳ Pending |
-| 5.M5 | Load Qwen3-32B in LM Studio alongside BGE embeddings | ⏳ Pending |
-| 5.M6 | Smoke test model routing — verify correct model used per query type | ⏳ Pending |
-| 5.M7 | Vision model integration for image ingestion (Qwen2-VL or LLaVA) | ⏳ Pending |
-
-### Notes
-- BGE embeddings (text-embedding-bge-large-en-v1.5, 1024 dims) stay unchanged
-- LM Studio supports multiple models loaded simultaneously — endpoint per model
-- Model routing is transparent to the user — same query interface, better answers
-
----
-
-## Phase 4 Architecture Decisions — Deployment & Data Sources
-
-Recorded for when the system is proven and ready for blind testing. NAS remains always-available dev/fallback environment.
-
-### Deployment / hosting
-- Target users: multiple people on Azure Virtual Desktop (AVD) sessions, same company tenant.
-- **Data-AVD and login-AVD are likely DISTINCT** — app stays a remote-DB client.
-- AVD-hosting dissolves "compiled installer" concern — provision-once, users open in browser.
-- UI framework: Streamlit stays; Open WebUI candidate when MCP server ready (Phase 4.7).
-- HTML-in-Streamlit pragmatic path for richer views.
-
-### Data sources
-- Current: file ingestion (XML, XLSX, CSV, Markdown).
-- Future: Halo + Confluence (API access confirmed) + Snowflake.
-- Keep ingestion-source boundary clean — new sources plug in as adapters.
-- Once ingested via MCP adapters, data uses same Postgres schema — metadata query path covers it for free.
-
-### Guardrail
-- Protect the core/UI separation religiously.
-- **NAS-AI is fully local. No external AI or cloud model connections, ever.**
-
----
-
-### Session 2026-06-22 — Retrieval fixes, image/OCR fix, cross-linking v1
-
-**Retrieval bug fixes (all verified):**
-- `discovery_count` returning raw JSON instead of count string — root cause: 3 early-return paths in `discovery.py` (`structured_discovery`, `fallback_results`, `distinct_discovery` ×2 duplicate blocks) bypassed the count-string conversion. Fixed all paths to check `intent["mode"] == "discovery_count"` before returning.
-- Preview table capped at 10 rows — root cause: "Debug top K" input (`ui_app.py`) was passed as the actual discovery query `limit=`, defaulting to 10/max 20. Fixed: discovery queries now use `limit=200` regardless of debug setting.
-- Wrong/misleading answer for misspelled filenames (e.g. "gsct.txt") — added trigram-based "did you mean" suggestions in `router.py` filename-detection block when no exact identifier match found.
-- False-confidence wrong answers for missing data (e.g. "horse head nebula" returning Trifid Nebula) — re-enabled confidence threshold check in `router.py`, scoped to `doc_type == "structured"` only (RRF score is the only signal there since BGE reranker doesn't apply). Below threshold (`system.json` `retrieval_confidence_threshold`, default 0.105) returns "no confident match" + top 5 closest instead of single wrong answer.
-- Discovery results table missing `category` column — added so users can see WHY a field matched (e.g. category path containing query term, not just name).
-- Single/non-structured discovery_list results showing sparse table instead of full content — added `_show_as_content` logic: when all result doc_types are in `{entity_row, procedural, mixed}`, render full description content instead of summary table.
-- "No answer payload available for image rendering" caption — now scoped to skip discovery_count/list/comparison methods.
-
-**XML/FIX schema fixes:**
-- `xml_serializer.py` was bypassing PostgreSQL schema storage entirely — called `infer_schema()` (heuristic-only) instead of `infer_table_schema()`, and saved to disk via `save_schema()` instead of `save_schema_to_db()`. Fixed both call sites — XML pipeline now uses the same PostgreSQL-first schema flow as tables.
-- `schema_inference_table.py` rewritten: heuristic-first (fast), LLM escalation only when heuristic misses `identifier`/`primary_name` — was previously LLM-first which is slow under concurrent load and frequently wrong for domain-specific column names (e.g. RECON's "Moore file name" vs "Tidal Job Name" — LLM and heuristic both repeatedly chose wrong columns). Dead/unreachable code removed.
-- `local_llm_client.py` `_parse_json_response()` — added bracket-counting algorithm to extract first complete JSON object when LLM appends extra text after closing brace (fixes "Extra data" JSONDecodeError during schema inference).
-- `schema_loader.py` — added `if not schema_dir.exists(): return schemas` guard (crashed after `schemas/` folder was deleted, since disk fallback still unconditionally called `.iterdir()`).
-- **RECON schema corrected via Validation tab + direct PostgreSQL writes** after both heuristic and LLM repeatedly produced wrong identifier/primary_name (`Tidal Job Name`/`Comment` instead of `Moore file name`/`Tidal Job Name`). `sFTP Folder` field was found completely missing from ALL roles (silently dropped by LLM) — added via direct Python `save_schema_to_db` call. **Known Validation tab limitation confirmed**: schema editor multiselect only shows fields already mapped to *some* role, so fields dropped entirely are invisible in the UI — this is how `sFTP Folder` got lost. Still needs UI fix.
-- **[DECISION] Domain-specific collections need manual schema definition, not LLM/heuristic inference.** Confirmed via repeated RECON failures — column names like "Moore file name" vs "Tidal Job Name" require business context no amount of prompt engineering reliably captures. LLM/heuristic work well for standard naming (BBG: `Id`, `Mnemonic`, `Description`, `DataType` — heuristic succeeded immediately).
-
-**Phase 1b — FIX version consolidation (COMPLETE, verified):**
-- Root cause of enum truncation (Tag 22 showing 9 values instead of 19): FIX enums/fields are split per-version-file (`Fields_FIX42.xml`, `Fields_FIX44.xml`, etc.) and ingested independently rather than merged by Tag across versions.
-- `merge_rows_by_version(all_rows, file_kind)` added to `xml_serializer.py`: extracts version from filename (`FIX44` → 44), groups rows by Tag (fields) or (Tag, Value) (enums) across all matching files, picks latest version as canonical, retains full `_version_history` per record. Files with unparseable version numbers skip merge (original per-file behavior preserved).
-- Call site in `xml_finalize()`: splits `all_rows` into fields/enums/other by filename prefix, merges each kind, replaces with synthetic `_merged_fields`/`_merged_enums` keys (with matching schema copied from an original file) before `build_link_index` runs.
-- **Verified**: re-ingested xml_test (1168→1164 chunks), "values for tag 22" now correctly returns all 19 values (9 from FIX42 + 10 from FIX44, A–J). `smoke_fix.py` 13/13 pass.
-
-**Obsidian inline images + expandable OCR (COMPLETE, major debugging session):**
-- Root cause #1: `debug_route_query` (which resolves images via `ranked_points[0]`) was gated behind `if show_debug and intent["mode"] == "answer":` — meant the debug checkbox controlled whether images resolved at all. Fixed: now runs whenever `intent["mode"] == "answer"`, debug *display* panels remain separately gated by the checkbox.
-- Root cause #2 (the real bug): for multi-chunk markdown notes, `build_fuller_doc_payload` (`crosslink.py`) correctly merges ALL relevant chunks' text AND images into one combined payload used to generate the answer text — but the UI's image-fetching logic used a *separate*, freshly-re-derived `ranked_points[0]` (single top chunk only) instead of this merged payload. Result: answer text correctly showed all embedded image OCR markers, but only images belonging to the single top-ranked chunk would resolve — others showed "Image not resolved."
-- Fix: `router.py` `route_query()` now stashes its merged payload as `route_query._last_answer_payload` right before returning; `run_query_with_method()` exposes it as `"answer_payload"` in its result dict. `ui_app.py` stores this in `st.session_state.ask_answer_payload` and uses it directly for image lookup (falling back to old debug-derived approach only if empty). **Verified working** — images from all merged chunks now render correctly inline.
-- Expandable OCR fix: added `embedded_image_ocr_map` field (list of `{image_target, image_path, ocr_text}`) to `_make_chunk()` in `doc_serializer.py` — captures OCR text as a clean, isolated value per image block (previously only available flattened into the combined `description` text, with no way to know where one image's OCR ended and surrounding prose began). `build_fuller_doc_payload` (`crosslink.py`) updated to merge this map across chunks alongside `embedded_image_paths`/`targets`. `render_answer_with_inline_images` (`ui_app.py`) simplified to use `image_item["ocr"]` directly for expander/inline display, and skips past the matching raw OCR text in the source string (via prefix-match) so it doesn't ALSO render as duplicate plain prose. **Verified working** — clean per-image expandable OCR, no duplication.
-- **Requires re-ingestion of Obsidian/doc collections** to populate `embedded_image_ocr_map` for existing notes (only new ingests after this change have the field).
-- Temporary `[CHUNK DEBUG]` print added during investigation was removed from `doc_serializer.py` after the fix was confirmed.
-
-**Cross-linking v1 (NEW — built and validated this session):**
-- `core/cross_link_discoverer.py` (new): `discover_cross_links(source_collection, target_collections=None)` — three match strategies: (1) exact identifier match, confidence 1.0, with guard to skip plain short numeric IDs (<5 digits) since these collide meaninglessly across unrelated collections (e.g. FIX tag "79" vs KB article "79"); (2) name/primary_name trigram similarity (>0.3), confidence = similarity score; (3) mention matching — source identifier or `type` field found as substring in target `description`, confidence flat 0.6, with generic-term filtering (length ≥4, not purely numeric, not in `generic_terms` config list) to suppress false positives from common financial vocabulary (e.g. "Common", "MarketData", "Confirmation", "Session" matching unrelated KB content purely by word overlap).
-- `config/doc_query_hints.json` — new `generic_terms` key added (reusing existing config infrastructure rather than hardcoding in Python) for mention-matching noise suppression. User can add terms ad-hoc via UI (see below).
-- `core/cross_link_store.py` (new): `ensure_cross_links_table()`, `save_cross_link_candidates()` (confidence ≥0.9 → `confirmed`, 0.3–0.9 → `pending_review`, <0.3 → skipped), `get_cross_links_for_identifier()` (lookup helper, not yet wired into query-time retrieval).
-- `cross_links` PostgreSQL table created manually by user; UNIQUE constraint added via ALTER TABLE (`source_collection, source_identifier, target_collection, target_identifier, match_type`) to support `ON CONFLICT` upsert.
-- **UI — Collections tab**: "Build Cross-Links" section (source collection selector, optional target multiselect, button → runs discoverer + saves candidates, shows saved/skipped counts). "Review Pending Cross-Links" section: filterable by source collection, expandable rows showing side-by-side source/target content preview (primary_name + description snippet) so the match can actually be judged, three actions per row — Confirm, Reject, **Reject + Ignore term** (rejects AND appends the matched term to `generic_terms` in `doc_query_hints.json` in one click — added per user request to avoid manual JSON editing).
-- `core/paths.py` — added `DOC_QUERY_HINTS_PATH` constant (was missing; `doc_query_hints.json` previously only loaded via `load_doc_query_hints()` helper, no direct path constant existed for UI read/write).
-- **Tested across real collection pairs**: RECON↔KB (mention matches confirmed meaningful, e.g. "bony_pos.txt" correctly found in a KB article about checking sFTP for missing files), RECON↔all (400 candidates: 149 KB, 230 Obsidian, 15 FIX — all `pending_review`, none auto-confirmed), xml_test↔KB (after generic-term filtering, dropped from 150→68→20 candidates as false positives were identified and filtered: numeric-ID collisions, then years/common words).
-- **[KNOWN ISSUE — not yet fixed]** Obsidian's `identifier` field is per-chunk synthetic (e.g. `notename_chunk_3`), not a real entity — produces duplicate near-identical cross-link candidates (one per chunk of the same note) when Obsidian is the *source* collection. Needs note-level (source_file) deduplication for Obsidian-as-source discovery, not yet implemented.
-- **[KNOWN ISSUE — not yet addressed]** All `mention` matches get a flat confidence of 0.6 regardless of match quality/specificity — not scored variably like `name_similarity`. Acceptable for now since all land in `pending_review` tier requiring manual confirmation anyway, but flagged as a future refinement (e.g. scale by term length/rarity).
-- **Not yet built**: Option B (background thread trigger after each ingest) — deferred until Option C (manual button) is exercised more and match quality is trusted. Query-time usage of confirmed cross-links (surfacing linked records from other collections in the Ask tab) — `get_cross_links_for_identifier()` helper exists but is not wired into `router.py` yet.
-
-**Smoke test status:** `smoke_fix.py` `smoke_bbg.py` `smoke_kb.py` `smoke_recon.py` all pass. `smoke_obsidian.py` — OBS-01 fails by design; confirmed via direct grep that the test's expected content (`gsact.txt` sftp folder) never existed in the actual Obsidian vault. Test needs rewriting against real note content or removal — not yet done.
-
----
-
-### Session 2026-06-23 — Cross-linking v2, Concept Vectors, Query-Time Enrichment
-
-**Cross-linking improvements:**
-- Obsidian per-chunk dedup: `cross_link_discoverer.py` detects chunk-style identifiers (`_chunk_N` suffix via 5-sample check) and groups by `source_file` instead — one query per note, not per chunk. Same applied to target side: when target collection has chunk-level identifiers, uses `source_file` as `target_identifier`.
-- Variable mention confidence: replaced flat 0.6 with term-length-based scoring: <7 chars = 0.45, 7–12 chars = 0.55, 13+ chars = 0.70. Also removed occurrence-count scoring (PostgreSQL NULLIF bug with REPLACE on NULL descriptions).
-- Bulk review UI: confidence threshold slider + "Confirm all above threshold" / "Reject all below threshold" buttons added to Collections tab cross-link review section.
-- Source/target preview now uses `OR payload->>'source_file' = %s` fallback in the DB lookup so Obsidian note-level targets (stored as source_file, not identifier) correctly show content.
-- `cross_link_store.py`: `save_cross_link_candidates()` deduplicates candidates by unique key (source_collection, source_identifier, target_collection, target_identifier, match_type) before saving, keeping highest confidence per key — prevents duplicate rows from chunk-level matching.
-- `DOC_QUERY_HINTS_PATH` added to `core/paths.py`; imported in `ui_app.py` for "Reject + Ignore term" button.
-
-**Concept vectors (NEW — `core/concept_vector_builder.py`):**
-- HDBSCAN clustering on chunk embeddings grouped by folder_path/category/source_file.
-- Multi-label assignment: chunks assigned to any cluster with cosine similarity >= 0.75 (not hard assignment).
-- Anchor chunks: top-5 closest chunks to centroid stored as `anchor_chunk_ids` + `anchor_texts` (1000 chars).
-- `concept_vectors` PostgreSQL table created (collection, group_field, group_value, cluster_id, centroid vector(1024), anchor_chunk_ids JSONB, anchor_texts JSONB).
-- HDBSCAN and scikit-learn installed via pip; both confirmed available.
-- Built and validated on all collections: recon_assist_file (2 clusters), kb_docs (4 clusters: FIX/CTM, RECON batch, Market data/AutoSys, Runbook procedures), obsidian (42 clusters across folders — correctly separated RECON procedures, CRD workflows, Soros checks, Astro posts, personal notes, etc.).
-- `anchor_texts` stored at 1000 chars (was 200 — caused truncated previews in Related sections).
-- Bug fixed: psycopg2 auto-parses JSONB to Python list — removed `json.loads()` wrappers around `anchor_chunk_ids`/`anchor_texts` in `concept_link_finder.py`.
-- Bug fixed: orphan `chunk_emb_str` reference before assignment in fallback path of `find_concept_links()`.
-- Bug fixed: `centroid::vector` cast required in pgvector queries (stored as string, needs explicit cast).
-- Bug fixed: `embedding <=>` typo in fallback cluster search — should be `centroid::vector <=>`.
-
-**`core/concept_link_finder.py` (NEW):**
-- `find_concept_links(collection, chunk_id, target_collections=None, similarity_threshold=0.75)`.
-- Step 1: find source cluster via `anchor_chunk_ids @> [chunk_id]::jsonb`; fallback to nearest cluster by chunk embedding if not an anchor.
-- Step 2: compare source centroid against all target collection centroids using pgvector `<=>` distance.
-- Returns top-3 matches per target collection above threshold.
-
-**Query-time enrichment wired into `router.py`:**
-- `identifier_lookup` path: enriched with both confirmed cross-links (`get_cross_links_for_identifier`) AND concept links (`find_concept_links`) on the matched chunk. Results merged, deduplicated by (collection, title), returned as structured `related_sections` list.
-- Semantic/answer path: same enrichment applied after `route_query()` — uses `_chunk_db_id` stashed in merged payload (set via `best.id` before `build_fuller_doc_payload` call, NOT after, to survive the merge replacement).
-- `run_query_with_method()` signature extended: `show_exact_links=True, show_related_topics=True` params gate each enrichment step independently.
-- `related_sections` returned as structured dicts: `{title, collection, match_type, confidence, preview, anchor_chunk_ids}`.
-
-**Ask tab UI (`ui_app.py`):**
-- Two new checkboxes: "Show exact cross-links" and "Show related topics".
-- `st.session_state.ask_related_sections` stores related sections, initialized to `[]`.
-- Related sections rendered as `st.expander` blocks below the answer: `[collection] title — match_type (confidence)` as label, content preview inside.
-- "No answer payload available for image rendering" caption now also suppressed for `identifier_lookup` method.
-
-**Collections tab UI (`ui_app.py`):**
-- "Build Cross-Links" button renamed "Build Cross-Links + Concept Vectors" — runs both `discover_cross_links` + `save_cross_link_candidates` + `build_concept_vectors`.
-- Auto-rebuild concept vectors after every ingestion (`DELETE FROM concept_vectors WHERE collection=X` then `build_concept_vectors(X)`).
-
-**Verified working end-to-end:**
-- "what is the sftp folder for jpm_holdings.xlsx" (recon_assist_file): returns confirmed cross-link (obsidian | 8. JPM Recurring Issue for jpm_activity.xlsx) + concept match (obsidian | Moore/Tidal Jobs/RECON, 0.80) + concept match (kb_docs | KB_Articles, 0.78) — all as expandable sections.
-- "how to check recon files on server" (obsidian, semantic mode): concept links surface RECON procedure cluster and KB batch articles as Related Topics.
-
-**Smoke tests:** All pass except OBS-01 (confirmed bad test — content never existed in vault).
-
-**New PostgreSQL tables added this session:**
-- `concept_vectors`: collection, group_field, group_value, cluster_id, centroid vector(1024), anchor_chunk_ids JSONB, anchor_texts JSONB. UNIQUE(collection, group_value, cluster_id).
-- `cross_links`: UNIQUE constraint added via ALTER TABLE (was missing from manually-created table).
-
----
-
-### Session 2026-06-24 — Chat Tab (R1+R2), Hallucination Fix, OCR Inline Fix
-
-**R1 — Conversational chat tab (built and working):**
-- `core/chat_engine.py` (new file): `chat_turn()` entry point, `detect_chat_intent()`, `generate_conversational_response()`, `augment_query_with_focus()`, `extract_focus_terms()`.
-- Multi-turn history: last 5 turns passed to LLM; last 3 turns used for intent detection and collection routing.
-- Intent detection: LLM classifies each message as `retrieval` or `chat` — greetings/small talk get free-form response, operational questions go to retrieval pipeline.
-- `CHAT_SYSTEM_PROMPT` for conversational responses; `GROUNDED_SYSTEM_PROMPT` for retrieval-backed responses with strict verbatim rules.
-- Temperature: 0.7 for chat, 0.2 for grounded.
-
-**Hallucination fix:**
-- Faithfulness guard (`_response_is_faithful`): extracts key terms from retrieved answer (filenames, numeric IDs, ALL_CAPS tokens); verifies ≥70% appear in LLM response; falls back to raw answer if check fails.
-- Faithfulness baseline uses `primary_answer` only (not appended context) — prevents false failures from extra terms in merged sections.
-- Fallback also returns `primary_answer` only — prevents `[Additional context from...]` labels leaking to user.
-- `max_tokens` increased 1024→2048 for grounded responses to prevent truncation when multi-source context is included.
-
-**R2 — Multi-collection routing:**
-- `select_collections()`: LLM picks 1–3 most relevant collections, ranked by relevance; fallback to first available collection if LLM fails.
-- `run_parallel_queries()`: `ThreadPoolExecutor` fan-out across selected collections; winner selection skips collections returning "No record found" or "No answer found" — correct collection wins even when others have no match.
-- `collections_queried` key added to return dict for future UI display.
-
-**High-confidence context merging:**
-- Related sections ≥0.75 confidence merged into LLM context as additional grounded data (stripped of OCR markers via `_strip_ocr_markers`).
-- Related sections <0.75 shown as collapsible expanders in the UI.
-- High-confidence anchor chunks searched for image payloads — first chunk with `embedded_image_paths` used as `answer_payload` for inline image rendering.
-
-**Inline images in chat tab:**
-- Chat tab renders images inline using `answer_payload` from retrieval result — mirrors Ask tab image rendering exactly.
-- `answer_payload` passed through `chat_turn()` return dict; UI builds `_source_image_items` from `embedded_image_paths`, `embedded_image_targets`, `embedded_image_ocr_map`.
-- Related sections expander uses plain `st.markdown` — no images in expanders (clean, no OCR garbage).
-
-**OCR inline text fix (doc_serializer.py):**
-- Root cause: ingestion wrote OCR text both inline in `text` field (after `[Embedded image OCR from: marker]`) AND in `embedded_image_ocr_map`. The inline copy polluted chat previews and LLM context with garbled table content.
-- Fix: `doc_serializer.py` line 80 — marker retained in `text`, OCR dump removed. OCR content stored only in `embedded_image_ocr_map`.
-- Obsidian re-ingested after fix; cross-link discovery + concept vector rebuild triggered automatically in background via `launch_cross_link_discovery`.
-- No impact on Ask tab — `render_answer_with_inline_images` finds marker, renders image, reads OCR from `embedded_image_ocr_map` (unchanged).
-
-**Background status banner:**
-- Cross-link discovery background status banner added to Chat tab (mirrors Ask tab).
-- Shows collection name being processed; disappears automatically when task completes.
-
-**`local_llm_client.py` robustness fix:**
-- `call_local_llm_json` wrapped in try/except — returns `None` on any failure instead of raising.
-- Callers (`select_collections`, `detect_chat_intent`) already handle `None` with fallbacks — no other changes needed.
-
-**Next session priorities:**
-1. Test chat tab after obsidian re-ingest completes — verify OCR garbage gone, images rendering inline
-2. OBS-01 smoke test fix/retire — rewrite against real vault content
-3. Validation tab UI fix — show ALL source columns, not just currently-mapped ones
-4. R3 — Clarifying questions (ambiguity gate when top candidates score similarly)
-5. R4 — Basic memory layer (`chat_memory` table, store/retrieve key facts)
-6. Full BBG dataset ingest (currently 730-row test subset of 69k)
-7. NER-based cross-linking (Phase 3.5)
-
+## Concept Vector Improvements (this session — CV series)
 
 | ID | Area | Description | Status |
 |---|---|---|---|
-| CV-01 | concept_vector_builder.py | Add section_heading as group field for mixed doc_type collections (docx, pdf). Update _get_group_field sample query to fetch it. | Pending |
-| CV-02 | concept_vector_builder.py | For entity_row collections (kb_docs), use kb_tags as Tier 1 category. Score tags by inverse document frequency — pick most distinctive tag as group_value. No LLM needed. | Pending |
-| CV-03 | concept_vector_builder.py | For entity_row chunks with no/generic tags (Tier 2): compute TF-IDF across collection, extract top 5-10 distinctive terms per chunk, batch call LLM for topic label. Use as group_value. | Pending |
-| CV-04 | concept_vector_builder.py | After HDBSCAN finds clusters, call LLM with anchor texts to generate meaningful group_value label. Applies to any collection where group_value is still a filename or generic value. | Pending |
-| CL-01 | cross_link_discoverer.py | Raise minimum identifier length in mention matcher from < 4 to < 8. Reduces false positives from short generic terms. | Pending |
-| CL-02 | cross_link_discoverer.py | Before saving mention link, verify matched term appears in meaningful context in target chunk — not just a passing reference. | Pending |
-| CL-03 | cross_link_discoverer.py | NER-based cross-linking Phase 3.5 — scan obsidian chunk text for known identifiers from other collections (RECON filenames, FIX tags). Creates proper obsidian to recon_assist_file links. | Deferred Phase 3.5 |
-| CL-04 | router.py | Wikilink traversal — follow one hop of confirmed wikilinks from initial cross-link targets. Enables gsact.txt to 4.2 to 4.3.1 chain. | Pending |
-| CL-05 | cross_link_discoverer.py | No obsidian to recon_assist_file links currently. Needs NER (CL-03) or manual hint file listing RECON filenames per obsidian note. | Deferred Phase 3.5 |
+| CV-01 | concept_vector_builder.py | Added `section_heading` as group field for `mixed`/chunked doc collections (docx, pdf) when >1 distinct section exists. | **Done** — docx_test: 1 filename cluster → 9 section-based clusters (Executive Summary, Introduction, Benefits, etc.) |
+| CV-02 | concept_vector_builder.py | For collections with a `tags` schema role populated on ≥20% of chunks: Tier 1 groups by the most distinctive shared tag (inverse document frequency), filtering tags shared by >30% of rows as "too broad." | **Done** — kb_docs: 4 useless filename clusters → 126 meaningful topic clusters (`Broadcaster is down or inactive`, `Bad Dates`, `Copy FIX Logs`, etc.) |
+| CV-03 | concept_vector_builder.py | Tier 2 for chunks with no usable tag (after CV-02 filtering): TF-IDF top-10 terms per chunk → batched LLM call (30/batch) assigns a shared topic label. Falls back to `Uncategorized` if sklearn unavailable. | **Done** — kb_docs: 5 untagged articles correctly labeled via 1 LLM batch call |
+| CV-03b | concept_vector_builder.py | Attempted LLM consolidation pass to merge synonymous labels (`AutoSys`/`AutoSys Job`, `Create KB Article`/`Creating Knowledge Base Articles`) after CV-02/03. | **Reverted** — Qwen 2.5 14B produced unacceptable false merges (`QA Archive→PROD Archive`, `Repo Collateral→Recon Missing Files`) even after prompt tightening (explicit environment/stage warning, "when unsure don't merge"). Function `_llm_consolidate_labels` left in file, unwired. Revisit with larger model in Phase 5. |
+| CV-04 | concept_vector_builder.py | Post-clustering relabel pass: any `group_value` that's a filename, ≤3 chars, boolean-ish, pure numeric, or a configured generic term gets replaced with an LLM-generated 2–5 word label built from that cluster's anchor texts. Cached per label to avoid duplicate LLM calls; uses running cluster_id ≥900000 to avoid unique-key collisions. | **Done** — astro_catalog: cryptic NGC type codes (`Gb`, `OC`, `PN`, `?`, `-`) → readable labels (`Galactic Globular Clusters`, `Open Star Cluster Data`, `Planetary Nebula Catalog`, `Unidentified Data Entries`) |
+| CV-05 | concept_vector_builder.py | Removed `doc_type`-based branching (`_is_entity_row_collection`) entirely. Tag-path routing now purely data-driven: step 6 of `_get_group_field` checks whether ≥20% of a collection's chunks have a non-empty `tags` field, independent of doc_type. | **Done** — fixed a latent bug where `astro_catalog` (doc_type=entity_row, 13,336 chunks, 0% tagged) would have routed through the tag path and triggered ~445 Tier-2 LLM batch calls on every rebuild; now correctly routes through `type` grouping with zero LLM cost. Verified via dry-run comparison before applying. |
+
+**Cascade order in `_get_group_field` (final, as of this session):**
+1. `folder_path` (obsidian)
+2. `section_heading`, if >1 distinct value (docx, pdf — CV-01)
+3. `identifier_namespace`, if >1 distinct value (xml_test)
+4. `type`, if >1 meaningful (non-data-type, non-numeric) value (recon_assist_file, astro_catalog)
+5. `category`
+6. `tags`, if populated on ≥20% of chunks (kb_docs — CV-02/03, CV-05)
+7. `source_file` fallback → CV-04 relabels resulting clusters via LLM
+
+---
+
+## Cross-Link Improvements (this session — CL series)
+
+| ID | Area | Description | Status |
+|---|---|---|---|
+| CL-01 | cross_link_discoverer.py | Raise minimum identifier length in mention matcher to reduce false positives from short generic terms. | **Superseded** — mention matching was removed from the discoverer entirely (not just length-gated); see Phase 3.5 note. Current discoverer only does exact-identifier + name-similarity matching. |
+| CL-02 | cross_link_discoverer.py | `_meaningful_context()` guard — a mention must appear with ≥8 other distinct surrounding words to count as a real discussion, not a passing/list reference. | **Done** — already implemented in current discoverer (kept in place even though mention matching itself is disabled, ready for reintroduction if needed) |
+| CL-03 | cross_link_discoverer.py / new tagger | NER-based cross-linking (Phase 3.5) — scan chunk text for known identifiers from other collections at ingest time, validated against live Postgres entity dictionary. | Deferred — Phase 3.5, full design above |
+| CL-04 | router.py | Wikilink traversal — when surfacing related sections for a structured-collection hit (e.g. `gsact.txt`), follow one hop of confirmed obsidian wikilinks from any linked obsidian note, to surface e.g. `4.2 → 4.3.1 Checking sFTP for Activity`. | Pending — next priority |
+| CL-05 | — | `obsidian → recon_assist_file` and `recon_assist_file → obsidian` cross-links: confirmed **zero** produced under current discoverer strategies (verified this session). Needs CL-03 (NER) or a manual identifier hint list. | Deferred — Phase 3.5 |
+
+**Verified working now:**
+- `obsidian → obsidian` wikilinks: 43 confirmed, confidence 1.0, `match_type='wikilink'`. Source: `core/related_titles_linker.py::persist_related_titles_as_crosslinks()`, reads `related_titles` from chunk payload (populated at ingest from `[[wikilink]]` syntax), wired into background runner after ingestion.
+- Knowledge Graph tab cross-link review: grouped by `(target_collection, target_identifier, match_type)` with resolved display names (not raw chunk IDs/row numbers) — Confirm All / Reject All / Reject+Ignore-term apply to the whole group at once instead of per-row.
+
+---
+
+## Chat Engine Improvements (this session)
+
+| ID | Area | Description | Status |
+|---|---|---|---|
+| CHAT-01 | chat_engine.py | Removed hardcoded FIX tag regex (`\btag\s+(\d+)\b`) from Tier 1 identifier matching — was domain-knowledge hardcoding that also failed on multi-tag questions ("tags 453, 452, and 448"). | **Done** — Tier 1 now only matches explicit filenames; tag/ID routing handled by Tier 2 LLM via `routing_description` |
+| CHAT-02 | chat_engine.py, collections.json, ui (collection form) | Two-tier collection routing: mandatory `routing_description` field (entered at collection creation, describes domain/topics) + auto-appended concept vector cluster topics for doc-type collections. Structured collections use static description only. | **Done** — verified: "what is FIX tag 22" → xml_test first; "broadcaster issue in CRD" → kb_docs first; "gsact.txt Goldman recon" → recon_assist_file first |
+| CHAT-03 | chat_engine.py | Tier 1 identifier hits no longer return early / override Tier 2 ordering — merged in AFTER the LLM's procedural-vs-lookup judgment, so "how can I check if gsact.txt is on sftp" correctly prioritizes obsidian procedure notes over the raw structured record, while still including recon_assist_file as a fallback. | **Done** |
+| CHAT-04 | chat_engine.py | `augment_query_with_focus` no longer injects stale conversation-history terms into questions that already contain their own filename/tag identifier — was causing "what is FIX tag 22" to get polluted with a prior turn's `gsact.txt` reference. | **Done** |
+| CHAT-05 | chat_engine.py | Hallucination fix: when `primary_answer` is literally "No answer found", skip the LLM wrapper entirely (it was fabricating plausible-sounding note titles/content) and return a clean "couldn't find" message instead. | **Done** |
+| CHAT-06 | chat_engine.py | Filter concept-link related sections from structured (`doc_type` uniformly `structured` across a sampled 5 chunks) collections when merging into another collection's answer context — was leaking irrelevant `bbg_fields`/`xml_test` "related" sections into unrelated RECON/obsidian answers. | **Done** |
+| CHAT-07 | — | Multi-item queries ("tags 453, 452, and 448") still only retrieve one item. | Pending — see CODE-023 |
+
+---
+
+## Structured Planner Removal (this session)
+
+Confirmed via live testing that the structured planner (`structured_query_planner.py` + `structured_plan_executor.py`) was configured with `dry_run: true` in every observed run — it generated a plan via LLM call on every query but never executed it, adding pure latency with zero functional contribution. Fully removed:
+
+- Deleted `core/structured_query_planner.py`
+- Deleted `core/structured_plan_executor.py`
+- `core/retrieval/router.py`: removed both imports, `_get_structured_planner_config()`, the entire planner branch (former step 4), `skip_planner` parameter, `structured_plan_dry_run` from the response dict, and the `structured_query_plan` debug panel case
+- `ui/system_config.py`: removed `_structured_planner_section()` and its call site
+- `core/chat_engine.py`: removed `skip_planner=True` argument (parameter no longer exists)
+
+**Post-removal bug caught and fixed:** the removal initially left a dangling `return response` (from the old step-6 fallback) with `response` no longer defined, since steps 5 (discovery) and 6 (semantic/lexical fallback + cross-link/concept-link enrichment) had been accidentally deleted along with the planner block. Restored both steps intact. Verified via full smoke suite after fix: FIX 13/13, RECON 10/10, KB 10/10, OBS passing.
+
+---
+
+## BGE Reranker Fix (this session)
+
+Root-caused a wrong-answer bug where `run_query_with_method('kb_docs', 'how to check recon files on sftp')` returned the wrong KB article despite RRF correctly ranking the right one #1. Traced through: RRF ranking (correct) → BGE reranker with `top_k=25` (introduces the error) → BGE reranker with `top_k=10` on the same query (correct). Confirmed with direct reproduction: `bge_rerank()` given the top-10 RRF candidates preserved correct order; given the top-25 candidates, it promoted a candidate with 10x lower RRF score to #1.
+
+Fix: removed `entity_row` from `system.json` → `bge_reranker.apply_to_doc_types`. KB docs now rely on RRF ranking alone (already correct) plus the LLM reranker path only if separately enabled. `structured`, `procedural`, `reference`, `mixed` doc types unaffected.
+
+Also confirmed via this investigation: `nlp_text` (dedicated PostgreSQL column) IS correctly populated with full chunk text for kb_docs and used for BM25/tsvector — an earlier concern that `payload->>'nlp_text'` was empty was a red herring (that JSON key is simply never populated; the real column is).
+
+---
+
+## Schema / Ingestion Findings (this session)
+
+- **KB CSV → `kbtags` column**: schema-mapped to a `tags` role. Payload key was `kb_tags`, renamed to `tags` for consistency with other system-convention payload keys (`primary_name`, `description`, `identifier`). Required: `table_serializer.py` line ~220, `concept_vector_builder.py` references, `diag_verify_ingestion.py`, `diag_concept_fields.py`. Re-ingested kb_docs after rename.
+- **KB CSV → `KBinactive` column**: confirmed working correctly via the existing Field/Row Filters UI (`exclude_equals` / `TRUE`) — every inactive article has an active duplicate-titled replacement; 21 of 199 rows correctly excluded at ingest, verified by ID (not just title) cross-check.
+- **KB CSV → `KBtype` column**: boolean flag (0/1), not a usable category — correctly excluded from grouping consideration by the `_data_types`/pure-numeric filter in `_get_group_field`.
+- Halo KB API JSON structure reviewed (`kb_tags`/`tag_string`, `description`, `resolution_list`, inline `Open image-XXXXXXXX.png` references requiring a separate attachment-fetch endpoint) — informs the future Phase 4 Halo MCP ingestion adapter design. Image/attachment pull from Halo is a separate, not-yet-scoped capability.
+
+---
+
+## Smoke Test Results (2026-07-03/04, post structured-planner-removal + BGE fix)
+
+- FIX: 13/13 ✅
+- RECON: 10/10 ✅
+- KB: 10/10 ✅ (includes previously-failing KB-06 sftp, KB-07 PB folders — root cause was BGE reranker, not a smoke test authoring error, though two genuinely wrong `must_contain` expectations were also corrected: `PrimeBroker`→`Prime Broker`, added `US1-Proc02`)
+- OBS: passing
+
+---
+
+## Next Session Priorities
+
+1. **CL-04** — wikilink traversal in router.py: follow one hop of confirmed obsidian wikilinks from any cross-linked target, to surface e.g. `4.2 → 4.3.1 Checking sFTP for Activity` for RECON file queries.
+2. **CODE-023** — multi-item parallel chat queries (LLM extracts identifier list from question, fan out `run_parallel_queries` per identifier in parallel, merge results).
+3. **R3** — clarifying questions when retrieval returns no answer / top candidates score similarly.
+4. Review whether the 123-group kb_docs concept vector output needs a cap/summarization in the `select_collections` routing prompt (currently appends ALL group_values as `[topics: ...]` — untested at this new scale).
+5. Phase 3.5 — NER-based cross-linking (CL-03/CL-05), the only path to real `recon_assist_file ↔ obsidian` / `recon_assist_file ↔ kb_docs` links.
+6. Full BBG dataset ingest (currently 730-row test subset of 69k).
+7. Data Prep tab: Excel upload + forward-fill (CODE-025), PostgreSQL chunk editor (CODE-026) — needed to fix the 14 NULL-identifier recon_assist_file rows (CODE-024).
+8. Revisit CV-03b (LLM label consolidation) if/when a larger local model becomes available.
