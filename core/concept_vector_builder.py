@@ -67,7 +67,17 @@ def _get_group_field(collection):
     if has_category:
         return 'category'
 
-    # 5. Fallback
+    # 5. Tags populated on >=20% of chunks — tag/IDF grouping (CV-02/03)
+    tag_stats = fetchall("""
+        SELECT COUNT(*) AS total,
+               COUNT(*) FILTER (WHERE payload->>'tags' IS NOT NULL
+                                AND payload->>'tags' NOT IN ('', '[]')) AS tagged
+        FROM chunks WHERE collection_name = %s
+    """, (collection,))
+    if tag_stats and tag_stats[0]['total'] and tag_stats[0]['tagged'] / tag_stats[0]['total'] >= 0.2:
+        return 'tags'
+
+    # 6. Fallback
     return 'source_file'
 
 
@@ -83,14 +93,6 @@ def _mk_obj(row):
         'text': row.get('text') or '',
         'embedding': np.array(emb, dtype=np.float32),
     }
-
-
-def _is_entity_row_collection(collection):
-    rows = fetchall(
-        "SELECT payload->>'doc_type' AS dt FROM chunks WHERE collection_name=%s LIMIT 80",
-        (collection,))
-    dts = [r['dt'] for r in rows if r.get('dt')]
-    return bool(dts) and sum(1 for d in dts if d == 'entity_row') >= len(dts) / 2
 
 
 # ---------------------------------------------------------------------------
@@ -223,9 +225,66 @@ def _llm_topic_labels(top_terms_per, batch_size=30):
                     labels[s + idx] = v.strip()
     return labels
 
+def _llm_consolidate_labels(groups, batch_size=60):
+    """CV-03b: merge synonymous group labels via one LLM pass.
+    Asks the LLM to map variant labels to a canonical label that MUST be one of
+    the existing labels — invented names are rejected. Groups whose labels map
+    to the same canonical are merged. Merge mapping is printed for review."""
+    from core.local_llm_client import call_local_llm_json
+
+    labels = sorted(groups.keys())
+    if len(labels) < 2:
+        return groups
+
+    canonical_map = {}
+    sys_p = ("You deduplicate topic labels for a technical knowledge base. "
+             "Merge ONLY labels that are trivial rewordings of the SAME specific topic: "
+             "plural/singular, verb forms (Create/Creating), or identical meaning. "
+             "NEVER merge labels that differ in environment or stage (QA vs PROD vs UAT vs DEV). "
+             "NEVER merge different functions of the same system — e.g. login issues, order export, "
+             "account setup, and environment recovery are all DIFFERENT topics even if all mention the same product. "
+             "NEVER merge a specific job/alert/ID with a general category. "
+             "When unsure, do NOT merge. "
+             "Respond ONLY with JSON mapping each duplicate label to its canonical label. "
+             "The canonical label MUST be copied exactly from the list. "
+             "Unique labels must be OMITTED from the response.")
+
+    for s in range(0, len(labels), batch_size):
+        batch = labels[s:s + batch_size]
+        listing = "\n".join(f"- {l}" for l in batch)
+        resp = call_local_llm_json(
+            sys_p,
+            f'Labels:\n{listing}\n\nReturn e.g. {{"Creating KB Articles":"Create KB Article"}}')
+        if not isinstance(resp, dict):
+            continue
+        batch_set = set(batch)
+        for variant, canonical in resp.items():
+            if (isinstance(variant, str) and isinstance(canonical, str)
+                    and variant in batch_set and canonical in batch_set
+                    and variant != canonical):
+                canonical_map[variant] = canonical
+
+    if not canonical_map:
+        return groups
+
+    # Resolve chains (A->B, B->C becomes A->C), with a cycle guard
+    def _resolve(l, seen=None):
+        seen = seen or set()
+        while l in canonical_map and l not in seen:
+            seen.add(l)
+            l = canonical_map[l]
+        return l
+
+    merged = {}
+    for label, chunks in groups.items():
+        target = _resolve(label)
+        if target != label:
+            print(f"[CONCEPT] Label merge: '{label}' -> '{target}'")
+        merged.setdefault(target, []).extend(chunks)
+    return merged
 
 def _build_groups(collection):
-    if _is_entity_row_collection(collection):
+    if _get_group_field(collection) == 'tags':
         return _entity_row_groups(collection)
     return _field_groups(collection)
 
