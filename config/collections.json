@@ -116,11 +116,10 @@
       ".xisf",
       ".xdrz"
     ],
+    "asset_search_roots": [],
     "source_label": "M51",
-    "notes": "M5a as of 2026-04-23",
-    "filters": {
-      "field_filters": []
-    }
+    "routing_description": "Collection of astro photos for M51, containing Fit, FITS and XISF images from raw camera and pixinsight pre-processing and processing.  Metadata includes info on target, object, gain, coordinates",
+    "notes": "M51 as of 2026-04-23"
   },
   "image_test": {
     "path": "/Users/raednasr/RaedsMacM1/nas-ai/images_tests",

@@ -84,9 +84,13 @@ def _extract_spec(question: str, collection: str, fields: set, field_values: Dic
         "return {\"operation\": null}.\n"
         "Return only JSON."
     )
+
     spec = call_local_llm_json(system_prompt, question, temperature=0.0)
     if not isinstance(spec, dict) or spec.get("operation") not in _OPERATIONS:
         return None
+
+    print(f"[METADATA DEBUG] raw spec: {spec}")
+
 
     tf = spec.get("target_field")
     if tf is not None and tf not in fields:
@@ -185,8 +189,12 @@ def run_metadata_query(collection: str, question: str) -> Optional[Dict]:
             return None
 
         if spec["operation"] in ("group_by", "list_distinct"):
+            from core.schema_inference import load_schema_from_db
+            _schema = load_schema_from_db(collection, collection) or {}
+            _generic = set((_schema.get("primary_name") or []) + (_schema.get("identifier") or [])
+                           + ["primary_name", "identifier"])
             better = _best_value_field(question, collection)
-            if better and better != spec.get("target_field"):
+            if better and spec.get("target_field") in _generic and better != spec.get("target_field"):
                 print(f"[METADATA] target_field override: {spec.get('target_field')} -> {better}")
                 spec["target_field"] = better
 
@@ -197,7 +205,9 @@ def run_metadata_query(collection: str, question: str) -> Optional[Dict]:
                 spec["filters"] = [_f]
 
         for f in spec["filters"]:
-            for fld, vals in field_values.items():
+            if any(f["value"].lower() == v.lower() for v in field_values.get(f["field"], [])):
+                continue
+            for fld, vals in sorted(field_values.items()):
                 if any(f["value"].lower() == v.lower() for v in vals):
                     if f["field"] != fld or f["op"] != "equals":
                         print(f"[METADATA] filter regrounded: {f} -> {fld} equals {f['value']}")
@@ -213,11 +223,10 @@ def run_metadata_query(collection: str, question: str) -> Optional[Dict]:
 
         if spec["operation"] in ("count", "count_distinct") and spec["filters"]:
             if _count_with(spec["filters"]) == 0:
-                _nf = _count_with([])
-                _full = fetchall("SELECT COUNT(*) AS n FROM chunks WHERE collection_name = %s", (collection,))[0]["n"]
-                if _nf and _nf != _full:
-                    print(f"[METADATA] zero-result filters dropped")
-                    spec["filters"] = []
+                _keep = [f for f in spec["filters"] if _count_with([f]) > 0]
+                if _keep and _count_with(_keep) > 0:
+                    print(f"[METADATA] dropped zero-result filters, kept: {_keep}")
+                    spec["filters"] = _keep
 
         where, params = _where(collection, spec["filters"])
         op = spec["operation"]
@@ -225,13 +234,13 @@ def run_metadata_query(collection: str, question: str) -> Optional[Dict]:
 
         if op == "count" or (op == "count_distinct" and not tf):
             rows = fetchall(f"SELECT COUNT(*) AS n FROM chunks WHERE {where}", tuple(params))
-            answer = f"{rows[0]['n']}"
+            answer = f"{rows[0]['n']} records match."
         elif op == "count_distinct":
             expr = _field_expr(tf)
             rows = fetchall(
                 f"SELECT COUNT(DISTINCT {expr}) AS n FROM chunks WHERE {where} AND {expr} IS NOT NULL",
                 tuple(params))
-            answer = f"{rows[0]['n']}"
+            answer = f"There are {rows[0]['n']} matching {tf or 'record'}(s)."
         elif op == "list_distinct":
             if not tf:
                 return None
@@ -240,6 +249,12 @@ def run_metadata_query(collection: str, question: str) -> Optional[Dict]:
                 f"SELECT DISTINCT {expr} AS v FROM chunks WHERE {where} AND {expr} IS NOT NULL ORDER BY v LIMIT 200",
                 tuple(params))
             vals = [r["v"] for r in rows if r["v"]]
+
+            import re as _re
+            _ts = [_v for _v in vals if _re.match(r'^\d{4}-\d{2}-\d{2}T', str(_v))]
+            if len(_ts) == len(vals) and vals:
+                vals = sorted({str(_v)[:10] for _v in vals})
+                
             answer = f"{len(vals)} value(s): " + ", ".join(vals)
         else:  # group_by
             if not tf:

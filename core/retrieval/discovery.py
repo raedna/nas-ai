@@ -109,6 +109,8 @@ def llm_detect_intent(question: str) -> Dict[str, str]:
             "- 'discovery_count': counting query "
             "(e.g. 'how many files does Goldman have', 'how many tags contain price', "
             "'how many notes are in X')\n"
+            "- 'which X has the most Y' or 'which X has the highest/lowest Y' -> discovery_list "
+            "(e.g. 'which broker has the most recon files').\n"
             "- 'comparison': comparing two or more items\n\n"
             "Role/target extraction examples:\n"
             "- 'which tags have order in their name' -> role: primary_name, target: order\n"

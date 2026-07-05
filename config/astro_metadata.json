@@ -52,7 +52,8 @@
         {
           "field": "file_frame_type",
           "position": 0,
-          "allowed_values": ["light", "dark", "flat", "bias"]
+          "allowed_values": ["light", "dark", "flat", "bias"],
+          "default": "light"
         },
         {
           "field": "file_target",

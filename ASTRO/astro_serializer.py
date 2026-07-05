@@ -33,12 +33,26 @@ def astro_serializer(parsed, file_path, template_config, file_tags, collection_n
     source_path = str(file_path)
     identity = _astro_identity(source_path, source_file)
 
-    primary_name = (
-        metadata.get("target")
-        or metadata.get("object")
-        or parsed.get("file_name")
-        or source_file
-    )
+    schema = None
+    try:
+        from ASTRO.schema_inference_astro import infer_astro_schema
+        schema = infer_astro_schema([metadata], collection_name, collection_name)
+    except Exception as e:
+        print(f"[ASTRO SCHEMA] inference failed: {e}")
+
+    primary_name = None
+    if schema:
+        for f in schema.get("primary_name", []) + ["file_target"]:
+            if metadata.get(f):
+                primary_name = metadata[f]
+                break
+    if not primary_name:
+        primary_name = (
+            metadata.get("target")
+            or metadata.get("object")
+            or parsed.get("file_name")
+            or source_file
+        )
 
     description_parts = []
 

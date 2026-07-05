@@ -99,6 +99,7 @@ def _apply_filename_pattern(stem, pattern):
     parts = stem.split(separator) if separator else [stem]
 
     parsed = {}
+    offset = 0
     fields = pattern.get("fields", []) or []
 
     for field_cfg in fields:
@@ -111,7 +112,7 @@ def _apply_filename_pattern(stem, pattern):
         # position-based extraction
         if "position" in field_cfg:
             try:
-                pos = int(field_cfg["position"])
+                pos = int(field_cfg["position"]) + offset
                 if 0 <= pos < len(parts):
                     value = parts[pos]
             except Exception:
@@ -138,6 +139,9 @@ def _apply_filename_pattern(stem, pattern):
 
             if value is not None:
                 if str(value).lower() not in allowed_norm:
+                    if "position" in field_cfg:
+                        offset -= 1
+                        parsed.setdefault(field, field_cfg.get("default"))
                     continue
             else:
                 for part in parts:
@@ -162,8 +166,10 @@ def _merge_filename_metadata(metadata: Dict[str, Any], path: Path) -> Dict[str, 
     fmd = _parse_astro_filename(path)
 
     for k, v in fmd.items():
-        if v not in [None, ""]:
-            md[k] = v
+        if k.startswith("file_") and v not in [None, ""]:
+            canon = k[5:]
+            if md.get(canon) in [None, ""]:
+                md[canon] = v
 
     if not md.get("target") and fmd.get("file_target"):
         md["target"] = str(fmd["file_target"]).lower()

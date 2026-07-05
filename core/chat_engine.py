@@ -684,7 +684,9 @@ def chat_turn(question: str, history: list, available_collections: list) -> dict
     if DEBUG:
         print("DEBUG retrieved snippet:", retrieved[:200])
     # Step 4: wrap in conversational response
-    if primary_answer and "No answer found" in primary_answer:
+    if query_run.get("method") == "metadata_sql":
+        response = retrieved
+    elif primary_answer and "No answer found" in primary_answer:
         response = "I couldn't find specific information about that in my knowledge base. Could you provide more details or rephrase the question?"
     else:
         response = generate_conversational_response(
