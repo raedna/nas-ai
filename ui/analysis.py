@@ -12,7 +12,8 @@ from fastapi import Request
 from nicegui import app
 from core.analysis.ocr.rapidocr_adapter import ocr_image_with_rapidocr
 from core.analysis.ocr.pdf_rapidocr_adapter import ocr_pdf_with_rapidocr
-from ui.analysis_renderers import render_compare_result
+from ui.analysis_renderers import render_compare_result, render_sequence_result
+from core.analysis.analyzers.fix.sequence_analyzer import analyze_fix_sequence
 
 
 @app.post("/analysis/clipboard-image-ocr")
@@ -186,10 +187,10 @@ def render_analysis_panel():
     ).props("outlined").classes("w-64")
 
     analysis_mode = ui.select(
-        ["Single Message", "Compare Messages"],
+        ["Single Message", "Compare Messages", "Multi-Message Sequence"],
         value="Single Message",
         label="Analysis Mode",
-    ).classes("w-64")
+    )
 
     raw_input = ui.textarea(
         label="FIX message / extracted OCR text",
@@ -495,6 +496,14 @@ def render_analysis_panel():
                 return
 
             result = compare_fix_messages(raw_a, raw_b)
+
+        elif analysis_mode.value == "Multi-Message Sequence":
+            if not raw_a.strip():
+                ui.notify("Please provide one or more FIX messages or OCR text to analyze.", color="warning")
+                return
+
+            result = analyze_fix_sequence(raw_a)
+
         else:
             if not raw_a.strip():
                 ui.notify("Please provide a FIX message or OCR text to analyze.", color="warning")
@@ -505,6 +514,10 @@ def render_analysis_panel():
         with result_area:
             if result.get("input_type") == "fix_compare":
                 render_compare_result(result)
+                return
+
+            if result.get("input_type") == "fix_sequence":
+                render_sequence_result(result)
                 return
 
             ui.label("Plain-English Summary").classes("text-lg font-bold")

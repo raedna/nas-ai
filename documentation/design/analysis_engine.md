@@ -583,3 +583,26 @@ If new functionality is required:
     * Create a new adapter.
 
     Do not modify existing implementations.
+
+Principle 2 — Additive Architecture
+
+    New capabilities are introduced alongside existing functionality.
+
+    Never replace working components simply because a better design exists.
+
+Principle 3 — Registry-Driven Expansion
+
+    Growth occurs through registration, not modification.
+
+Principle 4 — Backward Compatibility is Absolute
+
+A new feature must not change:
+
+    * existing ingestion
+    * existing retrieval
+    * existing KG
+    * existing Ask
+    * existing Chat
+
+    If an existing behavior changes, it is considered a regression.
+
