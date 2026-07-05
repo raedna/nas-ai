@@ -97,6 +97,17 @@ def _build_sequence_warnings(messages: List[Dict[str, Any]]) -> List[str]:
 
     return warnings
 
+def _sequence_sort_key(msg: Dict[str, Any]):
+    time_value = str(msg.get("transact_time") or msg.get("sending_time") or "").strip()
+    seq_num = _to_float(msg.get("msg_seq_num"))
+
+    return (
+        0 if time_value else 1,
+        time_value,
+        seq_num if seq_num is not None else 999999999,
+        msg.get("message_index") or 999999999,
+    )
+
 def analyze_fix_sequence(raw_text: str) -> Dict[str, Any]:
     """
     Analyze a pasted/uploaded block that may contain multiple FIX messages.
@@ -147,9 +158,11 @@ def analyze_fix_sequence(raw_text: str) -> Dict[str, Any]:
             "transact_time": _get_nested(business_object, "trade", "transaction_time"),
         })
 
+    sequence_messages = sorted(analyzed_messages, key=_sequence_sort_key)
+
     timeline_lines = []
 
-    for msg in analyzed_messages:
+    for msg in sequence_messages:
         parts = []
 
         msg_type = msg.get("msg_type") or "Unknown message"
@@ -194,7 +207,7 @@ def analyze_fix_sequence(raw_text: str) -> Dict[str, Any]:
         f"{'' if len(analyzed_messages) == 1 else 's'}."
     )
 
-    sequence_warnings = _build_sequence_warnings(analyzed_messages)
+    sequence_warnings = _build_sequence_warnings(sequence_messages)
 
     warning_count = (
         sum(len(msg.get("warnings") or []) for msg in analyzed_messages)
@@ -212,7 +225,7 @@ def analyze_fix_sequence(raw_text: str) -> Dict[str, Any]:
         "messages": analyzed_messages,
         "warnings": [
             warning
-            for msg in analyzed_messages
+            for msg in sequence_messages
             for warning in (msg.get("warnings") or [])
         ] + sequence_warnings,
     }
