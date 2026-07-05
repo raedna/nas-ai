@@ -151,3 +151,76 @@ def render_compare_result(result: dict):
           </q-td>
         </q-tr>
         """)
+
+def render_sequence_result(result: dict):
+    ui.separator()
+
+    ui.label("Sequence Summary").classes("text-lg font-semibold")
+
+    ui.textarea(
+        value=result.get("summary") or "",
+    ).props("readonly outlined autogrow").classes("w-full")
+
+    timeline_summary = result.get("timeline_summary") or ""
+
+    if timeline_summary:
+        ui.label("Timeline Summary").classes("text-lg font-semibold q-mt-md")
+
+        ui.textarea(
+            value=timeline_summary,
+        ).props("readonly outlined autogrow").classes("w-full")
+
+    warnings = result.get("warnings") or []
+
+    if warnings:
+        ui.label("Warnings").classes("text-lg font-semibold q-mt-md text-red")
+
+        for warning in warnings:
+            ui.label(f"- {warning}").classes("text-red")
+
+    messages = result.get("messages") or []
+
+    if messages:
+        ui.label("Messages").classes("text-lg font-semibold q-mt-md")
+
+        rows = []
+
+        for msg in messages:
+            rows.append({
+                "message_index": msg.get("message_index"),
+                "msg_seq_num": msg.get("msg_seq_num"),
+                "msg_type": msg.get("msg_type"),
+                "route": f"{msg.get('sender') or ''} → {msg.get('target') or ''}",
+                "time": msg.get("transact_time") or msg.get("sending_time"),
+                "cl_ord_id": msg.get("cl_ord_id"),
+                "order_id": msg.get("order_id"),
+                "exec_type": msg.get("exec_type"),
+                "ord_status": msg.get("ord_status"),
+                "symbol": msg.get("symbol"),
+                "order_qty": msg.get("order_qty"),
+                "cum_qty": msg.get("cum_qty"),
+                "leaves_qty": msg.get("leaves_qty"),
+            })
+
+        columns = [
+            {"name": "message_index", "label": "#", "field": "message_index", "align": "left", "sortable": True},
+            {"name": "msg_seq_num", "label": "Seq", "field": "msg_seq_num", "align": "left", "sortable": True},
+            {"name": "msg_type", "label": "MsgType", "field": "msg_type", "align": "left", "sortable": True},
+            {"name": "route", "label": "Route", "field": "route", "align": "left", "sortable": True},
+            {"name": "time", "label": "Time", "field": "time", "align": "left", "sortable": True},
+            {"name": "cl_ord_id", "label": "ClOrdID", "field": "cl_ord_id", "align": "left", "sortable": True},
+            {"name": "order_id", "label": "OrderID", "field": "order_id", "align": "left", "sortable": True},
+            {"name": "exec_type", "label": "ExecType", "field": "exec_type", "align": "left", "sortable": True},
+            {"name": "ord_status", "label": "OrdStatus", "field": "ord_status", "align": "left", "sortable": True},
+            {"name": "symbol", "label": "Symbol", "field": "symbol", "align": "left", "sortable": True},
+            {"name": "order_qty", "label": "OrderQty", "field": "order_qty", "align": "left", "sortable": True},
+            {"name": "cum_qty", "label": "CumQty", "field": "cum_qty", "align": "left", "sortable": True},
+            {"name": "leaves_qty", "label": "LeavesQty", "field": "leaves_qty", "align": "left", "sortable": True},
+        ]
+
+        ui.table(
+            columns=columns,
+            rows=rows,
+            row_key="message_index",
+            pagination={"rowsPerPage": 0},
+        ).classes("w-full")
