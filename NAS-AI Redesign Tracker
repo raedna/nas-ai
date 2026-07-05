@@ -9,7 +9,7 @@
 
 ---
 
-## System State (current — 2026-07-04)
+## System State (current — 2026-07-05)
 
 | Component | Status |
 |---|---|
@@ -24,6 +24,9 @@
 | Obsidian (`obsidian`) | 729 mixed + 37 narrative + 62 procedural + 71 reference chunks — smoke tests passing |
 | recon_assist_file | 89 chunks — 10/10 smoke tests passing |
 | astro_catalog | 13,336 chunks (OpenNGC + Messier merged via Data Prep) |
+| astro_test | 3 files — ASTRO-001 parser fix verified (M42 target correct) |
+| M51 | 505 chunks — schema-driven astro roles (ASTRO-004), clean schema after coalescing |
+| Metadata SQL path | **Live** — `core/metadata_query.py` handles count/list/group-by intents via parameterized SQL (Phase 4.6) |
 | Structured query planner | **Removed entirely** — was always dry-run, added latency with zero benefit |
 | BGE reranker | Disabled for `entity_row` doc_type — was demoting correct KB results when given 25 candidates |
 
@@ -44,7 +47,7 @@
 | CODE-021 | related_titles_linker.py | Obsidian wikilinks not persisted to cross_links table | **Resolved** — 43 wikilinks confirmed |
 | CODE-022 | ui / knowledge_graph.py | No Knowledge Graph UI | **Resolved** — full tab built: graph, concept clusters, cross-link review (grouped by target), build, danger zone |
 | CODE-023 | chat_engine.py | Multi-item queries ("tags 453, 452, and 448") only retrieve one item | Pending — LLM extracts identifier list, fan out parallel queries, merge results |
-| CODE-024 | recon_assist_file | 14 chunks with NULL identifier due to merged cells in source Excel | Pending — use Data Prep ffill |
+| CODE-024 | recon_assist_file | NULL primary_name/identifier rows from merged Excel cells. Concrete impact: `primary_name contains Goldman` returns 15 not 16 (one Goldman row has NULL job name) | Pending — Data Prep Excel upload + forward-fill (CODE-025) is the fix path |
 | CODE-025 | ui_data_prep.py | Data Prep tab only accepts CSV — add Excel (.xlsx) upload with sheet selector + forward-fill | Pending |
 | CODE-026 | ui_data_prep.py | Add PostgreSQL chunk editor — load collection chunks, edit payload fields inline, save with confirmation | Pending |
 | CODE-027 | chat_engine.py | Tier 1 identifier match in `select_collections` overrode Tier 2 LLM ordering entirely, ignoring procedural intent | **Resolved** — Tier 1 hits now merged AFTER Tier 2 ordering, not returned early |
@@ -53,11 +56,17 @@
 | CODE-030 | structured_query_planner.py, structured_plan_executor.py, router.py, ui/system_config.py, chat_engine.py | Structured query planner always ran in dry-run mode (never executed), added LLM call latency with zero functional benefit | **Resolved** — both files deleted, all references removed from router.py, ui/system_config.py, chat_engine.py |
 | CODE-031 | system.json | BGE reranker (`apply_to_doc_types` included `entity_row`) demoted correct top-RRF-ranked KB article when given 25 candidates (e.g. promoted `1.0 - RECON Mappings` over `2.3 Logging in to sFTP` despite RRF score 10x lower) | **Resolved** — removed `entity_row` from `bge_reranker.apply_to_doc_types`; RRF ranking alone is more reliable for kb_docs |
 | DISPLAY-001 | ui | Two-tier table header not supported by st.dataframe — needs HTML render or AgGrid | Deferred |
-| DISCOVERY-001 | discovery.py | discovery_count returns correct count but no record list | Pending — blocked on metadata query path |
+| DISCOVERY-001 | discovery.py | discovery_count returned retrieval-capped counts (top-k limited: 4 instead of 178, 41 instead of 947) | **Resolved** — Phase 4.6 metadata SQL path answers discovery_count/discovery_list via direct parameterized SQL; discovery engine remains as fallback |
 | OBS-001 | doc_serializer.py | Obsidian over-chunking on large notes (44KB → 246 chunks) | Low priority |
-| ASTRO-001 | astro_parser.py | Filename parser misreads target when frame type prefix absent (M42_2.0s → target=2.0s instead of M42) | Pending — Phase 3.6.6 |
+| ASTRO-001 | astro_parser.py, config/astro_metadata.json | Filename parser misread target when frame-type prefix absent (M42_2.0s → target=2.0s) | **Resolved** — positional `offset` shift in `_apply_filename_pattern` when position-0 allowed_values don't match, + `"default": "light"` on file_frame_type (no frame token = light frame) |
 | ASTRO-002 | astro_parser.py | XISF files have image geometry only — no astrometric metadata | Low priority |
-| ASTRO-003 | astro_serializer.py | primary_name for astro files without FITS OBJECT keyword falls back to filename-parsed target (see ASTRO-001) | Pending |
+| ASTRO-003 | astro_serializer.py | primary_name for astro files without FITS OBJECT keyword falls back to filename-parsed target (see ASTRO-001) | **Resolved** — schema-driven primary_name with `file_target` appended as final fallback (ASTRO-004) |
+| ASTRO-004 | ASTRO/schema_inference_astro.py (new), astro_serializer.py | Astro roles were hardcoded in serializer (no schema step like tables) | **Resolved** — same flow as tables: existing schema → LLM inference → heuristic fallback; collection-level schema (source_file_stem = collection_name, one LLM call per collection); serializer resolves primary_name via schema role fields |
+| ASTRO-005 | astro_parser.py | Duplicate metadata concepts (`gain`/`file_gain`, `object`/`target`/`file_target`) caused unstable filter/field picks in metadata queries | **Resolved** — `_merge_filename_metadata` generic fill: every `file_X` fills empty canonical `X`; `file_*` kept in payload for traceability, excluded from schema inference input. Retest AG-05/09 after M51 re-ingest |
+| ASTRO-006 | collections.json | Astro collections had empty/thin routing_description — image/gain/rotation questions routed to obsidian | Partially resolved — descriptions added for astro_test/M51; extend with rotation/angle/date terms |
+| MQ-01 | metadata_query.py | LLM spec extraction unstable — filters/fields vary run-to-run (Qwen 14B); four different answers observed for same question before mitigations | Open — mitigations in place (deterministic regrounding, zero-result repair, schema-aware override, value grounding) but root LLM variance remains |
+| MQ-02 | chat_engine.py | Chat fan-out + phrasing drift yields different metadata answers for same question across collections/runs | Open |
+| SCHEMA-01 | core/schema_inference.py | LLM schema inference misclassified filename/script columns and entity-name columns | **Resolved** — deterministic pre-LLM pass: columns with ≥70% values matching `name.ext` pattern → reference_identifier (excluded from LLM prompt); prompt: entity/org names → type, comments → description, numeric measurements + dates → other |
 | DB-001 | PostgreSQL trigger | Slash-delimited category paths tokenize as compound token | Resolved |
 | DB-002 | nlp_generator.py | type_value not included in build_structured_nlp_text | Resolved |
 
@@ -80,6 +89,10 @@ RET-011, CODE-001–004, CODE-007–009, CODE-016–019, DISCOVERY-002, STAGE0-0
 - **`doc_type` is a weak proxy for "how should I group this"** — two collections can share `doc_type=entity_row` (kb_docs, astro_catalog) but need completely different grouping strategies. Route on the *actual presence* of a usable field (tags %, type diversity, folder depth) rather than doc_type category.
 - **Local 14B-class LLMs are unreliable at semantic label deduplication** — even with an explicit guarded prompt (environment/stage warnings, "when unsure don't merge"), Qwen 2.5 14B produced merges like `QA Archive → PROD Archive` and `Repo Collateral → Recon Missing Files`. This class of judgment task needs either a larger model or a different (embedding-similarity-gated) approach — revisit in Phase 5.
 - **Mention-based cross-linking was removed, not just tuned** — broker/client names (Goldman, Moore, CITI) are too short and too common to serve as reliable mention-match anchors across collections. The current discoverer only does exact-identifier and name-similarity matching; true cross-collection linking for free-text mentions needs NER (CL-03), not string matching.
+- **Raw-value embeddings pick the wrong field; concept-vector labels pick the right one** — embedding the question against a field's raw values fails when another field's values lexically resemble the question (job names contain "RECON"/"PB" and beat broker names for "which broker..."). Embedding against concept vector *group labels* works because the labels are already concept-level. Concept vectors now serve double duty: routing topics AND metadata-query field selection.
+- **Every nondeterministic answer traced to an unordered iteration or an unguarded LLM pick** — the 4-different-answers bug was dict iteration order in filter regrounding. When an LLM output feeds a choice, either ground it (real value lists), guard it (schema-generic-only override), or repair it (zero-result filter drop) — and make every tie-break deterministic (sorted()).
+- **Coalesce duplicate metadata at ingest, not at query time** — two fields for the same concept (`gain`/`file_gain`, `object`/`file_target`) made every downstream query a coin-flip. Generic fill rule (file_X fills empty X) removed the ambiguity without losing traceability.
+- **Prompt tuning has a ceiling; deterministic pre-passes don't** — 3 prompt attempts failed to stop the LLM classifying a filename column as `type`; a 5-line regex pre-pass (≥70% values match `name.ext` → reference_identifier) fixed it permanently and generically.
 - **Wikilinks ≠ cross-collection links** — obsidian's `[[wikilinks]]` only capture note-to-note relationships inside the same collection. They do not and cannot bridge from a structured collection (recon_assist_file) into obsidian; that gap is only closed by NER-based tagging (CL-03/CL-05) or a confirmed identifier match already present in cross_links.
 
 ---
@@ -163,7 +176,7 @@ This is why `recon_assist_file → obsidian` and `obsidian → recon_assist_file
 | Step | Description | Status |
 |---|---|---|
 | 3.6.1–3.6.5 | Data Prep tab, two-file join, fuzzy matching, export, Messier+OpenNGC merge | Done |
-| 3.6.6 | Astro filename parser fix — target extraction without frame type prefix | Pending |
+| 3.6.6 | Astro filename parser fix — target extraction without frame type prefix | **Done** (ASTRO-001) |
 | 3.6.7 | RA/Dec cross-link tagger — match astro files to catalog within 0.5° tolerance | Pending |
 | 3.6.8 | Name/alias cross-link — match filename tokens against catalog common names | Pending |
 | 3.6.9 | Excel (.xlsx) upload with sheet selector + forward-fill for merged cells (CODE-025) | Pending |
@@ -175,8 +188,30 @@ This is why `recon_assist_file → obsidian` and `obsidian → recon_assist_file
 | Step | Description | Status |
 |---|---|---|
 | 4.1–4.5 | Design + implement + smoke test MCP server (local + online modes) | Pending |
-| 4.6 | Metadata query path — direct Postgres queries for vault analytics | Pending |
+| 4.6 | Metadata query path — direct Postgres queries for aggregation intents | **Done** — see Metadata SQL Query Path section below |
 | 4.7 | Open WebUI evaluation | Pending |
+
+---
+
+## Metadata SQL Query Path (Phase 4.6 — this session)
+
+`core/metadata_query.py` (new). For `discovery_count` / `discovery_list` intents, the router now tries `run_metadata_query(collection, question)` FIRST; the retrieval-based discovery engine is the fallback. Answers real counts/lists/group-bys via parameterized SQL against `chunks` — fixes the entire AG failure bucket (retrieval-capped counts).
+
+**Pipeline (all steps data-driven, zero hardcoding):**
+1. `_collection_fields()` — actual payload keys (sampled 200 chunks) + real table columns; every LLM-proposed field validated against this set, otherwise fall back to discovery.
+2. `_field_values()` — distinct values for low-cardinality (≤20) fields, injected into the extraction prompt so filter values are grounded in real data ("Filter values MUST be copied exactly from the listed values").
+3. `_extract_spec()` — LLM returns `{operation: count|count_distinct|list_distinct|group_by, target_field, filters[{field,op(equals|contains),value}]}`. count_distinct defaults to `identifier` (the schema's unique key) unless the question asks for a specific field's distinct values.
+4. `_best_value_field()` — for group_by/list_distinct: embeds the question against **concept vector group labels** per field (raw-value embedding failed — job names lexically beat broker names) and overrides the LLM's target_field **only when the LLM picked a schema-generic field** (that collection's primary_name/identifier per its schema). This guard fixed "what dates were images taken" (LLM's correct `date-obs` pick no longer overridden to folder_path).
+5. `_concept_label_filter()` — when the spec has NO filters, matches the question against concept labels (sim ≥0.6, margin ≥0.05 over runner-up) and injects an equals filter. Fixed "how many FIX tags" → `identifier_namespace=tag` → 947.
+6. Filter regrounding — a filter value exactly matching a listed field value is rewritten to `equals` on that field. **Determinism fix:** the LLM's own field is checked first (no rewrite if it already contains the value); only then other fields in sorted order. Was the root cause of 146/34/301/172 answer variance for the same question.
+7. Zero-result repair — if the filtered count is 0, drop individual zero-yield filters and keep ones that alone yield rows (LLM sometimes ANDs an invented junk filter onto a good one).
+8. Answer sentences built deterministically (`"{n} records match."`, `"There are {n} matching {tf}(s)."`); list_distinct collapses all-ISO-timestamp value sets to unique dates.
+9. `chat_engine.py` bypass — `method == "metadata_sql"` results are returned verbatim, skipping the conversational LLM wrapper (which misread bare numbers as tag IDs / lacking context).
+10. `discovery.py` intent prompt — "which X has the most Y" now classifies as `discovery_list`, reusing the same hook for group-by questions.
+
+**Standalone verification (5/5):** KB articles=178, FIX-mention articles=48, FIX tags=947, prime-broker list via `type` field, Goldman group-by → Goldman: 16.
+
+**Known limits:** MQ-01 (LLM spec variance), MQ-02 (chat fan-out variance), CODE-024 (NULL identifiers undercount contains-filters).
 
 **Standing constraint: NAS-AI is fully local. No external AI or cloud model connections, ever.**
 
@@ -287,11 +322,12 @@ Also confirmed via this investigation: `nlp_text` (dedicated PostgreSQL column) 
 
 ## Next Session Priorities
 
-1. **CL-04** — wikilink traversal in router.py: follow one hop of confirmed obsidian wikilinks from any cross-linked target, to surface e.g. `4.2 → 4.3.1 Checking sFTP for Activity` for RECON file queries.
-2. **CODE-023** — multi-item parallel chat queries (LLM extracts identifier list from question, fan out `run_parallel_queries` per identifier in parallel, merge results).
-3. **R3** — clarifying questions when retrieval returns no answer / top candidates score similarly.
-4. Review whether the 123-group kb_docs concept vector output needs a cap/summarization in the `select_collections` routing prompt (currently appends ALL group_values as `[topics: ...]` — untested at this new scale).
-5. Phase 3.5 — NER-based cross-linking (CL-03/CL-05), the only path to real `recon_assist_file ↔ obsidian` / `recon_assist_file ↔ kb_docs` links.
-6. Full BBG dataset ingest (currently 730-row test subset of 69k).
-7. Data Prep tab: Excel upload + forward-fill (CODE-025), PostgreSQL chunk editor (CODE-026) — needed to fix the 14 NULL-identifier recon_assist_file rows (CODE-024).
-8. Revisit CV-03b (LLM label consolidation) if/when a larger local model becomes available.
+1. **Re-run AG-05/AG-09** (M42 images, gain 100) after M51/astro_test re-ingest with metadata coalescing — expect 276-class answers stable now.
+2. **Finish eval retest** — AG remainder, then XC (cross-collection) and MI (multi-item, CODE-023) buckets, which are the two largest unaddressed failure groups.
+3. **CODE-023** — multi-item parallel chat queries (tags 22, 35, 54) — 3.5/4 eval failures.
+4. **Chat routing hardening** — DL-08/PP-03 hallucination-adjacent fallback when routing selects no collection; kb_docs/obsidian wrong-twin ranking (near-replica content).
+5. **Aliases searchability (DL-05)** — "PB filename" role-aware lookup/synthesis.
+6. **Astro synthesis (DL-06/DL-10)** — record found but details not rendered for astro_catalog.
+7. **CL-04** — wikilink traversal in router (surface 4.2 → 4.3.1 chain).
+8. **CODE-025/026** — Data Prep Excel upload + ffill (fixes CODE-024 Goldman NULL row), PostgreSQL chunk editor.
+9. Phase 3.5 NER cross-linking (CL-03/CL-05); full BBG ingest (69k); CV-03b revisit with larger model.
