@@ -272,7 +272,13 @@ def run_parallel_queries(collections: list, question: str) -> dict:
         futures = {
             executor.submit(
                 run_query_with_method,
-                col, question, "best", 25, True, True, True, True
+                collection=col,
+                question=question,
+                mode="best",
+                limit=25,
+                show_exact_links=True,
+                show_related_topics=True,
+                force_answer=True,
             ): col
             for col in collections
         }

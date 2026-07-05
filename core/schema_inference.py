@@ -197,7 +197,7 @@ def migrate_schemas_from_disk(schemas_dir, dry_run=False):
 
 def llm_infer_schema(rows, roles_config):
     """
-    Use LLaMA 8B to infer column-to-role mapping from column names + sample values.
+    Use QWEN 2.5 14B to infer column-to-role mapping from column names + sample values.
     Falls back to heuristic infer_schema() if LLM unavailable or returns invalid result.
     """
     try:
@@ -237,6 +237,21 @@ def llm_infer_schema(rows, roles_config):
         if pruned:
             print(f"[SCHEMA LLM] pruned {len(pruned)} near-empty columns "
                   f"({len(all_columns)} -> {len(columns)})")
+
+        import re
+        _fname_pat = re.compile(r'^\w+\.[A-Za-z]{2,4}$')
+        def _is_filename_col(col):
+            vals = [str(r.get(col) or "").strip() for r in _sample_rows]
+            vals = [v for v in vals if v not in ("", "None", "nan")]
+            if not vals:
+                return False
+            hits = sum(1 for v in vals if _fname_pat.match(v))
+            return hits / len(vals) >= 0.7
+
+        _filename_cols = [c for c in columns if _is_filename_col(c)]
+        columns = [c for c in columns if c not in _filename_cols]
+        if _filename_cols:
+            print(f"[SCHEMA LLM] pre-classified as filename/script -> reference_identifier: {_filename_cols}")
 
         # Final safety net: only bail if STILL very wide after pruning real columns.
         if len(columns) > 40:
@@ -282,7 +297,12 @@ def llm_infer_schema(rows, roles_config):
             "or a comments column containing names like Great Orion Nebula)\n"
             "- aliases: alternative names or secondary IDs (e.g. also_known_as, alt_id, messier_id)\n"
             "- description: longer descriptive text, notes, or definitions\n"
-            "- type: category, classification, or data type (e.g. type, category, class, object_type)\n"
+            "- type: category, classification, or data type (e.g. type, category, class, object_type). "
+            "Also columns whose values are entity/organization names repeating across rows "
+            "(brokers, clients, vendors). A column whose values look like filenames "
+            "(word characters followed by a dot and a short alphabetic extension) is never type. "
+            "Also check the column header — a header containing a drive letter+colon or slash "
+            "(e.g. 'K:/path') signals filename/script, not type even if low-cardinality\n"
             "- tags: a column whose cells hold MULTIPLE comma/semicolon-separated keywords "
             "or category labels per row (e.g. 'email,Office365,VPN'). Not boolean flags, "
             "not single values.\n"
@@ -298,7 +318,8 @@ def llm_infer_schema(rows, roles_config):
             "- Only ONE column should be identifier - the most unique key by cardinality\n"
             "- Only ONE column should be primary_name - a human-readable label (often higher "
             "cardinality than 'type', but it need not be unique)\n"
-            "- A column named comments or name or label with short descriptive strings -> primary_name\n"
+            "- primary_name is the column a user would call the record by. A comments/notes column "
+            "is description, not primary_name, unless no better name column exists\n"
             "- If two ID columns exist (e.g. ngc_id and messier_id), more comprehensive = identifier, other = aliases\n"
             "- ra, dec, lat, lon, magnitude, size, date, boolean flags -> other\n"
             "- Every column must appear exactly once\n"
@@ -354,6 +375,10 @@ def llm_infer_schema(rows, roles_config):
                     seen.add(col)
                     deduped.setdefault(role, []).append(col)
         result = deduped
+
+        for col in _filename_cols:
+            result.setdefault("reference_identifier", []).append(col)
+            seen.add(col)
 
         # Any column the model omitted, plus the pruned near-empty columns, -> 'other'
         # (full accounting of every original column; no silent loss).

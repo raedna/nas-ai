@@ -834,6 +834,14 @@ def run_query_with_method(
     # 5. Discovery  (count / list queries)
     # ------------------------------------------------------------------
     if intent["mode"] in ("discovery_count", "discovery_list"):
+        from core.metadata_query import run_metadata_query
+        _mq = run_metadata_query(collection, question)
+        if _mq:
+            return {
+                "method": "metadata_sql",
+                "reason": f"aggregation via SQL: {_mq['spec'].get('operation')}",
+                "result": _mq["result"],
+            }
         return run_discovery_with_method(collection, question, limit=limit)
 
     # ------------------------------------------------------------------

@@ -30,7 +30,7 @@
       "reference",
       "mixed"
     ],
-    "top_k": 10
+    "top_k": 25
   },
   "bge_reranker": {
     "enabled": true,
