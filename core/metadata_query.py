@@ -287,6 +287,17 @@ def run_metadata_query(collection: str, question: str, intent_mode: str = None) 
                   f"(upstream intent: {intent_mode})")
             spec["operation"] = "count_distinct"
 
+        # Chunks are storage units, not records: COUNT(*) answers "how many
+        # chunks", which is never what a user asking "how many X" means. A
+        # plain count is only honored when the question literally asks for
+        # rows/chunks; otherwise count DISTINCT records by the identifier key.
+        if spec["operation"] == "count" and not any(
+                w in question.lower() for w in ("chunk", "row")):
+            print("[METADATA] operation coerced count -> count_distinct(identifier) "
+                  "(record count, not chunk count)")
+            spec["operation"] = "count_distinct"
+            spec["target_field"] = spec.get("target_field") or "identifier"
+
         # Preemptive concept-vector override applies to group_by ONLY. For
         # list_distinct it repeatedly replaced correct validated LLM picks
         # (unguarded embedding argmax — no threshold/margin); the tautology and
