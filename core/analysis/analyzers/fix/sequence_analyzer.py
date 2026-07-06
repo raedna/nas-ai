@@ -25,6 +25,10 @@ def _to_float(value: Any):
     except ValueError:
         return None
 
+def _format_number(value: float) -> str:
+    if value == int(value):
+        return f"{int(value)}"
+    return f"{value:g}"
 
 def _build_sequence_warnings(messages: List[Dict[str, Any]]) -> List[str]:
     warnings: List[str] = []
@@ -75,14 +79,15 @@ def _build_sequence_warnings(messages: List[Dict[str, Any]]) -> List[str]:
         cum_qty = _to_float(msg.get("cum_qty"))
         leaves_qty = _to_float(msg.get("leaves_qty"))
 
-        #if order_qty is not None and cum_qty is not None and leaves_qty is not None:
-        #    expected = cum_qty + leaves_qty
-#
-        #    if abs(expected - order_qty) > 0.0001:
-        #        warnings.append(
-        #            f"Message {message_index}: CumQty + LeavesQty ({cum_qty:g} + {leaves_qty:g} = {expected:g}) "
-        #            f"does not equal OrderQty ({order_qty:g}). Confirm source/OCR."
-        #        )
+        if order_qty is not None and cum_qty is not None and leaves_qty is None:
+            expected_leaves_qty = order_qty - cum_qty
+
+            if expected_leaves_qty >= 0:
+                warnings.append(
+                    f"Message {message_index}: LeavesQty is missing, but OrderQty ({_format_number(order_qty)}) "
+                    f"and CumQty ({_format_number(cum_qty)}) are present. Expected LeavesQty may be "
+                    f"{_format_number(expected_leaves_qty)}. Confirm OCR/source."
+                )
 
         if cum_qty is not None:
             previous_cum_qty = last_cum_qty_by_order.get(order_key)
@@ -108,6 +113,15 @@ def _sequence_sort_key(msg: Dict[str, Any]):
         msg.get("message_index") or 999999999,
     )
 
+def _get_tag_value(decoded_rows: List[Dict[str, Any]], tag: str) -> str:
+    tag = str(tag)
+
+    for row in decoded_rows or []:
+        if str(row.get("tag") or "") == tag:
+            return str(row.get("value") or "").strip()
+
+    return ""
+
 def analyze_fix_sequence(raw_text: str) -> Dict[str, Any]:
     """
     Analyze a pasted/uploaded block that may contain multiple FIX messages.
@@ -124,6 +138,7 @@ def analyze_fix_sequence(raw_text: str) -> Dict[str, Any]:
     for split_msg in split_messages:
         analysis = analyze_fix_message(split_msg.get("raw_text") or "")
         business_object = analysis.get("business_object") or {}
+        decoded_rows = analysis.get("decoded_rows") or []
 
         analyzed_messages.append({
             "message_index": split_msg.get("message_index"),
@@ -133,7 +148,7 @@ def analyze_fix_sequence(raw_text: str) -> Dict[str, Any]:
             "parsed_count": analysis.get("parsed_count", 0),
             "warnings": analysis.get("warnings") or [],
             "business_object": business_object,
-            "decoded_rows": analysis.get("decoded_rows") or [],
+            "decoded_rows": decoded_rows,
 
             "msg_type": _get_nested(business_object, "message", "type"),
             "sender": _get_nested(business_object, "message", "sender"),
@@ -150,11 +165,26 @@ def analyze_fix_sequence(raw_text: str) -> Dict[str, Any]:
             "symbol": _get_nested(business_object, "trade", "symbol"),
             "security_id": _get_nested(business_object, "trade", "security_id"),
             "side": _get_nested(business_object, "trade", "side"),
-            "order_qty": _get_nested(business_object, "trade", "order_quantity"),
-            "last_qty": _get_nested(business_object, "trade", "last_quantity"),
-            "last_px": _get_nested(business_object, "trade", "last_price"),
-            "cum_qty": _get_nested(business_object, "trade", "cumulative_quantity"),
-            "leaves_qty": _get_nested(business_object, "trade", "leaves_quantity"),
+            "order_qty": (
+                _get_nested(business_object, "trade", "order_quantity")
+                or _get_tag_value(decoded_rows, "38")
+            ),
+            "last_qty": (
+                _get_nested(business_object, "trade", "last_quantity")
+                or _get_tag_value(decoded_rows, "32")
+            ),
+            "last_px": (
+                _get_nested(business_object, "trade", "last_price")
+                or _get_tag_value(decoded_rows, "31")
+            ),
+            "cum_qty": (
+                _get_nested(business_object, "trade", "cumulative_quantity")
+                or _get_tag_value(decoded_rows, "14")
+            ),
+            "leaves_qty": (
+                _get_nested(business_object, "trade", "leaves_quantity")
+                or _get_tag_value(decoded_rows, "151")
+            ),
             "transact_time": _get_nested(business_object, "trade", "transaction_time"),
         })
 

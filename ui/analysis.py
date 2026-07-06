@@ -193,9 +193,13 @@ def render_analysis_panel():
     )
 
     raw_input = ui.textarea(
-        label="FIX message / extracted OCR text",
-        placeholder="Paste FIX message, OCR text, or upload image/PDF...",
+        label="FIX message(s) / extracted OCR text",
+        placeholder="Paste one FIX message, multiple FIX messages, OCR text, or upload image/PDF...",
     ).props("outlined").classes("w-full mt-4 analysis-fix-input max-h-64 overflow-auto")
+
+    ui.label(
+        "For Multi-Message Sequence, paste or OCR multiple FIX messages into this same box."
+    ).classes("text-xs text-grey-7")
 
     compare_input_box = ui.textarea(
         label="Message B / Compare Against",
@@ -287,6 +291,7 @@ def render_analysis_panel():
     <div id="analysis-screenshot-paste-box-b"
         tabindex="0"
         style="
+            display: none;
             border: 2px dashed #aaa;
             border-radius: 8px;
             padding: 18px;
@@ -346,6 +351,8 @@ def render_analysis_panel():
             setPasteBoxIdle(boxA);
             setPasteBoxIdle(boxB);
         }
+
+        setInterval(updateBoxVisibility, 500);
 
         function setPasteBoxActive(box) {
             activeBox = box;
