@@ -22,6 +22,9 @@ def get_local_llm_config():
         "base_url": llm_cfg.get("base_url", "http://localhost:1234"),
         "model": llm_cfg.get("model", "meta-llama-3.1-8b-instruct"),
         "timeout": int(llm_cfg.get("timeout", 60)),
+        # Cap on generated tokens for JSON calls — prevents a runaway/looping
+        # generation from holding the request until the full HTTP timeout.
+        "max_tokens": int(llm_cfg.get("max_tokens", 1024)),
     }
 
 def call_local_llm_json(system_prompt, user_prompt, temperature=0.0,
@@ -43,6 +46,7 @@ def call_local_llm_json(system_prompt, user_prompt, temperature=0.0,
             },
         ],
         "temperature": temperature,
+        "max_tokens": llm_cfg["max_tokens"],
         "stream": False,
     }
 
@@ -61,7 +65,10 @@ def call_local_llm_json(system_prompt, user_prompt, temperature=0.0,
         data = response.json()
         content = data["choices"][0]["message"]["content"]
         return _parse_json_response(content)
-    except Exception:
+    except Exception as e:
+        # Never fail silently — callers treat None as "LLM unavailable" and
+        # fall back; without this line there is no way to know WHY.
+        print(f"[LLM] call failed ({type(e).__name__}): {str(e)[:200]}")
         return None
 
 

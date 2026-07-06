@@ -170,6 +170,23 @@ def get_by_identifier(
         LIMIT %s
     """
     rows = fetchall(sql, tuple(params))
+    if rows:
+        return _rows_to_points(rows)
+
+    # Fallback: exact value match against the record's other exact names —
+    # reference_identifiers and aliases (payload arrays). A record is findable
+    # by ANY of its exact names, not only the schema's primary identifier.
+    fb_sql = """
+        SELECT id, collection_name, source_file, source_type, doc_type,
+               identifier, identifier_field, identifier_namespace, identifier_kind,
+               primary_name, description, nlp_text, payload
+        FROM chunks
+        WHERE collection_name = %s
+          AND (jsonb_exists(payload->'reference_identifiers', %s)
+               OR jsonb_exists(payload->'aliases', %s))
+        LIMIT %s
+    """
+    rows = fetchall(fb_sql, (collection_name, str(identifier), str(identifier), limit))
     return _rows_to_points(rows)
 
 

@@ -22,56 +22,42 @@ def infer_table_schema(rows, collection_name=None, source_file=None):
             print(f"[SCHEMA] Loaded from PostgreSQL: {collection_name}/{source_file_stem}")
             return schema
 
-    # ── 2. Fall back to disk JSON file (legacy)
-    if collection_name and source_file_stem:
-        schema_path = SCHEMAS_DIR / f"{collection_name}_{source_file_stem}_schema.json"
-        if schema_path.exists():
-            import json
-            with open(schema_path, "r", encoding="utf-8") as f:
-                schema = json.load(f)
-            print(f"[SCHEMA] Loaded from disk: {schema_path.name} — migrating to PostgreSQL")
-            # Migrate to PostgreSQL and keep disk file for now
-            save_schema_to_db(schema, collection_name, source_file_stem)
-            return schema
+    # (Legacy disk-JSON resurrection removed — PostgreSQL is the only schema
+    # store (Phase 2). A stale disk file silently overwriting a deliberately
+    # deleted DB schema is exactly the failure mode we're closing.)
 
-    # ── 3. Heuristic first (fast), LLM only if key roles missing
-    print(f"[SCHEMA] No existing schema — running heuristic for {source_file_stem}")
-    schema = infer_schema(rows, roles)
+    # ── 2. LLM inference is PRIMARY for tables; the heuristic is only a
+    # fallback when the LLM is unreachable. The LLM path carries the
+    # deterministic guards (filename-role constraint, cardinality checks,
+    # leftmost-key tie-break); the raw heuristic has none of them.
+    print(f"[SCHEMA] No existing schema — running LLM inference for {source_file_stem}")
+    schema = llm_infer_schema(rows, roles)
+    _source = "llm"
+    if not schema:
+        print("[SCHEMA] LLM inference unavailable — trying heuristic fallback")
+        schema = infer_schema(rows, roles)
+        _source = "heuristic"
 
     for key in ["identifier", "primary_name", "aliases", "description",
-                "type", "enum_value", "enum_name", "reference_identifier", "other"]:
+                "type", "tags", "enum_value", "enum_name",
+                "reference_identifier", "other"]:
         schema.setdefault(key, [])
 
-    # Escalate to the LLM when the heuristic missed key roles, OR when the table looks
-    # like entity_row (article-style) — there the LLM detects a tags column and maps
-    # free-text roles better. Structured tables keep the fast heuristic. (Switch to
-    # always-run by removing the _is_entity_row gate.)
-    from TABLES.table_detector import detect_table_type
-    _heuristic_type = detect_table_type(rows, schema)
-    _missing_keys = not schema.get("identifier") or not schema.get("primary_name")
-    _is_entity_row = (_heuristic_type == "entity_row")
-
-    if _missing_keys or _is_entity_row:
-        _reason = "missed key roles" if _missing_keys else "entity_row table"
-        print(f"[SCHEMA] Escalating to LLM — {_reason}")
-        llm_result = llm_infer_schema(rows, roles)
-        if llm_result:
-            schema = llm_result
-            for key in ["identifier", "primary_name", "aliases", "description",
-                        "type", "tags", "enum_value", "enum_name",
-                        "reference_identifier", "other"]:
-                schema.setdefault(key, [])
-        else:
-            print("[SCHEMA] LLM escalation failed — keeping heuristic result")
+    # ── 3. Never persist a junk schema. A saved wrong schema short-circuits
+    # every future ingest and silently poisons retrieval; a missing schema is
+    # recoverable by re-running when the LLM is back.
+    if _source == "heuristic" and not schema.get("identifier"):
+        raise RuntimeError(
+            f"Schema inference failed for {source_file_stem}: LLM unavailable and "
+            "heuristic found no identifier. Refusing to save a junk schema — "
+            "retry when the LLM is reachable, or define the schema manually.")
 
     if DEBUG:
-        print("[TABLE SCHEMA] Inferred schema:")
+        print(f"[TABLE SCHEMA] Inferred schema (source: {_source}):")
         print(schema)
 
-    # Save to PostgreSQL (primary) and disk (legacy backup)
     if collection_name and source_file_stem:
         save_schema_to_db(schema, collection_name, source_file_stem)
-        #save_schema(schema, source_file, SCHEMAS_DIR, collection_name) # saving schema to disk
 
     return schema
 

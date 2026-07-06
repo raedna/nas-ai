@@ -26,34 +26,113 @@ _OPERATIONS = {"count", "count_distinct", "list_distinct", "group_by"}
 _FILTER_OPS = {"equals", "contains"}
 
 
-def _collection_fields(collection: str) -> set:
-    """All payload keys present in this collection (sampled) + table columns."""
+# Pipeline bookkeeping keys — present in every payload but NOT data. Letting
+# the LLM filter/target on these produced junk specs (doc_type=structured,
+# type_field=Category match every row).
+_SYSTEM_KEYS = {
+    "doc_type", "type_field", "identifier_field", "identifier_kind",
+    "source_type", "ingest_source", "link_keys", "related_link_keys",
+    "related_file_paths", "related_source_files", "related_image_targets",
+    "file_path", "text", "embedded_image_paths", "embedded_image_ocr_map",
+    "description_fields", "enum_values", "_question", "_version_history",
+    "_latest_version",
+}
+
+
+def _collection_fields(collection: str):
+    """Returns (queryable field names, description_fields keys). Queryable =
+    payload keys + table columns + the labeled description_fields columns
+    (original source column names — e.g. 'DataType', 'Recon Tool File
+    Format'), minus pipeline bookkeeping keys."""
     rows = fetchall("""
         SELECT DISTINCT jsonb_object_keys(payload) AS k
         FROM (SELECT payload FROM chunks
               WHERE collection_name = %s LIMIT 200) s
     """, (collection,))
-    keys = {r["k"] for r in rows}
-    return keys | _TABLE_COLUMNS
+    keys = {r["k"] for r in rows} - _SYSTEM_KEYS
 
-def _field_values(collection: str, fields: set) -> Dict[str, list]:
-    """Distinct values for low-cardinality fields — grounds the LLM in real values."""
+    df_rows = fetchall("""
+        SELECT DISTINCT jsonb_object_keys(payload->'description_fields') AS k
+        FROM (SELECT payload FROM chunks
+              WHERE collection_name = %s
+                AND jsonb_typeof(payload->'description_fields') = 'object'
+              LIMIT 200) s
+    """, (collection,))
+    df_keys = {r["k"] for r in df_rows} - keys - _TABLE_COLUMNS - _SYSTEM_KEYS
+
+    return (keys | _TABLE_COLUMNS | df_keys) - _SYSTEM_KEYS, df_keys
+
+def _field_values(collection: str, fields: set, df_keys=frozenset()) -> Dict[str, list]:
+    """Distinct values for low-cardinality fields — grounds the LLM in real
+    values. Side effect: CONSTANT fields (exactly one distinct value in the
+    whole collection, e.g. source_file in a single-file collection) are
+    removed from `fields` — they carry zero information as filter or target
+    and only mislead the LLM."""
     values = {}
-    for f in fields:
-        expr = _field_expr(f)
+    for f in sorted(fields):
+        expr = _field_expr(f, df_keys)
         rows = fetchall(
             f"SELECT DISTINCT {expr} AS v FROM chunks WHERE collection_name = %s AND {expr} IS NOT NULL LIMIT 25",
             (collection,))
         vals = [str(r["v"]) for r in rows if r["v"]]
+        if len(vals) == 1:
+            fields.discard(f)
+            continue
         if 0 < len(vals) <= 20:
             values[f] = vals
     return values
+
+def _collection_schema(collection: str) -> Dict:
+    """Union of ALL stored schemas for a collection (role -> source columns).
+    Schemas are keyed by (collection, source_file_stem) — looking up
+    (collection, collection) silently misses single-file collections whose
+    stem is the file name, and multi-file collections entirely."""
+    merged: Dict[str, list] = {}
+    try:
+        rows = fetchall(
+            "SELECT schema_json FROM schemas WHERE collection_name = %s", (collection,))
+        import json as _json
+        merged["_schema_count"] = len(rows)
+        for r in rows:
+            s = r["schema_json"]
+            s = s if isinstance(s, dict) else _json.loads(s)
+            for role, cols in s.items():
+                if isinstance(cols, list):
+                    for c in cols:
+                        if c and c not in merged.setdefault(role, []):
+                            merged[role].append(c)
+    except Exception:
+        pass
+    return merged
+
+
+def _schema_role_lines(collection: str) -> str:
+    """Ground the extraction LLM in the collection's schema: which system field
+    holds which source column ('identifier holds: Moore file name'). Without
+    this, the LLM cannot know that a question about 'files' maps to the
+    identifier field. Read from the stored schema at runtime — nothing named."""
+    try:
+        schema = _collection_schema(collection)
+        lines = []
+        for role in ("identifier", "primary_name", "aliases", "type",
+                     "description", "reference_identifier", "tags"):
+            cols = schema.get(role) or []
+            if cols:
+                lines.append(f"- The field '{role}' holds: {', '.join(str(c) for c in cols)}\n")
+        if lines:
+            return ("Field meanings for this collection (source column names):\n"
+                    + "".join(lines))
+    except Exception:
+        pass
+    return ""
+
 
 def _extract_spec(question: str, collection: str, fields: set, field_values: Dict) -> Optional[Dict]:
     """LLM extracts a structured aggregation spec. Returns None if unusable."""
     from core.local_llm_client import call_local_llm_json
 
     field_list = ", ".join(sorted(fields))
+    schema_lines = _schema_role_lines(collection)
     system_prompt = (
         "You translate a user question into a JSON aggregation spec for a database "
         "of document chunks. Return ONLY JSON with fields:\n"
@@ -77,6 +156,9 @@ def _extract_spec(question: str, collection: str, fields: set, field_values: Dic
         "brokers and a field's values are broker names, use that field). "
         "Do the same when choosing filter fields.\n"
         f"- Allowed fields: {field_list}\n"
+        + (schema_lines and schema_lines + "- Use these meanings to pick target/filter "
+           "fields: if the question asks for the things a field HOLDS (per the meanings "
+           "above), target THAT field.\n" or "")
         + "".join(f"- Values of '{k}': {', '.join(v)}\n" for k, v in field_values.items())
         + "- Filter values MUST be copied exactly from the listed values above. "
           "If the question does not mention one of these values, do NOT add that filter.\n"
@@ -107,19 +189,22 @@ def _extract_spec(question: str, collection: str, fields: set, field_values: Dic
     return spec
 
 
-def _field_expr(field: str) -> str:
-    """SQL expression for a field — real column or payload key. Field is
-    pre-validated against the collection's actual keys, never user-raw."""
+def _field_expr(field: str, df_keys=frozenset()) -> str:
+    """SQL expression for a field — real column, labeled description_fields
+    column, or payload key. Field is pre-validated against the collection's
+    actual keys, never user-raw."""
     if field in _TABLE_COLUMNS:
         return field
+    if field in df_keys:
+        return "payload->'description_fields'->>'{}'".format(field.replace("'", ""))
     return "payload->>'{}'".format(field.replace("'", ""))
 
 
-def _where(collection: str, filters: List[Dict]):
+def _where(collection: str, filters: List[Dict], df_keys=frozenset()):
     clauses = ["collection_name = %s"]
     params: list = [collection]
     for f in filters:
-        expr = _field_expr(f["field"])
+        expr = _field_expr(f["field"], df_keys)
         if f["op"] == "equals":
             clauses.append(f"LOWER({expr}) = LOWER(%s)")
             params.append(f["value"])
@@ -177,18 +262,36 @@ def _concept_label_filter(question: str, collection: str) -> Optional[Dict]:
     except Exception:
         return None
 
-def run_metadata_query(collection: str, question: str) -> Optional[Dict]:
+def run_metadata_query(collection: str, question: str, intent_mode: str = None) -> Optional[Dict]:
     """Entry point. Returns {'result': str, 'spec': dict} or None (caller falls back)."""
     try:
-        fields = _collection_fields(collection)
+        fields, df_keys = _collection_fields(collection)
         if not fields:
             return None
-        field_values = _field_values(collection, fields)
+        field_values = _field_values(collection, fields, df_keys)
         spec = _extract_spec(question, collection, fields, field_values)
         if not spec:
             return None
 
-        if spec["operation"] in ("group_by", "list_distinct"):
+        # The upstream intent classifier already decided list vs count — that
+        # is HOW the question reached this path. The spec extraction must not
+        # silently overrule it (LLM variance flips 'what tags contain X'
+        # between list_distinct and count_distinct run to run).
+        if intent_mode == "discovery_list" and spec["operation"] in ("count", "count_distinct"):
+            print(f"[METADATA] operation coerced {spec['operation']} -> list_distinct "
+                  f"(upstream intent: {intent_mode})")
+            spec["operation"] = "list_distinct"
+            spec["target_field"] = spec.get("target_field") or "identifier"
+        elif intent_mode == "discovery_count" and spec["operation"] in ("list_distinct",):
+            print(f"[METADATA] operation coerced {spec['operation']} -> count_distinct "
+                  f"(upstream intent: {intent_mode})")
+            spec["operation"] = "count_distinct"
+
+        # Preemptive concept-vector override applies to group_by ONLY. For
+        # list_distinct it repeatedly replaced correct validated LLM picks
+        # (unguarded embedding argmax — no threshold/margin); the tautology and
+        # degenerate-result guards below are the list safety net instead.
+        if spec["operation"] == "group_by":
             from core.schema_inference import load_schema_from_db
             _schema = load_schema_from_db(collection, collection) or {}
             _generic = set((_schema.get("primary_name") or []) + (_schema.get("identifier") or [])
@@ -214,11 +317,76 @@ def run_metadata_query(collection: str, question: str) -> Optional[Dict]:
                         f["field"], f["op"] = fld, "equals"
                     break
 
+        # Role-name matcher (deterministic, schema-driven): if a question token
+        # compact-matches a schema role's SOURCE COLUMN NAME ('files' matches
+        # 'Moore file name'), and the LLM's target matches NO question token,
+        # the question names its target explicitly and the LLM missed it —
+        # retarget. Self-match protection: an LLM pick whose own name matches
+        # a question token ('dates' -> date-obs) is never overridden.
+        if spec["operation"] == "list_distinct" and spec.get("target_field"):
+            try:
+                import re as _re2
+                _sch = _collection_schema(collection)
+                # Role-name matching is only meaningful when the collection has
+                # ONE schema — a multi-schema collection (xml_test: 16 files)
+                # unions its roles into ambiguity and the matcher fires on noise.
+                if _sch.get("_schema_count", 0) != 1:
+                    raise StopIteration
+                _toks = {t for t in _re2.findall(r"[a-z0-9]+", question.lower()) if len(t) > 2}
+                _toks |= {t[:-1] for t in list(_toks) if t.endswith("s") and len(t) > 3}
+
+                def _match_toks(names):
+                    out = set()
+                    for name in names:
+                        compact = _re2.sub(r"[^a-z0-9]", "", str(name).lower())
+                        out |= {t for t in _toks if t in compact}
+                    return out
+
+                _tf0 = spec["target_field"]
+                _tf_names = [_tf0]
+                for _r in ("identifier", "primary_name", "aliases", "type", "description"):
+                    if _tf0 == _r or _tf0 in (_sch.get(_r) or []):
+                        _tf_names += (_sch.get(_r) or [])
+                _tf_toks = _match_toks(_tf_names)
+                _id_toks = _match_toks(["identifier"] + (_sch.get("identifier") or []))
+
+                if _tf0 != "identifier" and _id_toks and _tf_toks <= _id_toks:
+                    # Everything justifying the LLM's pick also justifies the
+                    # record key ('files' matches both filename columns) — the
+                    # identifier wins ties; a pick justified by EXTRA tokens
+                    # ('prime broker files' -> aliases) is kept.
+                    print(f"[METADATA] role-name match: target '{_tf0}' -> "
+                          f"'identifier' (tie or miss; question tokens "
+                          f"{sorted(_id_toks)} name {_sch.get('identifier')})")
+                    spec["target_field"] = "identifier"
+                elif not _tf_toks:
+                    for _role in ("primary_name", "aliases", "type"):
+                        if _match_toks(_sch.get(_role) or []):
+                            print(f"[METADATA] role-name match: target "
+                                  f"'{_tf0}' -> '{_role}' (question names "
+                                  f"{_sch.get(_role)})")
+                            spec["target_field"] = _role
+                            break
+            except Exception:
+                pass
+
+        # Tautology guard (deterministic, field-agnostic): SELECT DISTINCT x
+        # WHERE x = v always returns {v} for ANY field/value — zero information.
+        # If the target field collides with an equals-filter field, retarget to
+        # the canonical record key (identifier column): a "list the Xs" question
+        # wants the matching records, not the filter value echoed back.
+        if spec["operation"] in ("list_distinct", "group_by") and spec.get("target_field"):
+            _eq_fields = {f["field"] for f in spec["filters"] if f["op"] == "equals"}
+            if spec["target_field"] in _eq_fields:
+                print(f"[METADATA] tautology guard: target '{spec['target_field']}' "
+                      f"is an equals-filter field -> identifier")
+                spec["target_field"] = "identifier"
+
         def _count_with(filters):
-            w, p = _where(collection, filters)
+            w, p = _where(collection, filters, df_keys)
             if spec["operation"] == "count" or not spec.get("target_field"):
                 return fetchall(f"SELECT COUNT(*) AS n FROM chunks WHERE {w}", tuple(p))[0]["n"]
-            e = _field_expr(spec["target_field"])
+            e = _field_expr(spec["target_field"], df_keys)
             return fetchall(f"SELECT COUNT(DISTINCT {e}) AS n FROM chunks WHERE {w} AND {e} IS NOT NULL", tuple(p))[0]["n"]
 
         if spec["operation"] in ("count", "count_distinct") and spec["filters"]:
@@ -228,43 +396,96 @@ def run_metadata_query(collection: str, question: str) -> Optional[Dict]:
                     print(f"[METADATA] dropped zero-result filters, kept: {_keep}")
                     spec["filters"] = _keep
 
-        where, params = _where(collection, spec["filters"])
+        where, params = _where(collection, spec["filters"], df_keys)
         op = spec["operation"]
         tf = spec.get("target_field")
 
+        # Human-readable filter summary — every answer states WHAT was matched
+        # (e.g. "type = String"), so the answer is self-explanatory.
+        _fdesc = ", ".join(
+            f"{f['field']} {'=' if f['op'] == 'equals' else 'contains'} {f['value']}"
+            for f in spec["filters"])
+        _suffix = f" matching {_fdesc}" if _fdesc else ""
+
+        _for = f" for {_fdesc}" if _fdesc else ""
         if op == "count" or (op == "count_distinct" and not tf):
             rows = fetchall(f"SELECT COUNT(*) AS n FROM chunks WHERE {where}", tuple(params))
-            answer = f"{rows[0]['n']} records match."
+            answer = f"{rows[0]['n']} record(s) match{_for}."
         elif op == "count_distinct":
-            expr = _field_expr(tf)
+            expr = _field_expr(tf, df_keys)
             rows = fetchall(
                 f"SELECT COUNT(DISTINCT {expr}) AS n FROM chunks WHERE {where} AND {expr} IS NOT NULL",
                 tuple(params))
-            answer = f"There are {rows[0]['n']} matching {tf or 'record'}(s)."
+            answer = f"There are {rows[0]['n']} matching {tf or 'record'}(s){_for}."
         elif op == "list_distinct":
             if not tf:
                 return None
-            expr = _field_expr(tf)
+            expr = _field_expr(tf, df_keys)
+            # Record-style listing for the name-ish system columns: a bare value
+            # carries little meaning alone, so append a companion column —
+            # identifier gets its primary_name, primary_name gets its description
+            # (truncated). Other targets (dates, types, paths) stay bare values.
+            _companion = {"identifier": "primary_name", "primary_name": "description"}.get(tf)
+            if _companion:
+                rows = fetchall(
+                    f"SELECT DISTINCT {tf} AS v, {_companion} AS c FROM chunks "
+                    f"WHERE {where} AND {tf} IS NOT NULL ORDER BY v LIMIT 200",
+                    tuple(params))
+                # Markdown-safe: blank line before the list (CommonMark) and
+                # code spans around values so underscores aren't italicized.
+                def _trunc(t):
+                    t = " ".join(str(t or "").split())
+                    return t[:100] + ("…" if len(t) > 100 else "")
+                items = []
+                _seen_v = set()
+                for r in rows:
+                    if not r["v"] or r["v"] in _seen_v:
+                        continue  # one line per distinct value even if companions differ
+                    _seen_v.add(r["v"])
+                    c = _trunc(r.get("c"))
+                    # Code-like companions (no spaces, e.g. job names) need code
+                    # spans so markdown doesn't italicize their underscores.
+                    if c and " " not in c:
+                        c = f"`{c}`"
+                    items.append(f"`{r['v']}`" + (f" — {c}" if c else ""))
+                if not items:
+                    print("[METADATA] degenerate list result -> fallback to discovery")
+                    return None
+                answer = (f"{len(items)} record(s){_suffix}:\n\n"
+                          + "\n".join(f"- {i}" for i in items))
+                return {"result": answer, "spec": spec}
             rows = fetchall(
                 f"SELECT DISTINCT {expr} AS v FROM chunks WHERE {where} AND {expr} IS NOT NULL ORDER BY v LIMIT 200",
                 tuple(params))
             vals = [r["v"] for r in rows if r["v"]]
 
+            # Degenerate-result guard: a list that is empty or merely echoes the
+            # filter value(s) back carries no information — return None so the
+            # caller falls back to the discovery engine.
+            _fvals = {str(f["value"]).lower() for f in spec["filters"]}
+            if not vals or all(str(v).lower() in _fvals for v in vals):
+                print("[METADATA] degenerate list result -> fallback to discovery")
+                return None
+
             import re as _re
             _ts = [_v for _v in vals if _re.match(r'^\d{4}-\d{2}-\d{2}T', str(_v))]
             if len(_ts) == len(vals) and vals:
                 vals = sorted({str(_v)[:10] for _v in vals})
-                
-            answer = f"{len(vals)} value(s): " + ", ".join(vals)
+
+            answer = (f"{len(vals)} value(s){_suffix}:\n\n"
+                      + "\n".join(f"- `{v}`" for v in vals))
         else:  # group_by
             if not tf:
                 return None
-            expr = _field_expr(tf)
+            expr = _field_expr(tf, df_keys)
             rows = fetchall(
                 f"SELECT {expr} AS v, COUNT(*) AS n FROM chunks WHERE {where} AND {expr} IS NOT NULL "
                 f"GROUP BY v ORDER BY n DESC LIMIT 50",
                 tuple(params))
-            answer = "\n".join(f"- {r['v']}: {r['n']}" for r in rows)
+            if not rows:
+                print("[METADATA] empty group_by result -> fallback to discovery")
+                return None
+            answer = "\n".join(f"- `{r['v']}`: {r['n']}" for r in rows)
 
         return {"result": answer, "spec": spec}
     except Exception as e:

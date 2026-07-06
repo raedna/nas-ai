@@ -549,6 +549,7 @@ def run_query_with_method(
     show_exact_links: bool = True,
     show_related_topics: bool = True,
     force_answer: bool = False,
+    single_item: bool = False,
 ) -> Dict:
     """
     Primary query entry point.  Returns a dict with keys:
@@ -730,6 +731,13 @@ def run_query_with_method(
     # synthesis and hedge with "no exact match found".
     if force_answer and intent["mode"] not in ("discovery_list", "discovery_count", "comparison"):
         intent["mode"] = "answer"
+    # single_item (used by the Chat multi-item split, CODE-023): each sub-query
+    # targets exactly ONE identifier by construction, so a discovery/comparison
+    # classification (e.g. plural phrasing "what are tags 22") is structurally
+    # wrong — override to single-record answer mode.
+    if single_item and intent["mode"] != "answer":
+        intent = {**intent, "mode": "answer",
+                  "reason": f"single_item override (was {intent['mode']})"}
 
     # ------------------------------------------------------------------
     # 1. Relationship queries (before plain namespace lookup)
@@ -835,7 +843,7 @@ def run_query_with_method(
     # ------------------------------------------------------------------
     if intent["mode"] in ("discovery_count", "discovery_list"):
         from core.metadata_query import run_metadata_query
-        _mq = run_metadata_query(collection, question)
+        _mq = run_metadata_query(collection, question, intent_mode=intent["mode"])
         if _mq:
             return {
                 "method": "metadata_sql",

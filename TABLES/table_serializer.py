@@ -146,6 +146,20 @@ def _build_structured_doc(row, schema, source_file):
     aliases = _all_values(row_n, alias_fields)
     type_value = _first_value(row_n, type_fields)
 
+    # Reference identifiers (schema role reference_identifier): keep them
+    # searchable — payload list + a namespaced link_key per value, exactly like
+    # the primary identifier. Without this they only exist inside the display
+    # dict description_fields and no retrieval path can find them.
+    ref_fields = schema.get("reference_identifier", [])
+    reference_identifiers = []
+    for _rf in ref_fields:
+        _rv = _first_value(row_n, [_rf])
+        if _rv:
+            reference_identifiers.append(_rv)
+            _rns = _namespace_from_field(_rf)
+            if _rns:
+                link_keys.append(f"{_rns}:{_rv}")
+
     text = build_structured_nlp_text(row, schema)
 
     if not text:
@@ -160,6 +174,7 @@ def _build_structured_doc(row, schema, source_file):
         "primary_name": primary_name or None,
         "description": description or None,
         "description_fields": description_fields or None,
+        "reference_identifiers": reference_identifiers,
         "enum_values": [],
         "link_keys": link_keys,
         "related_link_keys": [],

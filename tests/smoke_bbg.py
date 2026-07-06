@@ -67,7 +67,7 @@ SMOKE_TESTS = [
         "description": "Discovery list — returns multiple fields with ask price in name/desc",
         "must_contain": ["ASK"],
         "must_not_contain": [],
-        "expected_methods": ["discovery_list", "structured_query_plan"],
+        "expected_methods": ["discovery_list", "metadata_sql"],
         "min_results": 3,
         "enum_count_max": None,
     },
@@ -77,7 +77,7 @@ SMOKE_TESTS = [
         "description": "Category discovery — returns multiple ARD airline fields",
         "must_contain": ["ARD"],
         "must_not_contain": [],
-        "expected_methods": ["discovery_list", "structured_query_plan"],
+        "expected_methods": ["discovery_list", "metadata_sql"],
         "min_results": 3,
         "enum_count_max": None,
     },
@@ -87,7 +87,7 @@ SMOKE_TESTS = [
         "description": "Type discovery — returns multiple String type fields",
         "must_contain": ["String"],
         "must_not_contain": [],
-        "expected_methods": ["discovery_list", "structured_query_plan"],
+        "expected_methods": ["discovery_list", "metadata_sql"],
         "min_results": 3,
         "enum_count_max": None,
     },
@@ -95,9 +95,11 @@ SMOKE_TESTS = [
         "id": "BBG-07",
         "question": "how many fields contain ask price",
         "description": "Count query — returns number of matching fields",
-        "must_contain": ["150"],
+        # Ground truth computed at runtime via SQL (see GROUND_TRUTH_SQL below) —
+        # never a hardcoded count.
+        "must_contain": ["__SQL_COUNT__:ask price"],
         "must_not_contain": [],
-        "expected_methods": ["discovery_count"],
+        "expected_methods": ["discovery_count", "metadata_sql"],
         "min_results": 1,
         "enum_count_max": None,
     },
@@ -157,6 +159,21 @@ def evaluate(test: dict, answer_text: str, method: str) -> dict:
     lower = answer_text.lower()
 
     for term in test.get("must_contain", []):
+        # "__SQL_COUNT__:<substring>" — ground truth computed live from the DB:
+        # the answer must contain the exact distinct-identifier count of chunks
+        # whose nlp_text contains <substring>. Never a hardcoded number.
+        if term.startswith("__SQL_COUNT__:"):
+            from core.db import fetchall as _fa
+            _sub = term.split(":", 1)[1]
+            _n = _fa(
+                "SELECT COUNT(DISTINCT identifier) AS n FROM chunks "
+                "WHERE collection_name = %s AND nlp_text ILIKE %s",
+                (COLLECTION, f"%{_sub}%"))[0]["n"]
+            if str(_n) not in answer_text:
+                result["pass"] = False
+                result["failures"].append(
+                    f"MISSING ground-truth count {_n} (SQL: nlp_text contains '{_sub}')")
+            continue
         if not re.search(re.escape(term.lower()), lower):
             result["pass"] = False
             result["failures"].append(f"MISSING expected term: '{term}'")

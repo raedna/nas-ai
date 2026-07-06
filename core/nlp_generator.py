@@ -118,6 +118,12 @@ def build_structured_nlp_text(row, schema):
     if alias_values:
         parts.append("Also known as: " + ", ".join(alias_values))
 
+    # Reference identifiers must appear in nlp_text or BM25/trigram can never
+    # find the record by them (field not in nlp_text = invisible to lexical).
+    ref_values = _all_values(row_n, schema.get("reference_identifier", []))
+    if ref_values:
+        parts.append("References: " + ", ".join(ref_values))
+
     return "\n\n".join([p for p in parts if p]).strip()
 
 

@@ -198,12 +198,26 @@ def ingest_collection(
     except Exception as e:
         print(f"[INGEST] could not ensure collections row for {collection_name}: {e}")
 
-    source_files = discover_files(_get_collection_paths(collection_cfg))
+    # Source reachability check — an unmounted volume or moved file must
+    # produce a visible warning, not a green "complete" with all zeros.
+    _paths = _get_collection_paths(collection_cfg)
+    _warnings = []
+    if not _paths:
+        _warnings.append("No source path configured for this collection.")
+    for _p in _paths:
+        if not Path(_p).exists():
+            _warnings.append(f"Source path unreachable (unmounted volume or moved file?): {_p}")
+
+    source_files = discover_files(_paths)
 
     source_files = [
         f for f in source_files
         if not _should_exclude_file(f, collection_cfg)
     ]
+    if not source_files and not _warnings:
+        _warnings.append(
+            f"0 ingestable files found under configured path(s) {_paths} — "
+            "check filetype filters and exclusions.")
 
     tasks = _build_tasks(
         collection_name=collection_name,
@@ -248,6 +262,7 @@ def ingest_collection(
         "failed_files": result.failed_files,
         "total_chunks": result.total_chunks,
         "results": result.results,
+        "warnings": _warnings,
     }
 
 

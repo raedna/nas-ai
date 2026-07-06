@@ -121,18 +121,19 @@ def select_collections(question: str, history: list, available_collections: list
     selected = []
     seen = set()
 
-    # Skip identifier lookup for procedural questions — route by concept instead
+    # Procedural cue — used only as a Tier 2 prompt hint (Tier 1 hits are merged
+    # AFTER Tier 2 ordering per CODE-027, so no skip is needed).
     _procedural = re.search(
         r'\b(how|steps|procedure|where|verify|check|login|connect|access)\b',
         question, re.IGNORECASE
     )
-    if _procedural:
-        _identifiers = []  # skip Tier 1
 
     # --- Tier 1: direct identifier/filename match across collections ---
+    # Matches the dedicated identifier COLUMN (payload->>'identifier' is not
+    # reliably populated) plus reference_identifiers/aliases payload arrays,
+    # mirroring get_by_identifier's lookup + fallback.
     _filenames = re.findall(r'\b[a-zA-Z0-9_\-]+\.[a-zA-Z0-9]{2,5}\b', question)
-    #_tags = re.findall(r'\btag\s+(\d+)\b', question, re.IGNORECASE)
-    _identifiers = _filenames #+ _tags
+    _identifiers = _filenames
 
     _tier1_hits = []
     for _id in _identifiers:
@@ -142,9 +143,11 @@ def select_collections(question: str, history: list, available_collections: list
             _hit = _fetchall(
                 """SELECT 1 FROM chunks
                    WHERE collection_name = %s
-                   AND payload->>'identifier' ILIKE %s
+                   AND (identifier ILIKE %s
+                        OR jsonb_exists(payload->'reference_identifiers', %s)
+                        OR jsonb_exists(payload->'aliases', %s))
                    LIMIT 1""",
-                (_col, _id)
+                (_col, _id, _id, _id)
             )
             if _hit:
                 _tier1_hits.append(_col)
@@ -251,10 +254,12 @@ Respond with JSON only:
     # --- Tier 3: fallback ---
     return [available_collections[0]] if available_collections else []
 
-def run_parallel_queries(collections: list, question: str) -> dict:
+def run_parallel_queries(collections: list, question: str, single_item: bool = False) -> dict:
     """
     Fan out run_query_with_method across 1–3 collections in parallel.
     Returns the best result: highest-scoring single answer, plus all related_sections merged.
+    single_item=True (multi-item split path, CODE-023) tells the router each
+    sub-query targets exactly one identifier — discovery intents are overridden.
     """
     if not collections:
         return {"result": "No collections available.", "related_sections": [], "collection": None}
@@ -262,7 +267,8 @@ def run_parallel_queries(collections: list, question: str) -> dict:
     if len(collections) == 1:
         result = run_query_with_method(
             collections[0], question, limit=25,
-            show_exact_links=True, show_related_topics=True,force_answer=True
+            show_exact_links=True, show_related_topics=True, force_answer=True,
+            single_item=single_item,
         )
         result["collection"] = collections[0]
         return result
@@ -279,6 +285,7 @@ def run_parallel_queries(collections: list, question: str) -> dict:
                 show_exact_links=True,
                 show_related_topics=True,
                 force_answer=True,
+                single_item=single_item,
             ): col
             for col in collections
         }
@@ -289,13 +296,21 @@ def run_parallel_queries(collections: list, question: str) -> dict:
             except Exception as e:
                 results[col] = {"result": f"Error querying {col}: {e}", "related_sections": []}
 
-    # Pick best result: prefer non-"No answer found" results, then first collection wins
+    # Pick best result: prefer collections whose answer is not one of the
+    # system's own empty/zero-result phrasings, then first collection wins.
+    def _is_empty_answer(text: str) -> bool:
+        t = str(text or "")
+        return (not t.strip()) or any(m in t for m in (
+            "No answer found", "No record found", "No exact match found",
+            "Found 0 item", "Found 0 match", "0 record(s)", "0 value(s)",
+            "0 records match", "0 matching",
+        ))
+
     best_col = None
     best_result = None
     for col in collections:  # respects priority order from select_collections
         r = results.get(col, {})
-        answer = r.get("result", "")
-        if answer and "No answer found" not in answer and "No record found" not in answer and "No exact match found" not in answer:
+        if not _is_empty_answer(r.get("result", "")):
             best_col = col
             best_result = r
             break
@@ -363,6 +378,149 @@ def _has_explicit_identifier(question: str) -> bool:
         or re.search(r"\b[\w\-]+\.[A-Za-z0-9]{2,5}\b", q)  # filenames
         or re.search(r"\b[A-Z][A-Z0-9_]{3,}\b", q)         # ALL-CAPS codes
     )
+
+
+# ---------------------------------------------------------------------------
+# Multi-item questions (CODE-023) — chat path only.
+# Deterministic gate first (zero LLM cost for single-item questions), then an
+# LLM splitter that rewrites "what are tags 22, 35 and 54" into standalone
+# sub-questions. Generic pattern matching — no hardcoded entities.
+# ---------------------------------------------------------------------------
+
+MULTI_ITEM_MAX = 5  # cap on parallel sub-questions per turn
+
+_MULTI_ITEM_FORMAT = {
+    "type": "json_schema",
+    "json_schema": {
+        "name": "multi_item_split",
+        "strict": True,
+        "schema": {
+            "type": "object",
+            "properties": {
+                "is_multi": {"type": "boolean"},
+                "sub_questions": {"type": "array", "items": {"type": "string"}},
+                "reason": {"type": "string"},
+            },
+            "required": ["is_multi", "sub_questions", "reason"],
+            "additionalProperties": False,
+        },
+    },
+}
+
+
+def _identifier_tokens(question: str) -> list:
+    """Extract distinct identifier-like tokens (same generic patterns as
+    _has_explicit_identifier): filenames, numeric codes (>=2 digits), ALL-CAPS
+    codes. Filenames are removed before the numeric/caps pass so their parts
+    aren't double-counted. Order-preserving dedupe."""
+    import re
+    q = question or ""
+    file_pat = r"\b[\w\-]+\.[A-Za-z0-9]{2,5}\b"
+    toks = re.findall(file_pat, q)
+    rest = re.sub(file_pat, " ", q)
+    toks += re.findall(r"\b\d{2,}\b", rest)
+    toks += re.findall(r"\b[A-Z][A-Z0-9_]{3,}\b", rest)
+    seen, out = set(), []
+    for t in toks:
+        if t not in seen:
+            seen.add(t)
+            out.append(t)
+    return out
+
+
+def _is_multi_item_candidate(question: str) -> bool:
+    """Deterministic gate: >=2 identifier tokens AND a list separator present.
+    Only candidates pay for the LLM splitter call."""
+    import re
+    if len(_identifier_tokens(question)) < 2:
+        return False
+    return bool(re.search(r"(,|&|\band\b|\bvs\.?\b|\bversus\b)", question or "", re.IGNORECASE))
+
+
+def split_multi_item_question(question: str) -> list:
+    """Return a list of standalone sub-questions when `question` asks the SAME
+    thing about multiple explicit items; otherwise []. LLM output is validated
+    against the deterministically extracted tokens — every sub-question must
+    contain at least one gate token, and collectively they must cover >=2
+    distinct tokens (prevents LLM invention). Fail-safe: no split."""
+    if not _is_multi_item_candidate(question):
+        return []
+    tokens = _identifier_tokens(question)
+
+    system = (
+        "You split a user question into standalone sub-questions, ONE per item, "
+        "ONLY when the question asks the SAME thing about MULTIPLE explicit items "
+        "(e.g. several tags, codes, or filenames).\n\n"
+        "DEFAULT to is_multi=false. Set is_multi=false when:\n"
+        "- the question is about a single item;\n"
+        "- the listed values are combined conditions/filters of ONE question "
+        "(e.g. 'images with gain 100 and exposure 30');\n"
+        "- the parts ask DIFFERENT things (not the same question per item).\n\n"
+        "When is_multi=true: each sub-question must be complete, self-contained, and "
+        "REPHRASED as a SINGULAR single-item lookup — plural wording becomes singular "
+        "('what are tags 12 and 34' -> 'what is tag 12', NOT 'what are tags 12'). "
+        "A 'compare X and Y' question splits into the definition/lookup of X and of Y.\n\n"
+        "Examples (generic):\n"
+        "- 'what are tags 12, 34 and 56' -> is_multi=true, "
+        "['what is tag 12', 'what is tag 34', 'what is tag 56']\n"
+        "- 'give me the jobs for file_a.txt and file_b.txt' -> is_multi=true, "
+        "['what is the job for file_a.txt', 'what is the job for file_b.txt']\n"
+        "- 'how many records with value 100 and status 30' -> is_multi=false "
+        "(combined filters, one question)\n\n"
+        "Return only the JSON object."
+    )
+    try:
+        result = call_local_llm_json(
+            system_prompt=system,
+            user_prompt=f"Question: {question}",
+            temperature=0.0,
+            model=_fast_model(),
+            response_format=_MULTI_ITEM_FORMAT,
+        )
+    except Exception:
+        return []
+
+    if not (isinstance(result, dict) and result.get("is_multi")
+            and isinstance(result.get("sub_questions"), list)):
+        return []
+
+    subs, seen = [], set()
+    for sq in result["sub_questions"]:
+        if isinstance(sq, str) and sq.strip() and sq.strip() not in seen:
+            seen.add(sq.strip())
+            subs.append(sq.strip())
+    subs = subs[:MULTI_ITEM_MAX]
+
+    # Grounding validation against deterministic tokens.
+    if len(subs) < 2:
+        return []
+    covered = set()
+    for sq in subs:
+        hit = [t for t in tokens if t in sq]
+        if not hit:
+            return []  # a sub-question not tied to any real token — reject split
+        covered.update(hit)
+    if len(covered) < 2:
+        return []
+    return subs
+
+
+def run_multi_item_queries(sub_questions: list, collections: list) -> list:
+    """Run each sub-question through the existing per-collection fan-out, in
+    parallel. Returns results in sub-question order."""
+    results = [None] * len(sub_questions)
+    with ThreadPoolExecutor(max_workers=len(sub_questions)) as executor:
+        futures = {
+            executor.submit(run_parallel_queries, collections, sq, True): i
+            for i, sq in enumerate(sub_questions)
+        }
+        for future in as_completed(futures):
+            i = futures[future]
+            try:
+                results[i] = future.result()
+            except Exception as e:
+                results[i] = {"result": f"Error: {e}", "related_sections": [], "collection": None}
+    return results
 
 
 def contextualize_query(question: str, history: list) -> dict:
@@ -554,6 +712,52 @@ def generate_conversational_response(question: str, history: list, retrieved_ans
         return "I'm not sure how to answer that. Please try again."
 
 
+def _answer_multi_item(sub_questions: list, collections: list) -> dict:
+    """Assemble one chat answer from per-item retrieval results. Structured and
+    metadata_sql answers render verbatim (no LLM wrapper — faithfulness); doc
+    answers get the usual concise per-item synthesis; missing items get the
+    clean not-found line (CHAT-05), never fabricated content."""
+    results = run_multi_item_queries(sub_questions, collections)
+
+    sections = []
+    first_collection = None
+    queried = []
+    for sq, r in zip(sub_questions, results):
+        r = r or {}
+        primary = _result_to_text(r.get("result", "No answer found."))
+        if any(m in primary for m in ("No answer found", "No record found", "No exact match found")):
+            body = "No information found in the knowledge base for this item."
+        elif r.get("method") == "metadata_sql":
+            body = primary
+        else:
+            kind = classify_answer_kind(r.get("method"), r.get("answer_payload"))
+            if kind == "structured":
+                body = primary
+            else:
+                body = generate_conversational_response(
+                    sq, [], retrieved_answer=primary,
+                    primary_answer=primary, answer_kind=kind)
+            if first_collection is None:
+                first_collection = r.get("collection")
+        for c in r.get("collections_queried") or ([r.get("collection")] if r.get("collection") else []):
+            if c and c not in queried:
+                queried.append(c)
+        sections.append(f"**{sq}**\n{body}")
+
+    content = "\n\n".join(sections)
+    return {
+        "role": "assistant",
+        "content": content,
+        "method": "retrieval",
+        "collection": first_collection or (queried[0] if queried else None),
+        "collections_queried": queried or collections,
+        "related_sections": [],
+        "answer_kind": "multi_item",
+        "raw_answer": content,
+        "answer_payload": None,
+    }
+
+
 def chat_turn(question: str, history: list, available_collections: list) -> dict:
     """
     Process one chat turn. Returns:
@@ -587,8 +791,18 @@ def chat_turn(question: str, history: list, available_collections: list) -> dict
     if DEBUG:
         print("DEBUG contextualize:", ctx)
 
+    # Step 1c (CODE-023): multi-item questions — deterministic gate, LLM split,
+    # per-item fan-out, merged per-item answer. Single-item questions skip this
+    # entirely (gate fails before any LLM call).
+    sub_questions = split_multi_item_question(standalone_question)
+
     # Step 2: select collections (1–3, ranked by relevance)
     collections = select_collections(standalone_question, effective_history, available_collections)
+
+    if sub_questions and collections:
+        if DEBUG:
+            print("DEBUG multi-item split:", sub_questions)
+        return _answer_multi_item(sub_questions, collections)
     if not collections:
         return {
             "role": "assistant",

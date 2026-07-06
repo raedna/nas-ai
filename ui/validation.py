@@ -56,7 +56,17 @@ def render_validation_panel():
 # ===========================================================================
 def _schema_section():
     ui.label("Schema Info & Overrides").classes("text-lg font-bold")
+    container = ui.column().classes("w-full")
 
+    def build():
+        container.clear()
+        with container:
+            _build_schema_section(build)
+
+    build()
+
+
+def _build_schema_section(rebuild_cb):
     ensure_schemas_table()
     db_schemas = list_schemas_from_db()
     disk_schemas = sorted(SCHEMAS_DIR.glob("*_schema.json")) if SCHEMAS_DIR.exists() else []
@@ -70,6 +80,39 @@ def _schema_section():
     if not schema_options:
         ui.label("No schema files found in PostgreSQL or on disk.").classes("text-gray-500")
         return
+
+    # --- Bulk delete -------------------------------------------------------
+    _db_labels = [f"{r['collection_name']}/{r['source_file_stem']}" for r in db_schemas]
+    if _db_labels:
+        with ui.expansion("Bulk delete schemas (PostgreSQL)", icon="delete").classes(
+                "w-full max-w-xl"):
+            bulk = ui.select(_db_labels, multiple=True,
+                             label="Schemas to delete").props(
+                "outlined dense use-chips").classes("w-full")
+
+            def do_bulk_delete():
+                targets = list(bulk.value or [])
+                if not targets:
+                    ui.notify("Nothing selected", type="warning")
+                    return
+                with ui.dialog() as dlg, ui.card():
+                    ui.label(f"Delete {len(targets)} schema(s) from PostgreSQL?").classes(
+                        "font-medium")
+                    for t in targets:
+                        ui.label(f"• {t}").classes("text-sm text-gray-700")
+                    with ui.row().classes("gap-2 mt-2"):
+                        def _confirm():
+                            for t in targets:
+                                c, s = t.split("/", 1)
+                                delete_schema_from_db(c, s)
+                            dlg.close()
+                            ui.notify(f"Deleted {len(targets)} schema(s)", type="warning")
+                            rebuild_cb()
+                        ui.button("Delete", on_click=_confirm).props("unelevated color=red")
+                        ui.button("Cancel", on_click=dlg.close).props("flat")
+                dlg.open()
+
+            ui.button("Delete selected…", on_click=do_bulk_delete).props("outline color=red")
 
     sel = ui.select(schema_options, value=schema_options[0], label="Select schema").props(
         "outlined dense").classes("w-full max-w-xl")
@@ -89,13 +132,15 @@ def _schema_section():
             schema = _load_json(SCHEMAS_DIR / fname, {})
 
         with body:
-            _render_schema_editor(schema, collection_name_sel, source_stem_sel, selected, load_selected)
+            _render_schema_editor(schema, collection_name_sel, source_stem_sel, selected,
+                                  load_selected, delete_cb=rebuild_cb)
 
     sel.on_value_change(lambda: load_selected())
     load_selected()
 
 
-def _render_schema_editor(schema, collection_name_sel, source_stem_sel, selected_schema, reload_cb):
+def _render_schema_editor(schema, collection_name_sel, source_stem_sel, selected_schema,
+                          reload_cb, delete_cb=None):
     ui.markdown("### Schema")
     ui.label("Current schema. Edit below and save to update.").classes("text-sm text-gray-600")
     ui.code(json.dumps(schema, indent=2, ensure_ascii=False), language="json").classes(
@@ -145,6 +190,8 @@ def _render_schema_editor(schema, collection_name_sel, source_stem_sel, selected
     type_ms = _ms("Type field(s)", "type")
     enum_value_ms = _ms("Enum value field(s)", "enum_value")
     enum_name_ms = _ms("Enum name field(s)", "enum_name")
+    tags_ms = _ms("Tags field(s)", "tags")
+    other_ms = _ms("Other field(s) — kept in labeled fields, searchable", "other")
 
     subtype_default = schema.get("structured_subtype", "")
     subtype_sel = ui.select(
@@ -187,6 +234,17 @@ def _render_schema_editor(schema, collection_name_sel, source_stem_sel, selected
             "enum_name": enum_name_ms.value or [],
             "structured_subtype": subtype_sel.value or "",
         }
+        # NEVER drop columns on save: every known column not assigned to any
+        # role is auto-added to 'other' — an unassigned column silently
+        # vanishes from serialization otherwise (lost 'Recon Tool File
+        # Format' twice before this guard).
+        new_schema["tags"] = tags_ms.value or []
+        new_schema["other"] = list(other_ms.value or [])
+        _assigned = {c for cols in new_schema.values()
+                     if isinstance(cols, list) for c in cols}
+        for c in all_fields:
+            if c not in _assigned:
+                new_schema["other"].append(c)
         if collection_name_sel and source_stem_sel:
             save_schema_to_db(new_schema, collection_name_sel, source_stem_sel)
             ui.notify(f"Saved schema to PostgreSQL: {collection_name_sel}/{source_stem_sel}", type="positive")
@@ -200,7 +258,7 @@ def _render_schema_editor(schema, collection_name_sel, source_stem_sel, selected
     def do_delete():
         delete_schema_from_db(collection_name_sel, source_stem_sel)
         ui.notify(f"Deleted schema: {collection_name_sel}/{source_stem_sel}", type="warning")
-        reload_cb()
+        (delete_cb or reload_cb)()  # full section rebuild so the dropdown updates
 
     with ui.row().classes("gap-2 mt-2"):
         ui.button("Save schema", on_click=do_save).props("unelevated")

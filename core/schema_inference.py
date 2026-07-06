@@ -195,10 +195,24 @@ def migrate_schemas_from_disk(schemas_dir, dry_run=False):
 # LLM schema inference
 # ---------------------------------------------------------------------------
 
+def _schema_model():
+    """Optional dedicated model for schema inference (config:
+    local_llm.schema_model). Schema inference runs once per file, offline —
+    it can afford a bigger/slower model than the chat path. Falls back to the
+    default model when unset."""
+    try:
+        from core.local_llm_client import load_nlp_config
+        return load_nlp_config().get("local_llm", {}).get("schema_model") or None
+    except Exception:
+        return None
+
+
 def llm_infer_schema(rows, roles_config):
     """
-    Use QWEN 2.5 14B to infer column-to-role mapping from column names + sample values.
-    Falls back to heuristic infer_schema() if LLM unavailable or returns invalid result.
+    LLM column-to-role mapping from column names + sample values + cardinality.
+    Uses local_llm.schema_model when configured (bigger model for judgment),
+    else the default model. Falls back to heuristic infer_schema() if LLM
+    unavailable or returns invalid result.
     """
     try:
         from core.local_llm_client import call_local_llm_json
@@ -239,7 +253,12 @@ def llm_infer_schema(rows, roles_config):
                   f"({len(all_columns)} -> {len(columns)})")
 
         import re
-        _fname_pat = re.compile(r'^\w+\.[A-Za-z]{2,4}$')
+        # Filename-valued columns: core signal is "ends in a dot-extension".
+        # The body allows word chars, hyphens, spaces, $, &, commas and inner
+        # dots — real-world names like 'boa cash.csv', 'confirmed
+        # trades.MOORE.txt', 'OTC_DCM_1_$y4$m4$d4.csv' (verified on live data:
+        # filename columns score 87-100%, all others 0%).
+        _fname_pat = re.compile(r'^[\w\-\$&., ]*\.[A-Za-z][A-Za-z0-9]{1,3}$')
         def _is_filename_col(col):
             vals = [str(r.get(col) or "").strip() for r in _sample_rows]
             vals = [v for v in vals if v not in ("", "None", "nan")]
@@ -248,10 +267,15 @@ def llm_infer_schema(rows, roles_config):
             hits = sum(1 for v in vals if _fname_pat.match(v))
             return hits / len(vals) >= 0.7
 
+        # Constrain, don't hide: filename columns STAY in the LLM prompt — the
+        # LLM must choose which is the primary identifier vs alias vs reference,
+        # and it can't do that for columns it never sees. Their allowed roles
+        # are restricted to identifier/aliases/reference_identifier via a prompt
+        # note and enforced after the LLM responds.
         _filename_cols = [c for c in columns if _is_filename_col(c)]
-        columns = [c for c in columns if c not in _filename_cols]
         if _filename_cols:
-            print(f"[SCHEMA LLM] pre-classified as filename/script -> reference_identifier: {_filename_cols}")
+            print(f"[SCHEMA LLM] filename-valued columns (roles constrained to "
+                  f"identifier/aliases/reference_identifier): {_filename_cols}")
 
         # Final safety net: only bail if STILL very wide after pruning real columns.
         if len(columns) > 40:
@@ -327,10 +351,23 @@ def llm_infer_schema(rows, roles_config):
             "- Return only JSON mapping each role to its list of columns"
         )
 
+        _fname_note = ""
+        if _filename_cols:
+            _fname_note = (
+                f"\nFilename-valued columns: {_filename_cols}. These may ONLY be "
+                "classified as identifier, aliases, or reference_identifier — never "
+                "type, description, tags, or other. Among them: the table's OWN "
+                "file/record key (the name users refer to the record by) is the "
+                "identifier; an equivalent external/source system's filename for the "
+                "same record is aliases; a script or unrelated file reference is "
+                "reference_identifier.\n"
+            )
+
         user_prompt = (
             f"Columns: {columns}\n\n"
             f"Cardinality (distinct values per column — use this for identifier vs type):\n{card_lines}\n\n"
-            f"Sample values (5 most populated rows):\n{json.dumps(samples, indent=2)}\n\n"
+            f"Sample values (5 most populated rows):\n{json.dumps(samples, indent=2)}\n"
+            f"{_fname_note}\n"
             f"Map each column to one of: {available_roles}\n\n"
             "Think step by step: which column is near-unique (the identifier)? "
             "Which is a human-readable name? Which are low-cardinality categories (type)?"
@@ -355,8 +392,12 @@ def llm_infer_schema(rows, roles_config):
             },
         }
 
+        _model = _schema_model()
+        if _model:
+            print(f"[SCHEMA LLM] using schema model: {_model}")
         result = call_local_llm_json(
             system_prompt, user_prompt, temperature=0.0,
+            model=_model,
             response_format=response_format,
         )
 
@@ -377,9 +418,57 @@ def llm_infer_schema(rows, roles_config):
                     deduped.setdefault(role, []).append(col)
         result = deduped
 
+        # Enforce the filename-role constraint: a filename column belongs in a
+        # NAME-class role (identifier/primary_name/aliases/reference_identifier).
+        # The original SCHEMA-01 bug (filename -> type/description) stays
+        # impossible, but the LLM chooses WHICH filename column plays which
+        # name role. primary_name is allowed — tables whose records ARE files
+        # legitimately display them by filename (e.g. FIXMLFileName).
+        _fn_allowed = ("identifier", "primary_name", "aliases", "reference_identifier")
+
+        def _near_unique(col):
+            d, t = _card.get(col, (0, 0))
+            return t >= 5 and d / t >= 0.9
+
         for col in _filename_cols:
-            result.setdefault("reference_identifier", []).append(col)
-            seen.add(col)
+            if col in seen:
+                _placed = next((r for r, cols_ in result.items() if col in (cols_ or [])), None)
+                if _placed and _placed not in _fn_allowed:
+                    result[_placed].remove(col)
+                    result.setdefault("reference_identifier", []).append(col)
+                    print(f"[SCHEMA LLM] moved filename column '{col}' from "
+                          f"'{_placed}' to reference_identifier (constraint)")
+                elif _placed in ("identifier", "primary_name", "aliases") and not _near_unique(col):
+                    # 1:1 name roles — a filename shared across many rows (low
+                    # cardinality, e.g. a script) cannot be one; it is a reference.
+                    result[_placed].remove(col)
+                    result.setdefault("reference_identifier", []).append(col)
+                    print(f"[SCHEMA LLM] moved filename column '{col}' from "
+                          f"'{_placed}' to reference_identifier (not near-unique)")
+            else:
+                result.setdefault("reference_identifier", []).append(col)
+                seen.add(col)
+
+        # Deterministic tie-break: when 2+ NEAR-UNIQUE filename columns compete
+        # for the record key, the LEFTMOST in the source file wins identifier
+        # (table convention — authors lead with the key the table is organized
+        # around); the rest become aliases. Ends LLM coin-flips between
+        # equivalent name columns across re-ingests. Only fires when the LLM
+        # itself put a filename column in identifier.
+        _fn_keys = [c for c in all_columns if c in _filename_cols and _near_unique(c)]
+        if len(_fn_keys) >= 2 and any(c in (result.get("identifier") or []) for c in _fn_keys):
+            _leader = _fn_keys[0]  # all_columns preserves source column order
+            if (result.get("identifier") or []) != [_leader]:
+                _former = list(result.get("identifier") or [])
+                # Strip the competing filename keys from EVERY role before
+                # reassigning — a leftover copy (e.g. in reference_identifier)
+                # makes the downstream dedupe empty the identifier again.
+                for role in list(result.keys()):
+                    result[role] = [c for c in (result.get(role) or []) if c not in _fn_keys]
+                result["identifier"] = [_leader] + [c for c in _former if c not in _fn_keys]
+                result.setdefault("aliases", []).extend(c for c in _fn_keys if c != _leader)
+                print(f"[SCHEMA LLM] filename-key tie-break: identifier -> '{_leader}' "
+                      f"(leftmost); aliases += {[c for c in _fn_keys if c != _leader]}")
 
         # Any column the model omitted, plus the pruned near-empty columns, -> 'other'
         # (full accounting of every original column; no silent loss).

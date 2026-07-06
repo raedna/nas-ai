@@ -37,7 +37,7 @@
 | ID | Area | Description | Status |
 |---|---|---|---|
 | RET-010 | Structured planner | Ranking balance for phrases like "executing broker" in long descriptions. | Resolved — planner removed entirely (see CODE-030) |
-| CODE-005 | xml_serializer.py | Function-level state (`_all_rows`, `_files_seen`) for cross-file buffering — corrupts silently on crash. | Pending |
+| CODE-005 | xml_serializer.py | Function-level state (`_all_rows`, `_files_seen`) for cross-file buffering — corrupts silently on crash. | Partially resolved — buffer now reset unconditionally after full finalize (stale state was triggering a FULL finalize per file on re-ingest: re-embedding + duplicate upserts); schema failure of one file no longer aborts the batch. Function-attr design itself still pending replacement |
 | CODE-010 | ingestion | Collection name mismatch between UI and PostgreSQL collections table causes ForeignKeyViolation. | Pending |
 | CODE-012 | ui | Ask/Chat tabs need a "Clear cache" button | Pending |
 | CODE-013 | ui | BM25/lexical candidates not shown in debug panel | Pending |
@@ -46,7 +46,7 @@
 | CODE-020 | concept_vector_builder.py | Single-file/entity_row collections grouped by source_file — useless labels | **Resolved** — CV-01/02/03/04 (see below) |
 | CODE-021 | related_titles_linker.py | Obsidian wikilinks not persisted to cross_links table | **Resolved** — 43 wikilinks confirmed |
 | CODE-022 | ui / knowledge_graph.py | No Knowledge Graph UI | **Resolved** — full tab built: graph, concept clusters, cross-link review (grouped by target), build, danger zone |
-| CODE-023 | chat_engine.py | Multi-item queries ("tags 453, 452, and 448") only retrieve one item | Pending — LLM extracts identifier list, fan out parallel queries, merge results |
+| CODE-023 | chat_engine.py | Multi-item queries ("tags 453, 452, and 448") only retrieve one item | **Resolved** — deterministic gate (≥2 identifier tokens + separator), LLM splitter (grounded validation, cap 5), parallel fan-out via run_parallel_queries(single_item=True), per-item merged answer. smoke_multi_item.py 18/18 |
 | CODE-024 | recon_assist_file | NULL primary_name/identifier rows from merged Excel cells. Concrete impact: `primary_name contains Goldman` returns 15 not 16 (one Goldman row has NULL job name) | Pending — Data Prep Excel upload + forward-fill (CODE-025) is the fix path |
 | CODE-025 | ui_data_prep.py | Data Prep tab only accepts CSV — add Excel (.xlsx) upload with sheet selector + forward-fill | Pending |
 | CODE-026 | ui_data_prep.py | Add PostgreSQL chunk editor — load collection chunks, edit payload fields inline, save with confirmation | Pending |
@@ -320,14 +320,78 @@ Also confirmed via this investigation: `nlp_text` (dedicated PostgreSQL column) 
 
 ---
 
+---
+
+## Session 2026-07-05/06 — Multi-item chat, schema inference overhaul, metadata-query hardening
+
+**All smoke suites green at session end: FIX 13/13, RECON 10/10, KB, OBS, BBG, multi_item 18/18.**
+
+### Multi-item chat queries (CODE-023 — RESOLVED)
+- `chat_engine.py`: deterministic gate (`_is_multi_item_candidate` — ≥2 identifier tokens + list separator, zero LLM cost for single-item), LLM splitter with grounded validation (every sub-question must contain a real token; cap `MULTI_ITEM_MAX=5`; fail-safe no-split), parallel per-item fan-out, merged per-item answer (structured verbatim, doc synthesized, missing = clean not-found).
+- `router.py`: new `single_item` param — a split sub-query targets exactly one identifier by construction, so discovery/comparison intent classifications are overridden to `answer` (fixed plural-phrasing sub-questions being routed to discovery).
+- New test: `tests/smoke_multi_item.py` (gate 9 offline cases, splitter 4 live cases, 5 e2e chat cases incl. strengthened REG-02 that cannot false-pass on not-found).
+
+### Reference-identifier / alias searchability (new — fixes DL-02/DL-05 class)
+- `table_serializer.py`: reference_identifier role values → `reference_identifiers` payload list + namespaced link_keys.
+- `nlp_generator.py`: reference values appended to structured nlp_text ("References: ...").
+- `db_retrieval.get_by_identifier`: on miss, exact fallback against `reference_identifiers`/`aliases` payload arrays — a record is findable by ANY of its exact names.
+- chat Tier 1: queried `payload->>'identifier'` (never populated) — now the real `identifier` column + the payload arrays; dead procedural-skip block removed.
+- `run_parallel_queries`: empty-answer detection expanded ("Found 0 item(s)", "0 record(s)", etc.) — zero-result answers no longer win the fan-out.
+
+### Metadata SQL query path — variance armor (MQ-01/MQ-02 mitigations)
+All deterministic, in `metadata_query.py`:
+- **Tautology guard**: list/group target colliding with an equals-filter field → retarget to identifier.
+- **Degenerate-result fallback**: empty list / filter-echo list / empty group_by → return None → discovery engine.
+- **Record listings**: identifier target lists `identifier — primary_name`; primary_name target gets truncated description companion; markdown-safe (code spans, real bullets); every answer states its filters.
+- **Preemptive concept-vector override scoped to group_by only** — it was an unguarded embedding argmax that repeatedly replaced correct LLM picks on list questions (FIX-06/07, astro dates, RECON-06).
+- **System-key exclusion** (`_SYSTEM_KEYS`): pipeline bookkeeping (doc_type, type_field, link_keys, ...) no longer offered as filter/target fields.
+- **description_fields expansion**: labeled source columns (DataType, Recon Tool File Format, ...) are first-class queryable fields with grounded value lists.
+- **Constant-field exclusion**: fields with 1 distinct value collection-wide dropped (source_file in single-file collections).
+- **Schema grounding**: extraction prompt now includes role → source-column meanings via `_collection_schema` (merges ALL stored schemas — the old `(collection, collection)` lookup silently missed every real stem).
+- **Role-name matcher** (single-schema collections only): question token compact-matches a role's source column ("files" ⊂ "Moore file name") and the LLM's target matches nothing → retarget; tie between roles → identifier wins only when the pick's tokens are a subset of identifier's; self-match protected ("dates" → date-obs kept).
+- **Intent-mode coercion**: router passes `intent_mode`; a list-intent question whose spec came out count (or vice versa) is coerced — spec extraction can no longer overrule the upstream classifier.
+
+### Schema inference overhaul (LLM perception + deterministic structure)
+- `schema_inference.py`: filename pre-pass now **constrains instead of hides** — filename columns stay in the LLM prompt (pattern broadened: spaces/$/&/multi-dot, verified 87–100% vs 0% separation on live data), allowed roles identifier/primary_name/aliases/reference_identifier, enforced post-hoc; non-near-unique filename in a 1:1 role → reference_identifier; **leftmost near-unique filename key wins identifier ties** (stripped from every role before reassignment — leftover copies emptied identifier via refine_schema_roles dedupe).
+- `schema_inference_table.py`: **LLM-primary** (heuristic only when LLM unreachable), **never persists a junk schema** (raises visibly), legacy disk-JSON resurrection removed, `schema_model` config for a dedicated (larger) inference model — wiring verified, config key on the box still to be fixed (no `using schema model` line yet).
+- `xml_serializer.py`: `_correct_detail_table_keys` — batch-level parent-key correction (a table containing another table's identifier with ≥80% value overlap, own key unreferenced → detail table keyed by parent; sibling twins whose shared column is each's own identifier don't count as referencing); displaced key → primary_name when vacant; **discriminator correction** (aliases-class column completing a near-unique composite with the parent key → enum_value); merged-twin schema picked by most non-empty roles instead of first.
+- `local_llm_client.py`: `max_tokens` cap (config, default 1024 — a runaway generation no longer burns the 300s timeout) + failures now log exception class/message instead of silent None.
+- Verification assets: `diag_schema_all.py` (fleet-wide stored-vs-inferred diff, per-source-file, comparison limited to reconstructable columns), `diag_schema_ab.py` (old pure-LLM from git vs current pipeline, scored vs ground truth — result: old era was 2/5 too; identifier/alias correctness came from the old deterministic collapse, not the LLM), `diag_schema_recon.py` (superseded by _all).
+
+### Ingestion & UI
+- Ingestion warnings: unreachable source path / no path / 0 files discovered / per-reason skip & fail summaries — orange "finished with warnings" instead of green zeros; per-file Reason column.
+- Schema editor: **Tags and Other roles now visible and editable**; save NEVER drops columns (unassigned → other) — the invisible-other bug silently deleted "Recon Tool File Format" from serialization twice.
+- Bulk schema delete (multi-select + confirm dialog); single delete refreshes the dropdown.
+
+### Recon collection final state (verified 10/10)
+identifier=Moore file name · primary_name=Tidal Job Name (manual pin — proven 14B blind spot, 6+ runs never picked it) · aliases=Prime Broker file name · reference=Date Column to Check, Move Script · type=Prime Broker, Recon Tool Data Source, Active, Included in Email Alert · other=Recon Tool File Format + note column.
+
+### Key learnings (this session)
+- **LLM for perception, math for constraints**: every schema/spec failure was an unguarded LLM pick; every fix was either grounding (real values, schema meanings, upstream intent) or a structural invariant (tautology, cardinality, composite keys, leftmost convention). Guards are no-ops when the model is right — model upgrades need no code changes.
+- **A saved wrong schema is worse than no schema** — it short-circuits every future ingest. Never persist junk; fail loudly.
+- **The UI process caches code** — every fix needs a restart before retesting; half the "still fails" reports were stale processes.
+- **LM Studio serves chat + embeddings + schema calls on one queue** — testing during ingestion starves both; schema failures mid-ingest were contention, not code.
+- **Retrieval-capped counts as fallback are confidently wrong** — a failed exact count should say "couldn't determine", not return top-k as truth (future item).
+- **Union of multi-file schemas is mush** — role-level machinery must scope to single-schema collections or work per source file.
+
+### New/open tickets
+| ID | Description |
+|---|---|
+| BG-01 | background_tasks has no heartbeat — rows stay 'running' forever if the process dies. Startup sweep (auto-cancel orphans) + stale marker |
+| UI-03 | NiceGUI "parent slot deleted" noise — background/timer UI updates need liveness guard |
+| MODEL-01 | `schema_model` config key not resolving on the box (no "using schema model" line) — fix key/id, then Qwen3-VL-32B Q4 serves schema inference via JIT load |
+| DESIGN-01 | Astro/personal collections: workflow profiles (config flags per collection controlling metadata-SQL/count/routing behavior) instead of one pipeline for work + personal domains |
+| INGEST-01 | Debug-print cleanup in xml_serializer/orchestrator (DEBUG LINK INDEX block incl. stale "CHECK TAG 22" check, FILES_SEEN/ALL_ROWS/sample-keys, PRE/POST-MERGE 21R2 lines) — gate behind config or delete |
+| CTM-01 | CTM XML ingest prep: parser fit check on a sample file first (nested message-style XML vs FIX's attribute-row shape); DTCC specs are login-gated on DTCC Learning, not public |
+| DATA-01 | Datatypes_FIX44 has no schema/chunks (LLM failed during its window, fails loudly now) — re-ingest when LM Studio idle, or via schema_model once MODEL-01 fixed |
+
 ## Next Session Priorities
 
-1. **Re-run AG-05/AG-09** (M42 images, gain 100) after M51/astro_test re-ingest with metadata coalescing — expect 276-class answers stable now.
-2. **Finish eval retest** — AG remainder, then XC (cross-collection) and MI (multi-item, CODE-023) buckets, which are the two largest unaddressed failure groups.
-3. **CODE-023** — multi-item parallel chat queries (tags 22, 35, 54) — 3.5/4 eval failures.
-4. **Chat routing hardening** — DL-08/PP-03 hallucination-adjacent fallback when routing selects no collection; kb_docs/obsidian wrong-twin ranking (near-replica content).
-5. **Aliases searchability (DL-05)** — "PB filename" role-aware lookup/synthesis.
-6. **Astro synthesis (DL-06/DL-10)** — record found but details not rendered for astro_catalog.
-7. **CL-04** — wikilink traversal in router (surface 4.2 → 4.3.1 chain).
-8. **CODE-025/026** — Data Prep Excel upload + ffill (fixes CODE-024 Goldman NULL row), PostgreSQL chunk editor.
-9. Phase 3.5 NER cross-linking (CL-03/CL-05); full BBG ingest (69k); CV-03b revisit with larger model.
+1. **MODEL-01** — fix `schema_model` config; re-ingest Datatypes_FIX44 (DATA-01) as the 32B's first live test before CTM.
+2. **Eval retest** (NAS_AI_Retrieval_Eval_v1.md) — full pass: MI bucket should flip to ✅; DL-02/05, AG/RECON buckets re-scored; XC remains the largest unaddressed group.
+3. **Chat routing hardening** — DL-08/PP-03 no-collection fallback; kb_docs/obsidian wrong-twin ranking.
+4. **CL-04** — wikilink traversal in router (4.2 → 4.3.1 chain).
+5. **CODE-025/026** — Data Prep Excel upload + ffill (fixes CODE-024 Goldman NULL row), PostgreSQL chunk editor.
+6. **CTM-01** — sample-file parse + schema dry-run when the file is ready.
+7. Honest count fallback ("couldn't determine" instead of retrieval-capped number); BG-01/UI-03/INGEST-01 cleanups.
+8. Phase 3.5 NER cross-linking (CL-03/CL-05); full BBG ingest (69k); CV-03b revisit with the 32B; astro synthesis (DL-06/DL-10); DESIGN-01 workflow profiles.

@@ -24,6 +24,7 @@ _FILE_COLUMNS = [
     {"name": "success", "label": "Success", "field": "success", "align": "left"},
     {"name": "skipped", "label": "Skipped", "field": "skipped", "align": "left"},
     {"name": "chunks_created", "label": "Chunks", "field": "chunks_created"},
+    {"name": "reason", "label": "Reason", "field": "reason", "align": "left"},
     {"name": "error", "label": "Error", "field": "error", "align": "left"},
     {"name": "metadata", "label": "Metadata", "field": "metadata", "align": "left"},
 ]
@@ -118,7 +119,31 @@ def render_ingestion_panel():
         res = res or {}
         result_box.clear()
         with result_box:
-            ui.label("Ingestion complete.").classes("text-green-700 font-medium")
+            _warns = list(res.get("warnings") or [])
+
+            # Summarize skip/fail reasons in the headline, not just the table.
+            _skip_reasons, _fail_reasons = {}, {}
+            for fr in res.get("results", []) or []:
+                _r = (getattr(fr, "metadata", {}) or {}).get("reason") or ""
+                if getattr(fr, "error", None):
+                    _fail_reasons[getattr(fr, "error")] = _fail_reasons.get(getattr(fr, "error"), 0) + 1
+                elif getattr(fr, "skipped", False):
+                    _skip_reasons[_r or "unknown"] = _skip_reasons.get(_r or "unknown", 0) + 1
+            for _r, _n in sorted(_skip_reasons.items()):
+                _hint = " — use Force re-ingest to override" if "hash" in _r or "unchanged" in _r else ""
+                _warns.append(f"{_n} file(s) skipped: {_r}{_hint}")
+            for _r, _n in sorted(_fail_reasons.items()):
+                _warns.append(f"{_n} file(s) FAILED: {_r}")
+            if (res.get("processed_files") or 0) == 0 and (res.get("total_files") or 0) > 0:
+                _warns.append("Nothing was ingested — 0 files processed.")
+
+            if _warns:
+                ui.label("Ingestion finished with warnings.").classes(
+                    "text-orange-700 font-medium")
+                for _w in _warns:
+                    ui.label(f"⚠ {_w}").classes("text-sm text-orange-700")
+            else:
+                ui.label("Ingestion complete.").classes("text-green-700 font-medium")
             with ui.row().classes("gap-8"):
                 for key, lbl in _METRICS:
                     with ui.column().classes("items-center"):
@@ -137,6 +162,7 @@ def render_ingestion_panel():
                     "success": "✓" if getattr(fr, "success", False) else "",
                     "skipped": "✓" if getattr(fr, "skipped", False) else "",
                     "chunks_created": getattr(fr, "chunks_created", 0),
+                    "reason": (getattr(fr, "metadata", {}) or {}).get("reason", ""),
                     "error": getattr(fr, "error", "") or "",
                     "metadata": json.dumps(getattr(fr, "metadata", {}) or {}),
                 })
