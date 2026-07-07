@@ -122,6 +122,175 @@ def _get_tag_value(decoded_rows: List[Dict[str, Any]], tag: str) -> str:
 
     return ""
 
+def _message_group_key(msg: Dict[str, Any]) -> str:
+    """
+    Conservative grouping key.
+
+    Prefer order identifiers that should represent the same lifecycle.
+    ExecID is not used as the primary group because every fill can have a unique ExecID.
+    """
+    order_id = str(msg.get("order_id") or "").strip()
+    secondary_order_id = str(msg.get("secondary_order_id") or "").strip()
+    cl_ord_id = str(msg.get("cl_ord_id") or "").strip()
+
+    if order_id:
+        return f"order_id:{order_id}"
+
+    if secondary_order_id:
+        return f"secondary_order_id:{secondary_order_id}"
+
+    if cl_ord_id:
+        return f"cl_ord_id:{cl_ord_id}"
+
+    return f"ungrouped:message:{msg.get('message_index')}"
+
+
+def _message_group_label(msg: Dict[str, Any]) -> str:
+    order_id = str(msg.get("order_id") or "").strip()
+    secondary_order_id = str(msg.get("secondary_order_id") or "").strip()
+    cl_ord_id = str(msg.get("cl_ord_id") or "").strip()
+
+    parts = []
+
+    if cl_ord_id:
+        parts.append(f"ClOrdID {cl_ord_id}")
+
+    if order_id:
+        parts.append(f"OrderID {order_id}")
+
+    if secondary_order_id:
+        parts.append(f"SecondaryOrderID {secondary_order_id}")
+
+    if parts:
+        return " / ".join(parts)
+
+    return f"Ungrouped message {msg.get('message_index')}"
+
+
+def _message_identifier_tokens(msg: Dict[str, Any]) -> List[str]:
+    tokens: List[str] = []
+
+    for field, prefix in [
+        ("cl_ord_id", "cl_ord_id"),
+        ("order_id", "order_id"),
+        ("secondary_order_id", "secondary_order_id"),
+    ]:
+        value = str(msg.get(field) or "").strip()
+        if value:
+            tokens.append(f"{prefix}:{value}")
+
+    return tokens
+
+
+def _build_message_groups(messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """
+    Build related groups using linked identifiers.
+
+    Example:
+    - Message 1 only has ClOrdID CL1
+    - Message 2 has ClOrdID CL1 and OrderID ORD1
+
+    These should be one group because they share ClOrdID CL1.
+    """
+    groups: List[Dict[str, Any]] = []
+
+    for msg in messages:
+        tokens = _message_identifier_tokens(msg)
+
+        matching_groups = []
+
+        for group in groups:
+            group_tokens = set(group.get("identifier_tokens") or [])
+            if tokens and group_tokens.intersection(tokens):
+                matching_groups.append(group)
+
+        if not matching_groups:
+            if tokens:
+                group_key = tokens[0]
+            else:
+                group_key = f"ungrouped:message:{msg.get('message_index')}"
+
+            group = {
+                "group_key": group_key,
+                "group_label": "",
+                "identifier_tokens": list(tokens),
+                "message_count": 0,
+                "message_indexes": [],
+                "cl_ord_ids": [],
+                "order_ids": [],
+                "secondary_order_ids": [],
+                "exec_ids": [],
+                "messages": [],
+            }
+
+            groups.append(group)
+
+        else:
+            group = matching_groups[0]
+
+            # Merge any additional matching groups into the first group.
+            for extra_group in matching_groups[1:]:
+                for key in [
+                    "identifier_tokens",
+                    "message_indexes",
+                    "cl_ord_ids",
+                    "order_ids",
+                    "secondary_order_ids",
+                    "exec_ids",
+                    "messages",
+                ]:
+                    for value in extra_group.get(key) or []:
+                        if value not in group[key]:
+                            group[key].append(value)
+
+                group["message_count"] += extra_group.get("message_count") or 0
+                groups.remove(extra_group)
+
+            for token in tokens:
+                if token not in group["identifier_tokens"]:
+                    group["identifier_tokens"].append(token)
+
+        group["message_count"] += 1
+        group["message_indexes"].append(msg.get("message_index"))
+        group["messages"].append(msg)
+
+        for source_field, target_field in [
+            ("cl_ord_id", "cl_ord_ids"),
+            ("order_id", "order_ids"),
+            ("secondary_order_id", "secondary_order_ids"),
+            ("exec_id", "exec_ids"),
+        ]:
+            value = str(msg.get(source_field) or "").strip()
+            if value and value not in group[target_field]:
+                group[target_field].append(value)
+
+    for group in groups:
+        label_parts = []
+
+        if group.get("cl_ord_ids"):
+            label_parts.append("ClOrdID " + ", ".join(group["cl_ord_ids"]))
+
+        if group.get("order_ids"):
+            label_parts.append("OrderID " + ", ".join(group["order_ids"]))
+
+        if group.get("secondary_order_ids"):
+            label_parts.append("SecondaryOrderID " + ", ".join(group["secondary_order_ids"]))
+
+        group["group_label"] = " / ".join(label_parts) or f"Ungrouped message {group['message_indexes'][0]}"
+
+        for msg in group.get("messages") or []:
+            msg["group_key"] = group["group_key"]
+            msg["group_label"] = group["group_label"]
+
+    groups.sort(
+        key=lambda group: (
+            1 if str(group.get("group_key") or "").startswith("ungrouped:") else 0,
+            min(group.get("message_indexes") or [999999]),
+        )
+    )
+
+    return groups
+
 def analyze_fix_sequence(raw_text: str) -> Dict[str, Any]:
     """
     Analyze a pasted/uploaded block that may contain multiple FIX messages.
@@ -156,9 +325,22 @@ def analyze_fix_sequence(raw_text: str) -> Dict[str, Any]:
             "msg_seq_num": _get_nested(business_object, "message", "message_sequence_number"),
             "sending_time": _get_nested(business_object, "message", "sending_time"),
 
-            "cl_ord_id": _get_nested(business_object, "order", "client_order_id"),
-            "order_id": _get_nested(business_object, "order", "order_id"),
-            "exec_id": _get_nested(business_object, "order", "execution_id"),
+            "cl_ord_id": (
+                _get_nested(business_object, "order", "client_order_id")
+                or _get_tag_value(decoded_rows, "11")
+            ),
+            "order_id": (
+                _get_nested(business_object, "order", "order_id")
+                or _get_tag_value(decoded_rows, "37")
+            ),
+            "secondary_order_id": (
+                _get_nested(business_object, "order", "secondary_order_id")
+                or _get_tag_value(decoded_rows, "198")
+            ),
+            "exec_id": (
+                _get_nested(business_object, "order", "execution_id")
+                or _get_tag_value(decoded_rows, "17")
+            ),
             "exec_type": _get_nested(business_object, "order", "execution_type"),
             "ord_status": _get_nested(business_object, "order", "order_status"),
 
@@ -189,6 +371,8 @@ def analyze_fix_sequence(raw_text: str) -> Dict[str, Any]:
         })
 
     sequence_messages = sorted(analyzed_messages, key=_sequence_sort_key)
+
+    groups = _build_message_groups(sequence_messages)
 
     timeline_lines = []
 
@@ -234,7 +418,9 @@ def analyze_fix_sequence(raw_text: str) -> Dict[str, Any]:
 
     summary = (
         f"Analyzed {len(analyzed_messages)} FIX message"
-        f"{'' if len(analyzed_messages) == 1 else 's'}."
+        f"{'' if len(analyzed_messages) == 1 else 's'} "
+        f"across {len(groups)} related group"
+        f"{'' if len(groups) == 1 else 's'}."
     )
 
     sequence_warnings = _build_sequence_warnings(sequence_messages)
@@ -252,10 +438,12 @@ def analyze_fix_sequence(raw_text: str) -> Dict[str, Any]:
         "summary": summary,
         "timeline_summary": "\n".join(timeline_lines),
         "message_count": len(analyzed_messages),
+        "group_count": len(groups),
+        "groups": groups,
         "messages": analyzed_messages,
         "warnings": [
             warning
-            for msg in sequence_messages
+            for msg in analyzed_messages
             for warning in (msg.get("warnings") or [])
         ] + sequence_warnings,
     }

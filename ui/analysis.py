@@ -249,7 +249,7 @@ def render_analysis_panel():
             print(f"=== ANALYSIS UPLOAD FAILED: {ex} ===", flush=True)
 
     ui.upload(
-        label="Upload Message A screenshot/image or PDF",
+        label="Upload FIX screenshot/image/PDF into main input",
         on_upload=lambda e: handle_analysis_upload(e, target_box=raw_input),
         auto_upload=True,
         max_files=1,
@@ -494,222 +494,81 @@ def render_analysis_panel():
             return
 
         raw_a = raw_input.value or ""
+        raw_b = compare_input_box.value or ""
+        mode = analysis_mode.value
 
-        if analysis_mode.value == "Compare Messages":
-            raw_b = compare_input_box.value or ""
-
+        if mode == "Compare Messages":
             if not raw_a.strip() or not raw_b.strip():
                 ui.notify("Please provide both Message A and Message B for comparison.", color="warning")
                 return
 
-            result = compare_fix_messages(raw_a, raw_b)
-
-        elif analysis_mode.value == "Multi-Message Sequence":
+        elif mode == "Multi-Message Sequence":
             if not raw_a.strip():
                 ui.notify("Please provide one or more FIX messages or OCR text to analyze.", color="warning")
                 return
-
-            result = analyze_fix_sequence(raw_a)
 
         else:
             if not raw_a.strip():
                 ui.notify("Please provide a FIX message or OCR text to analyze.", color="warning")
                 return
 
-            result = analyze_fix_message(raw_a)
-
         with result_area:
-            if result.get("input_type") == "fix_compare":
-                render_compare_result(result)
-                return
+            ui.label("Analyzing... please wait.").classes("text-blue-7 font-bold")
+            ui.spinner(size="lg")
 
-            if result.get("input_type") == "fix_sequence":
-                render_sequence_result(result)
-                return
+        def do_analysis():
+            if mode == "Compare Messages":
+                result = compare_fix_messages(raw_a, raw_b)
 
-            ui.label("Plain-English Summary").classes("text-lg font-bold")
+            elif mode == "Multi-Message Sequence":
+                result = analyze_fix_sequence(raw_a)
 
-            summary_text = str(result.get("summary") or "").strip()
+            else:
+                result = analyze_fix_message(raw_a)
 
-            ui.textarea(
-                value=summary_text or "No summary generated.",
-            ).props(
-                "readonly outlined autogrow"
-            ).classes(
-                "w-full bg-gray-100"
-            )
+            result_area.clear()
 
-            ui.label(
-                f"Parsed tags: {result.get('parsed_count', 0)} | "
-                f"Dictionary hits: {result.get('dictionary_hits', 0)} | "
-                f"Misses: {result.get('dictionary_misses', 0)} | "
-                f"Enum hits: {result.get('enum_hits', 0)}"
-            ).classes("text-sm text-gray-500")
+            with result_area:
+                if result.get("input_type") == "fix_compare":
+                    render_compare_result(result)
+                    return
 
-            warnings = result.get("warnings") or []
-            if warnings:
-                ui.label("Warnings").classes("text-lg font-bold mt-4")
-                for warning in warnings:
-                    ui.label(warning).classes("text-red-600")
+                if result.get("input_type") == "fix_sequence":
+                    render_sequence_result(result)
+                    return
 
-            business_object = result.get("business_object", {}) or {}
+                ui.label("Plain-English Summary").classes("text-lg font-bold")
 
-            parties = business_object.get("parties") or []
+                summary_text = str(result.get("summary") or "").strip()
 
-            if parties:
-                ui.label("Parties").classes("text-lg font-bold mt-4")
+                ui.textarea(
+                    value=summary_text or "No summary generated.",
+                ).props(
+                    "readonly outlined autogrow"
+                ).classes(
+                    "w-full bg-gray-100"
+                )
 
-                ui.table(
-                    columns=[
-                        {"name": "party_id", "label": "Party ID", "field": "party_id", "align": "left"},
-                        {"name": "party_id_source", "label": "Source", "field": "party_id_source", "align": "left"},
-                        {"name": "party_role", "label": "Role", "field": "party_role", "align": "left"},
-                        {"name": "party_role_name", "label": "Role Meaning", "field": "party_role_name", "align": "left"},
-                    ],
-                    rows=parties,
-                    row_key="party_id",
-                    pagination=10,
-                ).classes("w-full max-h-80 overflow-auto")
-
-            ui.label("Decoded Values").classes("text-lg font-bold mt-4")
-
-            rows = result.get("decoded_rows") or []
-
-            rows = [
-                {
-                    **row,
-                    "_seq": index,
-                    "_tag_sort": int(str(row.get("tag", "999999")).split("#")[0]) if str(row.get("tag", "")).split("#")[0].isdigit() else 999999,
-                }
-                for index, row in enumerate(rows)
-            ]
-
-            review_rows = [
-                row for row in rows
-                if str(row.get("enum_valid", "")).lower() in {"false", "review", "parse review", "ocr review"}
-                or row.get("enum_warning")
-                or row.get("tag_warning")
-            ]
-
-            review_tags = []
-            for row in review_rows:
-                tag = str(row.get("tag", "")).strip()
-                if tag and tag not in review_tags:
-                    review_tags.append(tag)
-
-            if review_tags:
                 ui.label(
-                    "Check values for tags "
-                    + ", ".join(review_tags)
-                    + " in the Decoded Values table. Their values do not match listed dictionary values or need review."
-                ).classes("text-red-600 font-bold mt-4")
+                    f"Parsed tags: {result.get('parsed_count', 0)} | "
+                    f"Dictionary hits: {result.get('dictionary_hits', 0)} | "
+                    f"Misses: {result.get('dictionary_misses', 0)} | "
+                    f"Enum hits: {result.get('enum_hits', 0)}"
+                ).classes("text-sm text-gray-500")
 
-            ui.add_head_html("""
-            <style>
-            .decoded-values-scroll .q-table__middle {
-                max-height: 650px;
-                overflow: auto;
-            }
+                warnings = result.get("warnings") or []
+                if warnings:
+                    ui.label("Warnings").classes("text-lg font-bold mt-4")
+                    for warning in warnings:
+                        ui.label(warning).classes("text-red-600")
 
-            .decoded-values-scroll thead tr th {
-                position: sticky;
-                top: 0;
-                z-index: 5;
-                background: white;
-            }
+                business_object = result.get("business_object", {}) or {}
 
-            .decoded-values-scroll thead tr:first-child th {
-                top: 0;
-            }
-            </style>
-            """)
+                parties = business_object.get("parties") or []
 
-            ui.label(
-                "Default order follows the message sequence. Click column headers to sort."
-            ).classes("text-sm text-gray-500")
+                if parties:
+                    ui.label("Parties").classes("text-lg font-bold mt-4")
 
-            reset_decoded_sort_button = ui.button("Reset sorting").props("outline size=sm")
-
-            with ui.element("div").classes("w-full border rounded decoded-values-scroll"):
-                decoded_table = ui.table(
-                    columns=[
-                        {"name": "_seq", "label": "#", "field": "_seq", "align": "left", "sortable": True},
-                        {"name": "tag", "label": "Tag", "field": "_tag_sort", "align": "left", "sortable": True},
-                        {"name": "tag_name", "label": "Tag Name", "field": "tag_name", "align": "left", "sortable": True},
-                        {"name": "tag_status", "label": "Tag Status", "field": "tag_status", "align": "left", "sortable": True},
-                        {"name": "tag_warning", "label": "Tag Warning", "field": "tag_warning", "align": "left"},
-                        {"name": "ocr_repair_warning", "label": "OCR Repair", "field": "ocr_repair_warning", "align": "left"},
-                        {"name": "value", "label": "Value", "field": "value", "align": "left", "sortable": True},
-                        {"name": "value_name", "label": "Value Name", "field": "value_name", "align": "left", "sortable": True},
-                        {"name": "has_enums", "label": "Has Enums", "field": "has_enums", "align": "left", "sortable": True},
-                        {"name": "enum_valid", "label": "Enum Valid", "field": "enum_valid", "align": "left", "sortable": True},
-                        {"name": "enum_warning", "label": "Enum Warning", "field": "enum_warning", "align": "left"},
-                        {"name": "description", "label": "Description", "field": "description", "align": "left"},
-                        {"name": "ocr_inferred", "label": "OCR Inferred", "field": "ocr_inferred", "align": "left", "sortable": True},
-                        {"name": "ocr_score", "label": "OCR Score", "field": "ocr_score", "align": "left", "sortable": True},
-                    ],
-                    rows=rows,
-                    pagination={
-                        "sortBy": "_seq",
-                        "descending": False,
-                        "rowsPerPage": 0,
-                    },
-                ).classes("w-full")
-
-                def reset_decoded_sorting():
-                    decoded_table.rows = sorted(
-                        rows,
-                        key=lambda row: row.get("_seq", 0),
-                    )
-                    decoded_table.pagination = {
-                        "sortBy": "_seq",
-                        "descending": False,
-                        "rowsPerPage": 0,
-                    }
-                    decoded_table.update()
-
-                reset_decoded_sort_button.on_click(reset_decoded_sorting)
-
-                decoded_table.add_slot("body", r"""
-                <q-tr
-                  :props="props"
-                  :class="(
-                    props.row.enum_valid === false ||
-                    props.row.enum_valid === 'Review' ||
-                    props.row.enum_valid === 'Parse Review' ||
-                    props.row.enum_valid === 'OCR Review' ||
-                    props.row.enum_warning ||
-                    props.row.tag_warning ||
-                    props.row.ocr_repair_warning
-                  ) ? 'text-red' : ''"
-                >
-                  <q-td
-                    v-for="col in props.cols"
-                    :key="col.name"
-                    :props="props"
-                    :style="(
-                      col.name === 'ocr_repair_warning' ||
-                      col.name === 'tag_warning' ||
-                      col.name === 'enum_warning'
-                    )
-                      ? 'max-width: 160px; min-width: 90px; white-space: normal; word-break: break-word; overflow-wrap: anywhere; vertical-align: top; font-size: 11px;'
-                      : (
-                          col.name === 'description'
-                        )
-                          ? 'max-width: 320px; min-width: 220px; white-space: normal; word-break: break-word; overflow-wrap: anywhere; vertical-align: top; font-size: 12px;'
-                          : 'white-space: nowrap; vertical-align: top;'"
-                  >
-                    {{ col.name === 'tag' ? props.row.tag : col.value }}
-                  </q-td>
-                </q-tr>
-                """)
-
-            parties = business_object.get("parties") or []
-
-            if parties:
-                ui.label("Parties").classes("text-lg font-bold mt-4")
-
-                with ui.element("div").classes("w-full max-h-80 overflow-auto border rounded"):
                     ui.table(
                         columns=[
                             {"name": "party_id", "label": "Party ID", "field": "party_id", "align": "left"},
@@ -719,15 +578,170 @@ def render_analysis_panel():
                         ],
                         rows=parties,
                         row_key="party_id",
-                        pagination=False,
+                        pagination=10,
+                    ).classes("w-full max-h-80 overflow-auto")
+
+                ui.label("Decoded Values").classes("text-lg font-bold mt-4")
+
+                rows = result.get("decoded_rows") or []
+
+                rows = [
+                    {
+                        **row,
+                        "_seq": index,
+                        "_tag_sort": int(str(row.get("tag", "999999")).split("#")[0])
+                        if str(row.get("tag", "")).split("#")[0].isdigit()
+                        else 999999,
+                    }
+                    for index, row in enumerate(rows)
+                ]
+
+                review_rows = [
+                    row for row in rows
+                    if str(row.get("enum_valid", "")).lower() in {"false", "review", "parse review", "ocr review"}
+                    or row.get("enum_warning")
+                    or row.get("tag_warning")
+                ]
+
+                review_tags = []
+                for row in review_rows:
+                    tag = str(row.get("tag", "")).strip()
+                    if tag and tag not in review_tags:
+                        review_tags.append(tag)
+
+                if review_tags:
+                    ui.label(
+                        "Check values for tags "
+                        + ", ".join(review_tags)
+                        + " in the Decoded Values table. Their values do not match listed dictionary values or need review."
+                    ).classes("text-red-600 font-bold mt-4")
+
+                ui.add_head_html("""
+                <style>
+                .decoded-values-scroll .q-table__middle {
+                    max-height: 650px;
+                    overflow: auto;
+                }
+
+                .decoded-values-scroll thead tr th {
+                    position: sticky;
+                    top: 0;
+                    z-index: 5;
+                    background: white;
+                }
+
+                .decoded-values-scroll thead tr:first-child th {
+                    top: 0;
+                }
+                </style>
+                """)
+
+                ui.label(
+                    "Default order follows the message sequence. Click column headers to sort."
+                ).classes("text-sm text-gray-500")
+
+                reset_decoded_sort_button = ui.button("Reset sorting").props("outline size=sm")
+
+                with ui.element("div").classes("w-full border rounded decoded-values-scroll"):
+                    decoded_table = ui.table(
+                        columns=[
+                            {"name": "_seq", "label": "#", "field": "_seq", "align": "left", "sortable": True},
+                            {"name": "tag", "label": "Tag", "field": "_tag_sort", "align": "left", "sortable": True},
+                            {"name": "tag_name", "label": "Tag Name", "field": "tag_name", "align": "left", "sortable": True},
+                            {"name": "tag_status", "label": "Tag Status", "field": "tag_status", "align": "left", "sortable": True},
+                            {"name": "tag_warning", "label": "Tag Warning", "field": "tag_warning", "align": "left"},
+                            {"name": "ocr_repair_warning", "label": "OCR Repair", "field": "ocr_repair_warning", "align": "left"},
+                            {"name": "value", "label": "Value", "field": "value", "align": "left", "sortable": True},
+                            {"name": "value_name", "label": "Value Name", "field": "value_name", "align": "left", "sortable": True},
+                            {"name": "has_enums", "label": "Has Enums", "field": "has_enums", "align": "left", "sortable": True},
+                            {"name": "enum_valid", "label": "Enum Valid", "field": "enum_valid", "align": "left", "sortable": True},
+                            {"name": "enum_warning", "label": "Enum Warning", "field": "enum_warning", "align": "left"},
+                            {"name": "description", "label": "Description", "field": "description", "align": "left"},
+                            {"name": "ocr_inferred", "label": "OCR Inferred", "field": "ocr_inferred", "align": "left", "sortable": True},
+                            {"name": "ocr_score", "label": "OCR Score", "field": "ocr_score", "align": "left", "sortable": True},
+                        ],
+                        rows=rows,
+                        pagination={
+                            "sortBy": "_seq",
+                            "descending": False,
+                            "rowsPerPage": 0,
+                        },
                     ).classes("w-full")
 
-            ui.label("Business Object").classes("text-lg font-bold mt-4")
+                    def reset_decoded_sorting():
+                        decoded_table.rows = sorted(
+                            rows,
+                            key=lambda row: row.get("_seq", 0),
+                        )
+                        decoded_table.pagination = {
+                            "sortBy": "_seq",
+                            "descending": False,
+                            "rowsPerPage": 0,
+                        }
+                        decoded_table.update()
 
-            ui.code(
-                json.dumps(business_object, indent=2, ensure_ascii=False),
-                language="json",
-            ).classes("w-full max-h-96 overflow-auto")
+                    reset_decoded_sort_button.on_click(reset_decoded_sorting)
+
+                    decoded_table.add_slot("body", r"""
+                    <q-tr
+                      :props="props"
+                      :class="(
+                        props.row.enum_valid === false ||
+                        props.row.enum_valid === 'Review' ||
+                        props.row.enum_valid === 'Parse Review' ||
+                        props.row.enum_valid === 'OCR Review' ||
+                        props.row.enum_warning ||
+                        props.row.tag_warning ||
+                        props.row.ocr_repair_warning
+                      ) ? 'text-red' : ''"
+                    >
+                      <q-td
+                        v-for="col in props.cols"
+                        :key="col.name"
+                        :props="props"
+                        :style="(
+                          col.name === 'ocr_repair_warning' ||
+                          col.name === 'tag_warning' ||
+                          col.name === 'enum_warning'
+                        )
+                          ? 'max-width: 160px; min-width: 90px; white-space: normal; word-break: break-word; overflow-wrap: anywhere; vertical-align: top; font-size: 11px;'
+                          : (
+                              col.name === 'description'
+                            )
+                              ? 'max-width: 320px; min-width: 220px; white-space: normal; word-break: break-word; overflow-wrap: anywhere; vertical-align: top; font-size: 12px;'
+                              : 'white-space: nowrap; vertical-align: top;'"
+                      >
+                        {{ col.name === 'tag' ? props.row.tag : col.value }}
+                      </q-td>
+                    </q-tr>
+                    """)
+
+                parties = business_object.get("parties") or []
+
+                if parties:
+                    ui.label("Parties").classes("text-lg font-bold mt-4")
+
+                    with ui.element("div").classes("w-full max-h-80 overflow-auto border rounded"):
+                        ui.table(
+                            columns=[
+                                {"name": "party_id", "label": "Party ID", "field": "party_id", "align": "left"},
+                                {"name": "party_id_source", "label": "Source", "field": "party_id_source", "align": "left"},
+                                {"name": "party_role", "label": "Role", "field": "party_role", "align": "left"},
+                                {"name": "party_role_name", "label": "Role Meaning", "field": "party_role_name", "align": "left"},
+                            ],
+                            rows=parties,
+                            row_key="party_id",
+                            pagination=False,
+                        ).classes("w-full")
+
+                ui.label("Business Object").classes("text-lg font-bold mt-4")
+
+                ui.code(
+                    json.dumps(business_object, indent=2, ensure_ascii=False),
+                    language="json",
+                ).classes("w-full max-h-96 overflow-auto")
+
+        ui.timer(0.1, do_analysis, once=True)
 
     def clear_analysis():
         raw_input.value = ""
