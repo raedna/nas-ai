@@ -6,7 +6,7 @@ from nicegui import ui, run
 from core.ui_data import collection_stats
 from core.retrieval.router import run_query_with_method
 from core.chat_engine import classify_answer_kind, generate_conversational_response
-from ui.render import render_answer, build_image_items
+from ui.render import render_answer, build_image_items, render_related_section
 
 
 def _related(container, sections):
@@ -19,7 +19,7 @@ def _related(container, sections):
             label = (f"[{s.get('collection')}] {s.get('title')} · "
                      f"{s.get('match_type')} {float(s.get('confidence') or 0):.2f}")
             with ui.expansion(label).classes("w-full"):
-                ui.markdown(str(s.get("preview") or ""))
+                render_related_section(s)
 
 
 def render_ask_panel():

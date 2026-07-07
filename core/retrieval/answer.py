@@ -158,7 +158,15 @@ def synthesize_answer(payload: Dict, roles: List[str], collection_name: str) -> 
         lines = []
 
         if identifier_value and primary_name:
-            lines.append(f"{identifier_field} {identifier_value} is {primary_name}.")
+            # Label the name with its actual FIELD when known — "gsact.txt is
+            # 019_W_RECON_..." reads as an alias; "Tidal Job Name: ..." says
+            # what the value actually is.
+            _pn_field = payload.get("primary_name_field")
+            if _pn_field and str(_pn_field).strip().lower() not in ("name", "primary_name"):
+                lines.append(f"{identifier_field} {identifier_value} — "
+                             f"{_pn_field}: {primary_name}.")
+            else:
+                lines.append(f"{identifier_field} {identifier_value} is {primary_name}.")
         elif primary_name:
             lines.append(str(primary_name))
         elif identifier_value:

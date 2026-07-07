@@ -5,7 +5,7 @@ from nicegui import ui, run
 
 from core.ui_data import collection_stats
 from core.chat_engine import chat_turn
-from ui.render import render_answer, build_image_items
+from ui.render import render_answer, build_image_items, render_related_section
 
 
 def render_chat_panel():
@@ -78,7 +78,7 @@ def render_chat_panel():
                 label = (f"[{s.get('collection')}] {s.get('title')} · "
                          f"{s.get('match_type')} {float(s.get('confidence') or 0):.2f}")
                 with ui.expansion(label).classes("w-full"):
-                    ui.markdown(str(s.get("preview") or ""))
+                    render_related_section(s)
 
     send.on_click(do_send)
     msg.on("keydown.enter", do_send)

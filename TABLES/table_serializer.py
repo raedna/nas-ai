@@ -172,6 +172,7 @@ def _build_structured_doc(row, schema, source_file):
         "identifier_namespace": identifier_namespace or None,
         "identifier_kind": "canonical",
         "primary_name": primary_name or None,
+        "primary_name_field": (name_fields[0] if name_fields else None),
         "description": description or None,
         "description_fields": description_fields or None,
         "reference_identifiers": reference_identifiers,

@@ -60,6 +60,44 @@ def _render_discovery(container, result):
         ).classes("w-full").props("dense")
 
 
+def _md_safe(text):
+    """Escape underscores OUTSIDE code spans so identifiers like
+    019_W_RECON_GOLDMAN_PRIO_PULL render literally instead of being eaten as
+    markdown italics. Backticked segments are left untouched."""
+    parts = str(text or "").split("`")
+    for i in range(0, len(parts), 2):  # even indices = outside code spans
+        parts[i] = parts[i].replace("_", "\\_")
+    return "`".join(parts)
+
+
+def render_related_section(section, show_ocr=True):
+    """Render one related-section preview INSIDE an already-open expansion:
+    full renderer (images inline) using the anchor chunk's payload — plain
+    ui.markdown(preview) dropped embedded images and mangled underscores."""
+    payload = None
+    for cid in (section.get("anchor_chunk_ids") or []):
+        try:
+            from core.db import fetchall as _fa
+            rows = _fa("SELECT payload FROM chunks WHERE id = %s LIMIT 1", (cid,))
+            if rows:
+                p = rows[0]["payload"]
+                if isinstance(p, str):
+                    import json as _json
+                    p = _json.loads(p)
+                if p.get("embedded_image_paths"):
+                    payload = p
+                    break
+        except Exception:
+            continue
+    cids = section.get("anchor_chunk_ids") or []
+    if cids:
+        ui.link("Open full article ↗", f"/entry/{cids[0]}", new_tab=True).classes(
+            "text-xs text-blue-700")
+    box = ui.column().classes("w-full")
+    render_answer(box, str(section.get("preview") or ""),
+                  build_image_items(payload), show_ocr=show_ocr)
+
+
 def render_answer(container, text, image_items=None, show_ocr=True):
     """Render `text` into `container`, inlining images at their markers.
 
@@ -85,7 +123,7 @@ def render_answer(container, text, image_items=None, show_ocr=True):
             found = True
             before = text[pos:m.start()].strip()
             if before:
-                ui.markdown(before)
+                ui.markdown(_md_safe(before))
 
             name = m.group(1).strip()
             it = by_name.get(Path(name).name.lower())
@@ -111,8 +149,8 @@ def render_answer(container, text, image_items=None, show_ocr=True):
                     pos = pos + idx + len(known)
 
         if not found:
-            ui.markdown(text)
+            ui.markdown(_md_safe(text))
         else:
             tail = text[pos:].strip()
             if tail:
-                ui.markdown(tail)
+                ui.markdown(_md_safe(tail))

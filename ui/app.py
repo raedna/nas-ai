@@ -25,6 +25,7 @@ from ui.analysis import render_analysis_panel
 from ui.validation import render_validation_panel  # noqa: E402
 from ui.system_config import render_system_config_panel  # noqa: E402
 from ui.data_prep import render_data_prep_panel  # noqa: E402
+from ui import entry_page  # noqa: E402,F401  (registers the /entry/{chunk_id} full-article page)
 
 # Tab order — query tabs first, admin next, debug/remaining after.
 TABS = [
