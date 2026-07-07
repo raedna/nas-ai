@@ -112,8 +112,13 @@ def _build_section_for_link(link):
         desc = "\n\n".join(r["text"] for r in full if r["text"]) if full else ""
     if not desc:                              # structured / primary_name match: own description
         desc = str(lp.get("description") or "")
+    # Anchor chunk id — lets the UI link to the full article (/entry/{id}).
+    _idrow = _f("SELECT id FROM chunks WHERE collection_name=%s AND "
+                "(identifier=%s OR primary_name=%s OR payload->>'source_file'=%s) "
+                "ORDER BY id LIMIT 1", (tc, ti, ti, sf))
     return {"title": lp.get("primary_name") or ti, "collection": tc,
-            "source_file": sf, "confidence": link.get("confidence", 1.0), "preview": desc}
+            "source_file": sf, "confidence": link.get("confidence", 1.0), "preview": desc,
+            "anchor_chunk_ids": [_idrow[0]["id"]] if _idrow else []}
 
 
 # ---------------------------------------------------------------------------
@@ -679,12 +684,19 @@ def run_query_with_method(
                             _ldesc = "\n\n".join(r["text"] for r in _full if r["text"])
                         else:
                             _ldesc = str(_lp.get("description") or "")
+                        _idrow = _fetchall(
+                            "SELECT id FROM chunks WHERE collection_name=%s AND "
+                            "(identifier=%s OR primary_name=%s OR payload->>'source_file'=%s) "
+                            "ORDER BY id LIMIT 1",
+                            (_link["target_collection"], _link["target_identifier"],
+                             _link["target_identifier"], _source_file))
                         _related_sections.append({
                             "title": _lname,
                             "collection": _link["target_collection"],
                             "match_type": "confirmed",
                             "confidence": _link.get("confidence", 1.0),
-                            "preview": _ldesc
+                            "preview": _ldesc,
+                            "anchor_chunk_ids": [_idrow[0]["id"]] if _idrow else [],
                         })
 
                 # CL-04: one hop along confirmed wikilinks from first-hop targets

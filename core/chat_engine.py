@@ -36,6 +36,8 @@ Never mention that you are an AI language model — you are NAS-AI."""
 # Related sections with similarity >= this are merged into the main answer.
 # Below this threshold they appear as collapsible "Related" items.
 RELATED_MERGE_THRESHOLD = 0.80
+# Cap on the "Related" list shown in chat — ranked confirmed-first.
+RELATED_MAX_SECTIONS = 5
 
 
 def _result_to_text(result) -> str:
@@ -156,13 +158,16 @@ def select_collections(question: str, history: list, available_collections: list
             if _hit:
                 _tier1_hits.append(_col)
 
-    # Also add collections linked via confirmed cross-links
+    # Also add collections linked via confirmed cross-links (either direction —
+    # links are edges, not arrows)
     for _id in _identifiers:
         linked = _fetchall(
             """SELECT DISTINCT target_collection FROM cross_links
-               WHERE source_identifier ILIKE %s
-               AND status = 'confirmed'""",
-            (_id,)
+               WHERE source_identifier ILIKE %s AND status = 'confirmed'
+               UNION
+               SELECT DISTINCT source_collection AS target_collection FROM cross_links
+               WHERE target_identifier ILIKE %s AND status = 'confirmed'""",
+            (_id, _id)
         )
         for row in linked:
             col = row["target_collection"]
@@ -862,6 +867,15 @@ def chat_turn(question: str, history: list, available_collections: list) -> dict
         if s.get("confidence", 0) < RELATED_MERGE_THRESHOLD
         and not (s.get("match_type") == "concept" and _is_structured_collection(s.get("collection", "")))
     ]
+    # Rank + cap: confirmed edges (exact/ner/wikilink) first, hops next,
+    # similarity/concept last; confidence desc within each class. A long
+    # unranked list buries the procedure notes the user actually needs.
+    _type_rank = {"exact": 0, "wikilink": 0, "ner": 0,
+                  "wikilink_hop": 1, "name_similarity": 2, "concept": 3}
+    related_sections = sorted(
+        related_sections,
+        key=lambda s: (_type_rank.get(str(s.get("match_type") or "concept"), 3),
+                       -(s.get("confidence") or 0)))[:RELATED_MAX_SECTIONS]
 
     merged_image_payload = None
     # Append high-confidence previews to the retrieved answer before sending to LLM
@@ -922,7 +936,10 @@ def chat_turn(question: str, history: list, available_collections: list) -> dict
         "method": "retrieval",
         "collection": collection,
         "collections_queried": query_run.get("collections_queried", [collection]),
-        "related_sections": [],  # Step 1: related/enrichment noise suppressed by default
+        # Related sections re-enabled: with mention-matching removed, these are
+        # now confirmed NER/wikilink edges + hops — curated signal, not the
+        # concept-noise floods that originally justified suppressing them.
+        "related_sections": related_sections,
         "answer_kind": answer_kind,
         "raw_answer": primary_answer,
         "answer_payload": query_run.get("answer_payload") if query_run.get("answer_payload") and (query_run.get("answer_payload") or {}).get("embedded_image_paths") else (merged_image_payload or None)

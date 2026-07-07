@@ -79,11 +79,21 @@ def save_cross_link_candidates(candidates):
 
 
 def get_cross_links_for_identifier(collection_name, identifier, status="confirmed"):
-    """Lookup confirmed links for a given source identifier (used at query time)."""
+    """Lookup confirmed links touching an identifier, in EITHER direction —
+    links are semantic edges, not arrows. An NER link stored obsidian->recon
+    must also surface when the query answers from recon (the other side is
+    normalized into the target_* columns)."""
     rows = fetchall("""
         SELECT target_collection, target_identifier, match_type, confidence
         FROM cross_links
         WHERE source_collection = %s AND source_identifier = %s AND status = %s
+        UNION
+        SELECT source_collection AS target_collection,
+               source_identifier AS target_identifier,
+               match_type, confidence
+        FROM cross_links
+        WHERE target_collection = %s AND target_identifier = %s AND status = %s
         ORDER BY confidence DESC
-    """, (collection_name, identifier, status))
+    """, (collection_name, identifier, status,
+          collection_name, identifier, status))
     return rows

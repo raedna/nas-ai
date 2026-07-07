@@ -11,6 +11,7 @@
   "embeddings_model": "text-embedding-bge-large-en-v1.5",
   "vector_size": 1024,
   "retrieval_confidence_threshold": 0.105,
+  "answer_coverage_disclaimer_below": 0.3,
   "cross_encoder": {
     "enabled": false,
     "model": "cross-encoder/ms-marco-MiniLM-L-6-v2",

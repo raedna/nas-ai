@@ -385,8 +385,60 @@ identifier=Moore file name · primary_name=Tidal Job Name (manual pin — proven
 | CTM-01 | CTM XML ingest prep: parser fit check on a sample file first (nested message-style XML vs FIX's attribute-row shape); DTCC specs are login-gated on DTCC Learning, not public |
 | DATA-01 | Datatypes_FIX44 has no schema/chunks (LLM failed during its window, fails loudly now) — re-ingest when LM Studio idle, or via schema_model once MODEL-01 fixed |
 
+---
+
+## Session 2026-07-07 — Eval runner, full eval pass, PP-02/NA-03/DL-07 fixes
+
+### Eval automation
+- `tests/eval_runner.py` — all 50 eval-doc questions through BOTH surfaces (Ask = run_query_with_method against expected collection; Chat = chat_turn auto-routed), incremental md+json results, latency summary (avg/p95/max + slowest five). Full run: 50.7 min. **This is the regression harness — diff the json between runs.**
+- First full run scoreboard: AG 7/10 exact · PR 7/8 Ask · MI Chat 3/4 (was 0/4) · DL lookups solid · failure mass concentrated in Chat routing (kb↔obsidian twins) and XC cross-collection synthesis. Latency: Ask avg 14.8s, Chat avg 46s — the gap is serial LLM call count, not retrieval.
+
+### Fixes from eval failures (each verified via diag + smoke gates)
+| Eval ID | Root cause | Fix |
+|---|---|---|
+| AG-01 | Spec variance produced COUNT(*) = 348 chunks, not 178 articles | metadata_query: plain `count` coerced to count_distinct(identifier) unless question literally says rows/chunks; intent-mode (list/count) passed from router and coerced — spec extraction can no longer overrule the upstream classifier |
+| PP-02 | `OrderQty` is ONE tsvector token — lexically invisible to 'order quantity'; typo 'teh' vetoed every AND-variant (websearch_to_tsquery ANDs terms), silencing the whole BM25 leg of RRF | `word_split()` in nlp_generator (camelCase/snake_case split appended to structured nlp_text; applied in BOTH the tables path and the XML serializer's own text build — they don't share code); `_filter_corpus_words` drops corpus-absent tokens before building BM25 variants; search_bm25 standalone gets OR fallback on zero rows. NOTE: an OR-variant in RRF was tried and REVERTED — it flooded the lexical leg and flipped clean queries wrong |
+| NA-03 / PP-03 | Ask rendered nearest-neighbor articles with full confidence on weak matches | Low-coverage disclaimer: fraction of question content words present in answering chunk < `answer_coverage_disclaimer_below` (config, tuned 0.5 → 0.3 on three-question calibration) → "⚠ No direct match found" banner. ALL content words count in the denominator (corpus-filtering it inflated 1-of-3 to 100%). Banner must live OUTSIDE LLM synthesis — ask.py strips before, re-prepends after (the LLM summarizes it away otherwise) |
+| DL-07 | Chat Tier 1 anchors on filenames only — ALL-CAPS codes (BBG mnemonics, job names) never pinned routing | Tier 1 extended to code-like tokens (`[A-Z][A-Z0-9_]{3,}`) matched against identifier AND primary_name + payload arrays |
+
+### Learnings
+- **A too-strict lexical leg fails silent, a too-loose one fails loud**: AND-veto returned zero rows invisibly; the OR experiment returned garbage visibly. Token-level vocabulary filtering (per-collection EXISTS checks) is the precise middle.
+- **Any text that must survive LLM synthesis can't live in the text** — flags/banners must travel beside the prose, not in it.
+- **Coverage denominators must include the words that can't match** — excluding typos inflated confidence exactly when it should collapse.
+- PP-01 ("that goldman activity file...") is deliberately unfixed: it is the acceptance test for the cross-links/concept-vectors block.
+
+### New tickets
+| ID | Description |
+|---|---|
+| VOCAB-01 | Per-collection vocabulary table (ts_stat at ingest) + trigram spell-correction of query tokens (brodcaster→broadcaster) — upgrades PP category from "survives typos" to "understands them"; correct-spelling test confirmed the right answers exist |
+| UI-04 | Auth gate for the UI (reachable via Tailscale from phone; no login today) — before Confluence/Halo work data lands |
+| SPEED-01 | Chat turn = 4-6 serial LLM calls (46s avg): dedupe per-collection llm_detect_intent (same question, 3 identical calls), fast_model routing for classification calls, merge intent+contextualize+routing into one call, stream synthesis. Target 4-8s on current hardware |
+
+---
+
+## Session 2026-07-07 (cont.) — Cross-links block, chapter 1: restore, consume, navigate
+
+**State found:** cross_links nearly empty (4 NER rows). The 43 obsidian wikilinks were lost when a UI restart killed the background threads mid-queue after the all-collections re-ingest (BG-01 upgraded: needs startup sweep + RE-QUEUE of interrupted work, not just orphan relabeling). Raw material had survived (701 chunks with related_titles).
+
+**Restored:** `rebuild_cross_links.py` extended with the missing wikilink-persistence pass. Recovery run: 43 wikilinks confirmed + 95 NER mention links (kb_docs 16, obsidian 79 — the first-ever recon↔notes bridge; quality sampled clean, all confirmed via KG review). NER found both filename AND job-name mentions — the searchability overhaul feeding it.
+
+**Consumed:**
+- `get_cross_links_for_identifier` + chat Tier 1 cross-link routing made BIDIRECTIONAL (links are edges, not arrows — obsidian→recon links now surface when answering from recon).
+- Chat related_sections UN-suppressed (they were hardcoded to [] from the noise era), ranked confirmed-first (exact/ner/wikilink → hop → similarity → concept), capped at 5 (`RELATED_MAX_SECTIONS`).
+- Lead sentence labels the name field: "gsact.txt — Tidal Job Name: 019_W_..." instead of the alias-implying "is" (needs `primary_name_field`, now emitted by table_serializer).
+
+**Navigable (PP-05 wish granted):**
+- `/entry/{chunk_id}` full-article page (ui/entry_page.py): sibling chunks merged (identifier for kb articles, source_file for notes, single for structured), ALL images inline; "Open full article ↗" link on every related section (anchor_chunk_ids attached in both router link paths).
+- `_md_safe` underscore escaping outside code spans in all markdown rendering — job names/aliases no longer italics-eaten.
+- Import gotcha fixed: `import ui.entry_page` shadowed nicegui's `ui` in app.py — `from ui import entry_page`.
+
+**Acceptance:** XC-01 ✅ both surfaces — record + 4.1 (NER confirmed) + 4.2 (wikilink_hop; CL-04 traversal was already wired, it just never had confirmed links to walk). PP-01 still ❌ (Tier 2 routed to bbg_fields this run) — REMAINS the acceptance test for chapter 2.
+
+**Chapter 2 (next):** concept-vector quality (bbg 169 hierarchical-path clusters; recon clusters polluted by CODE-024 merged-cell fallthrough incl. source-data typo 'Transction'), kb↔obsidian twin routing, Tier 2 stability. Also: KG review grouping collapse (UI-05, cosmetic dup rows), preview-images gap (markers stripped from previews — mitigated by full-article links).
+
 ## Next Session Priorities
 
+0. **Cross-links + concept vectors block — chapter 2** — concept-vector quality, kb↔obsidian twin routing, Tier 2 stability; acceptance tests: PP-01, PP-03 routing, PP-06 chat, XC-02/05.
 1. **MODEL-01** — fix `schema_model` config; re-ingest Datatypes_FIX44 (DATA-01) as the 32B's first live test before CTM.
 2. **Eval retest** (NAS_AI_Retrieval_Eval_v1.md) — full pass: MI bucket should flip to ✅; DL-02/05, AG/RECON buckets re-scored; XC remains the largest unaddressed group.
 3. **Chat routing hardening** — DL-08/PP-03 no-collection fallback; kb_docs/obsidian wrong-twin ranking.

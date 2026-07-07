@@ -32,6 +32,17 @@ from core.ner_cross_linker import run_identifier_ner
 for c in cols:
     run_identifier_ner(c)
 
+print("\n=== wikilink persistence (related_titles -> cross_links) ===", flush=True)
+from core.related_titles_linker import persist_related_titles_as_crosslinks
+for c in cols:
+    if c in SKIP_COLLECTIONS:
+        continue
+    try:
+        n = persist_related_titles_as_crosslinks(c)
+        print(f"  {c:24s} wikilinks persisted={n}", flush=True)
+    except Exception as e:
+        print(f"  {c:24s} wikilink persistence FAILED: {e}", flush=True)
+
 print("\n=== resulting cross_links by status / match_type ===")
 for r in fetchall("""SELECT status, match_type, COUNT(*) n FROM cross_links
                      GROUP BY status, match_type ORDER BY status, n DESC""", ()):
