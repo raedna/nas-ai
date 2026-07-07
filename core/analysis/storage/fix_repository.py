@@ -13,7 +13,127 @@ def _analysis_source_hash(messages: list) -> str:
     raw_text = "\n---FIX_MESSAGE---\n".join(raw_parts).strip()
 
     return hashlib.sha256(raw_text.encode("utf-8")).hexdigest()
-    
+
+def _get_tag_value(decoded_rows: list, tag: str) -> str:
+    tag = str(tag)
+
+    for row in decoded_rows or []:
+        if str(row.get("tag") or "") == tag:
+            return str(row.get("value") or "").strip()
+
+    return ""
+
+
+def _get_nested(data: dict, *keys: str) -> str:
+    current = data
+
+    for key in keys:
+        if not isinstance(current, dict):
+            return ""
+        current = current.get(key)
+
+    return str(current or "").strip()
+
+
+def _enrich_single_message(msg: Dict[str, Any]) -> Dict[str, Any]:
+    business_object = msg.get("business_object") or {}
+    decoded_rows = msg.get("decoded_rows") or []
+
+    return {
+        **msg,
+
+        "msg_type": (
+            _get_nested(business_object, "message", "type")
+            or _get_tag_value(decoded_rows, "35")
+        ),
+        "msg_seq_num": (
+            _get_nested(business_object, "message", "message_sequence_number")
+            or _get_tag_value(decoded_rows, "34")
+        ),
+        "sender": (
+            _get_nested(business_object, "message", "sender")
+            or _get_tag_value(decoded_rows, "49")
+        ),
+        "target": (
+            _get_nested(business_object, "message", "target")
+            or _get_tag_value(decoded_rows, "56")
+        ),
+        "sending_time": (
+            _get_nested(business_object, "message", "sending_time")
+            or _get_tag_value(decoded_rows, "52")
+        ),
+        "transact_time": (
+            _get_nested(business_object, "trade", "transaction_time")
+            or _get_tag_value(decoded_rows, "60")
+        ),
+
+        "cl_ord_id": (
+            _get_nested(business_object, "order", "client_order_id")
+            or _get_tag_value(decoded_rows, "11")
+        ),
+        "order_id": (
+            _get_nested(business_object, "order", "order_id")
+            or _get_tag_value(decoded_rows, "37")
+        ),
+        "secondary_order_id": (
+            _get_nested(business_object, "order", "secondary_order_id")
+            or _get_tag_value(decoded_rows, "198")
+        ),
+        "exec_id": (
+            _get_nested(business_object, "order", "execution_id")
+            or _get_tag_value(decoded_rows, "17")
+        ),
+        "exec_type": (
+            _get_nested(business_object, "order", "execution_type")
+            or _get_tag_value(decoded_rows, "150")
+        ),
+        "ord_status": (
+            _get_nested(business_object, "order", "order_status")
+            or _get_tag_value(decoded_rows, "39")
+        ),
+
+        "symbol": (
+            _get_nested(business_object, "trade", "symbol")
+            or _get_tag_value(decoded_rows, "55")
+        ),
+        "security_id": (
+            _get_nested(business_object, "trade", "security_id")
+            or _get_tag_value(decoded_rows, "48")
+        ),
+        "security_id_source": (
+            _get_nested(business_object, "trade", "security_id_source")
+            or _get_tag_value(decoded_rows, "22")
+        ),
+        "side": (
+            _get_nested(business_object, "trade", "side")
+            or _get_tag_value(decoded_rows, "54")
+        ),
+        "order_qty": (
+            _get_nested(business_object, "trade", "order_quantity")
+            or _get_tag_value(decoded_rows, "38")
+        ),
+        "last_qty": (
+            _get_nested(business_object, "trade", "last_quantity")
+            or _get_tag_value(decoded_rows, "32")
+        ),
+        "last_px": (
+            _get_nested(business_object, "trade", "last_price")
+            or _get_tag_value(decoded_rows, "31")
+        ),
+        "avg_px": (
+            _get_nested(business_object, "trade", "average_price")
+            or _get_tag_value(decoded_rows, "6")
+        ),
+        "cum_qty": (
+            _get_nested(business_object, "trade", "cumulative_quantity")
+            or _get_tag_value(decoded_rows, "14")
+        ),
+        "leaves_qty": (
+            _get_nested(business_object, "trade", "leaves_quantity")
+            or _get_tag_value(decoded_rows, "151")
+        ),
+    }
+
 def _json(value: Any) -> str:
     return json.dumps(value or {}, ensure_ascii=False)
 
@@ -51,14 +171,14 @@ def save_fix_analysis_result(
     # Single-message analysis result does not naturally have result["messages"].
     # Normalize it into one message-like object.
     if not messages and result.get("input_type") != "fix_sequence":
-        messages = [{
+        messages = [_enrich_single_message({
             "message_index": 1,
             "raw_text": result.get("raw_text") or "",
             "summary": result.get("summary") or "",
             "warnings": result.get("warnings") or [],
             "business_object": result.get("business_object") or {},
             "decoded_rows": result.get("decoded_rows") or [],
-        }]
+        })]
 
     source_hash = _analysis_source_hash(messages)
     warnings = result.get("warnings") or []
