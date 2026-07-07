@@ -1,6 +1,7 @@
 import json
 
 from nicegui import ui
+from core.analysis.analyzers.fix.comparator import compare_fix_messages
 
 def render_compare_result(result: dict):
     relationship = result.get("relationship") or {}
@@ -264,9 +265,62 @@ def render_sequence_result(result: dict):
             {"name": "leaves_qty", "label": "LeavesQty", "field": "leaves_qty", "align": "left", "sortable": True},
         ]
 
-        ui.table(
+        compare_result_area = ui.column().classes("w-full q-mt-md")
+
+        def compare_selected_messages():
+            compare_result_area.clear()
+
+            selected_rows = list(message_table.selected or [])
+
+            ui.notify(f"Selected {len(selected_rows)} message(s).", color="info")
+
+            if len(selected_rows) != 2:
+                ui.notify("Please select exactly 2 messages to compare.", color="warning")
+                return
+
+            message_by_index = {
+                msg.get("message_index"): msg
+                for msg in messages
+            }
+
+            first_index = selected_rows[0].get("message_index")
+            second_index = selected_rows[1].get("message_index")
+
+            first_message = message_by_index.get(first_index)
+            second_message = message_by_index.get(second_index)
+
+            if not first_message or not second_message:
+                ui.notify("Could not find selected messages.", color="negative")
+                return
+
+            result = compare_fix_messages(
+                first_message.get("raw_text") or "",
+                second_message.get("raw_text") or "",
+            )
+
+            with compare_result_area:
+                ui.label(
+                    f"Comparison: Message {first_index} vs Message {second_index}"
+                ).classes("text-lg font-semibold q-mt-md")
+
+                render_compare_result(result)
+
+        ui.label(
+            "Select exactly two message rows, then click Compare Selected Messages."
+        ).classes("text-sm text-gray-500")
+
+        ui.button(
+            "Compare Selected Messages",
+            on_click=compare_selected_messages,
+        ).props("outline")
+
+        message_table = ui.table(
             columns=columns,
             rows=rows,
             row_key="message_index",
+            selection="multiple",
             pagination={"rowsPerPage": 0},
         ).classes("w-full")
+
+
+
