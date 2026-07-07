@@ -314,11 +314,18 @@ def xml_finalize(file_path, collection_name, file_tags):
 
     items = []
 
+    from core.nlp_generator import word_split
+
     for doc in normalized_docs:
         text_parts = []
 
         if doc.get("primary_name"):
             text_parts.append(doc["primary_name"])
+            # camelCase/snake_case names are single search tokens — append the
+            # split form so 'OrderQty' is findable by 'order quantity'.
+            _sp = word_split(doc["primary_name"])
+            if _sp:
+                text_parts.append(f"({_sp})")
 
         if doc.get("description"):
             text_parts.append(doc["description"])

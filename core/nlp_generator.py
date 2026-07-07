@@ -75,6 +75,18 @@ if DEBUG:
 # =========================================================
 # STRUCTURED NLP TEXT
 # =========================================================
+def word_split(value):
+    """Split camelCase / snake_case names into words so BM25 and the embedding
+    can match them ('OrderQty' alone is ONE token — invisible to a search for
+    'order quantity'). Returns None when splitting adds nothing. Generic
+    string shape, no vocabulary."""
+    import re
+    s = str(value or "")
+    split = re.sub(r"(?<=[a-z0-9])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])", " ", s)
+    split = split.replace("_", " ").strip()
+    return split if split.lower() != s.lower() and " " in split else None
+
+
 def build_structured_nlp_text(row, schema):
     row_n = _row_norm(row)
 
@@ -99,12 +111,19 @@ def build_structured_nlp_text(row, schema):
     alias_values = _all_values(row_n, alias_fields)
 
     parts = []
+    _word_split = word_split  # shared splitter (module level)
 
     if identifier:
         parts.append(str(identifier))
+        _sp = _word_split(identifier)
+        if _sp:
+            parts.append(_sp)
 
     if primary_name:
         parts.append(primary_name)
+        _sp = _word_split(primary_name)
+        if _sp:
+            parts.append(_sp)
 
     if description:
         parts.append(description)

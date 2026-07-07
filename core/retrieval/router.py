@@ -363,13 +363,40 @@ def _normalise_to_points(items: List) -> List:
     return items
 
 
-def _get_bm25_queries(question: str) -> List[str]:
+# Deterministic low-confidence banner. Prepended by route_query when answer
+# coverage is weak; surfaces (Ask/Chat) must keep it OUTSIDE any LLM synthesis
+# — the LLM summarizes it away otherwise.
+LOW_COVERAGE_PREFIX = "No direct match found for this question — closest result shown:"
+
+
+def _filter_corpus_words(collection: str, words: List[str]) -> List[str]:
+    """Keep only words that exist somewhere in the collection's text (one
+    indexed EXISTS each). Drops typos and dead tokens generically."""
+    from core.db import fetchall as _fa
+    kept = []
+    for w in words:
+        try:
+            hit = _fa(
+                "SELECT 1 FROM chunks WHERE collection_name = %s "
+                "AND nlp_text_tsv @@ plainto_tsquery('english', %s) LIMIT 1",
+                (collection, w))
+        except Exception:
+            return list(words)
+        if hit:
+            kept.append(w)
+    return kept
+
+
+def _get_bm25_queries(question: str, collection: str = None) -> List[str]:
     """
     Build BM25 query variants from a question.
     Strips noise words, expands synonyms into separate query variants.
+    Tokens absent from the collection's vocabulary (typos like 'teh') are
+    dropped — websearch_to_tsquery ANDs terms, so one corpus-absent token
+    vetoes the variant and silences the whole BM25 leg of RRF.
     """
     from core.query_helpers import load_doc_query_hints, expand_terms_with_synonyms
-    
+
     q_norm = normalize_simple_text(question)
     hints = load_doc_query_hints()
     noise = set(hints.get("discovery_noise_words", []))
@@ -380,6 +407,11 @@ def _get_bm25_queries(question: str) -> List[str]:
     content_words = [w for w in q_norm.split() if w and w not in noise]
     if not content_words:
         return [q_norm]
+
+    if collection:
+        kept = _filter_corpus_words(collection, content_words)
+        if kept:
+            content_words = kept
 
     queries: set = set()
     queries.add(" ".join(content_words))
@@ -402,7 +434,7 @@ def _build_candidate_points(collection: str, question: str, limit: int = 25) -> 
     from core.retrieval.db_retrieval import search_rrf
     from core.retrieval.semantic import embed_question
 
-    bm25_queries = _get_bm25_queries(question)
+    bm25_queries = _get_bm25_queries(question, collection=collection)
     embedding = embed_question(question)
 
     # Detect namespace filter from question
@@ -505,7 +537,36 @@ def route_query(
         payload = build_fuller_doc_payload(collection, payload) or payload
     payload["_chunk_db_id"] = _best_chunk_db_id
     route_query._last_answer_payload = payload
-    return synthesize_answer(payload, roles, collection)
+    answer = synthesize_answer(payload, roles, collection)
+
+    # Low-coverage disclaimer: when most of the question's REAL content words
+    # (typos and corpus-absent tokens excluded from the denominator) don't
+    # appear in the answering chunk, this is a nearest-neighbor guess, not a
+    # match — say so instead of presenting it with full confidence. Framing
+    # only, never blocks the answer: loose matching is a feature for messy
+    # phrasing; silence about weakness is not.
+    try:
+        from core.query_helpers import load_doc_query_hints
+        _hints = load_doc_query_hints()
+        _noise = set()
+        for _k in ("discovery_noise_words", "question_words",
+                   "structured_namespace_terms", "stopwords"):
+            _noise.update(_hints.get(_k, []))
+        # ALL content words count in the denominator — including typos and
+        # corpus-absent tokens. They are part of the question's information;
+        # excluding them inflated a 1-of-3-words match to 100% coverage.
+        _words = [w for w in normalize_simple_text(question).split()
+                  if w and w not in _noise and len(w) > 2]
+        if _words:
+            _hay = " ".join(str(payload.get(k) or "") for k in
+                            ("nlp_text", "text", "primary_name", "description")).lower()
+            _cov = sum(1 for w in _words if w in _hay) / len(_words)
+            _min_cov = load_system_config().get("answer_coverage_disclaimer_below", 0.5)
+            if _cov < _min_cov:
+                answer = LOW_COVERAGE_PREFIX + "\n\n" + str(answer)
+    except Exception:
+        pass
+    return answer
 
 
 # ---------------------------------------------------------------------------

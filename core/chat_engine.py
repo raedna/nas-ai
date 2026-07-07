@@ -128,12 +128,15 @@ def select_collections(question: str, history: list, available_collections: list
         question, re.IGNORECASE
     )
 
-    # --- Tier 1: direct identifier/filename match across collections ---
+    # --- Tier 1: direct identifier/filename/code match across collections ---
     # Matches the dedicated identifier COLUMN (payload->>'identifier' is not
-    # reliably populated) plus reference_identifiers/aliases payload arrays,
-    # mirroring get_by_identifier's lookup + fallback.
+    # reliably populated), primary_name (BBG mnemonics, job names), plus
+    # reference_identifiers/aliases payload arrays. Anchors: filenames AND
+    # code-like tokens (ALL-CAPS with digits/underscores, >=4 chars — e.g.
+    # ARD_OPERATING_EXP_PER_ASM_ASK) — generic shapes, no vocabulary.
     _filenames = re.findall(r'\b[a-zA-Z0-9_\-]+\.[a-zA-Z0-9]{2,5}\b', question)
-    _identifiers = _filenames
+    _codes = re.findall(r'\b[A-Z][A-Z0-9_]{3,}\b', question)
+    _identifiers = _filenames + [c for c in _codes if c not in _filenames]
 
     _tier1_hits = []
     for _id in _identifiers:
@@ -144,10 +147,11 @@ def select_collections(question: str, history: list, available_collections: list
                 """SELECT 1 FROM chunks
                    WHERE collection_name = %s
                    AND (identifier ILIKE %s
+                        OR primary_name ILIKE %s
                         OR jsonb_exists(payload->'reference_identifiers', %s)
                         OR jsonb_exists(payload->'aliases', %s))
                    LIMIT 1""",
-                (_col, _id, _id, _id)
+                (_col, _id, _id, _id, _id)
             )
             if _hit:
                 _tier1_hits.append(_col)

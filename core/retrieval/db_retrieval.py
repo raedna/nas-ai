@@ -382,6 +382,20 @@ def search_bm25(
     """
     # CTE query param must be first -- before WHERE params
     rows = fetchall(sql, tuple([query] + params))
+
+    if not rows:
+        # websearch_to_tsquery ANDs all terms — ONE unmatched token (a typo
+        # like 'teh') returns zero rows and silences the whole lexical leg of
+        # RRF. Fall back to OR semantics: unmatched tokens contribute nothing,
+        # matched rare terms still rank high via ts_rank.
+        import re as _re
+        _terms = _re.findall(r"[A-Za-z0-9_.]+", str(query))
+        if len(_terms) > 1:
+            or_query = " OR ".join(_terms)
+            # params layout: [collection_name, query, (doc_type), (source_type), limit]
+            or_params = list(params)
+            or_params[1] = or_query
+            rows = fetchall(sql, tuple([or_query] + or_params))
     return _rows_to_points(rows, score_key="bm25_score")
 
 

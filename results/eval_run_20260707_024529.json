@@ -1,0 +1,1103 @@
+[
+ {
+  "id": "DL-01",
+  "question": "what is FIX tag 22",
+  "expected": "SecurityIDSource definition",
+  "ask": {
+   "collection": "xml_test",
+   "method": "structured_namespace_lookup",
+   "answer": "Tag 22 is SecurityIDSource.\n\nDescription: Identifies class or source of the SecurityID (48) value. Required if SecurityID is specified.",
+   "seconds": 4.1
+  },
+  "chat": {
+   "collections_queried": [
+    "xml_test",
+    "astro_test"
+   ],
+   "collection": "xml_test",
+   "method": "retrieval",
+   "answer_kind": "structured",
+   "answer": "Here is what I found:\n\nTag 22: SecurityIDSource\n\nDescription: Identifies class or source of the SecurityID (48) value. Required if SecurityID is specified.\n\nThis field is necessary when a SecurityID is provided, to specify its class or source.",
+   "seconds": 26.5
+  }
+ },
+ {
+  "id": "DL-02",
+  "question": "what is gsact.txt",
+  "expected": "Goldman RECON mapping record",
+  "ask": {
+   "collection": "recon_assist_file",
+   "method": "identifier_lookup",
+   "answer": "Moore file name gsact.txt is 019_W_RECON_GOLDMAN_PRIO_PULL.\n\nActive: YES\n\nPrime Broker: Goldman\n\nDate Column to Check: Column 1\n\nRecon Tool Data Source: Transaction\n\nRecon Tool File Format: GS Cash Activity\n\nIncluded in Email Alert: YES\n\nMove Script (K:/Recon/FTP): GSCopy_srpb.bat\n\nAlso known as: SRPB_4000_1200105898_DATA_Custody_Tra_286534_156520.xls\n\nType: Goldman",
+   "seconds": 0.3
+  },
+  "chat": {
+   "collections_queried": [
+    "kb_docs",
+    "obsidian",
+    "recon_assist_file"
+   ],
+   "collection": "recon_assist_file",
+   "method": "retrieval",
+   "answer_kind": "structured",
+   "answer": "Here is what I found:\n\nMoore file name gsact.txt is 019_W_RECON_GOLDMAN_PRIO_PULL.\n\nActive: YES\n\nPrime Broker: Goldman\n\nDate Column to Check: Column 1\n\nRecon Tool Data Source: Transaction\n\nRecon Tool File Format: GS Cash Activity\n\nIncluded in Email Alert: YES\n\nMove Script (K:/Recon/FTP): GSCopy_srpb.bat\n\nAlso known as: SRPB_4000_1200105898_DATA_Custody_Tra_286534_156520.xls\n\nType: Goldman",
+   "seconds": 20.4
+  }
+ },
+ {
+  "id": "DL-03",
+  "question": "what is tag 35 in FIX",
+  "expected": "MsgType definition",
+  "ask": {
+   "collection": "xml_test",
+   "method": "structured_namespace_lookup",
+   "answer": "Tag 35 is MsgType.\n\nDescription: Defines message type ALWAYS THIRD FIELD IN MESSAGE. (Always unencrypted)\nNote: A \"U\" as the first character in the MsgType field (i.e. U, U2, etc) indicates that the message format is privately defined between the sender and receiver.",
+   "seconds": 3.7
+  },
+  "chat": {
+   "collections_queried": [
+    "xml_test",
+    "astro_test"
+   ],
+   "collection": "xml_test",
+   "method": "retrieval",
+   "answer_kind": "structured",
+   "answer": "Here is what I found:\n\nTag 35: MsgType\n\nDescription: Defines message type ALWAYS THIRD FIELD IN MESSAGE. (Always unencrypted)\nNote: A \"U\" as the first character in the MsgType field (i.e. U, U2, etc) indicates that the message format is privately defined between the sender and receiver.",
+   "seconds": 26.6
+  }
+ },
+ {
+  "id": "DL-04",
+  "question": "jpm_activity.xlsx details",
+  "expected": "JPM mapping record (verify filename)",
+  "ask": {
+   "collection": "recon_assist_file",
+   "method": "semantic",
+   "answer": "No exact match found for 'jpm_activity.xlsx details'. Closest results:\n- jpm_fi_activity.xlsx: 090_W_RECON_JPM_PB_PULL\n- jpm_activity.xlsx: 090_W_RECON_JPM_PB_PULL\n- jpmfx_act.csv: 090_W_RECON_JPM_PB_PULL\n- jpm_bal.xlsx: 090_W_RECON_JPM_PB_PULL\n- : ",
+   "seconds": 4.8
+  },
+  "chat": {
+   "collections_queried": [
+    "kb_docs",
+    "obsidian",
+    "recon_assist_file"
+   ],
+   "collection": "kb_docs",
+   "method": "retrieval",
+   "answer_kind": "structured",
+   "answer": "Here is what I found:\n\nNo record found for 'jpm_activity.xlsx' in this collection. Please check the filename and try again.\n\nIf you have any other inquiries or need assistance with a different file, feel free to ask!",
+   "seconds": 17.1
+  }
+ },
+ {
+  "id": "DL-05",
+  "question": "what is the PB filename for gsact.txt",
+  "expected": "SRPB_4000_..._Custody_Tra alias",
+  "ask": {
+   "collection": "recon_assist_file",
+   "method": "semantic",
+   "answer": "No exact match found for 'what is the PB filename for gsact.txt'. Closest results:\n- gsrepopos.txt: \n- gsact.txt: 019_W_RECON_GOLDMAN_PRIO_PULL\n- gsco_act.txt: 020_W_RECON_GOLDMAN_PB_PULL\n- gsact_sd.txt: 019_W_RECON_GOLDMAN_PRIO_PULL\n- gsact_fx.txt: 020_W_RECON_GOLDMAN_PB_PULL",
+   "seconds": 3.9
+  },
+  "chat": {
+   "collections_queried": [
+    "recon_assist_file"
+   ],
+   "collection": "recon_assist_file",
+   "method": "retrieval",
+   "answer_kind": "doc",
+   "answer": "\"The PB filename for gsact.txt is '019_W_RECON_GOLDMAN_PRIO_PULL'. This information is quoted verbatim from the retrieved data.\"",
+   "seconds": 16.1
+  }
+ },
+ {
+  "id": "DL-06",
+  "question": "what is the Whirlpool galaxy",
+  "expected": "M51/NGC5194 catalog entry",
+  "ask": {
+   "collection": "astro_catalog",
+   "method": "semantic",
+   "answer": "Source: Entity record\n\nWhirlpool galaxy",
+   "seconds": 13.8
+  },
+  "chat": {
+   "collections_queried": [
+    "M51",
+    "astro_catalog"
+   ],
+   "collection": "astro_catalog",
+   "method": "retrieval",
+   "answer_kind": "doc",
+   "answer": "The Whirlpool galaxy is referred to in the entity record. However, no specific details are provided about it within the retrieved data.",
+   "seconds": 23.8
+  }
+ },
+ {
+  "id": "DL-07",
+  "question": "ARD_OPERATING_EXP_PER_ASM_ASK",
+  "expected": "BBG field A0356 definition",
+  "ask": {
+   "collection": "bbg_fields",
+   "method": "semantic",
+   "answer": "Id A0356 is ARD_OPERATING_EXP_PER_ASM_ASK.\n\nCategory: Fundamentals/Bloomberg Fundamentals/Standard Labels ARD/Industry Specific/Airlines\n\nDataType: Double\n\nDescription: ARD Operating Expense Per ASM (Ask)\n\nType: Fundamentals/Bloomberg Fundamentals/Standard Labels ARD/Industry Specific/Airlines",
+   "seconds": 4.4
+  },
+  "chat": {
+   "collections_queried": [
+    "kb_docs",
+    "obsidian"
+   ],
+   "collection": "kb_docs",
+   "method": "retrieval",
+   "answer_kind": "doc",
+   "answer": "The retrieved data does not contain information about \"ARD_OPERATING_EXP_PER_ASM_ASK\". The document details procedures related to the automated 21R2 PROD archive process and does not mention the term or concept asked in your question.",
+   "seconds": 79.5
+  }
+ },
+ {
+  "id": "DL-08",
+  "question": "message broadcaster down",
+  "expected": "Broadcaster Down / Alert Checklist KB article",
+  "ask": {
+   "collection": "kb_docs",
+   "method": "semantic",
+   "answer": "Source: Kb Docs\n\nMessage Broadcaster Down\n\nStep 1: Initial Status Check\r\nVerify the status of the Message Broadcaster in Web Admin and open the Support mailbox simultaneously.\r\nIf the broadcaster is Active on us1-crd078081 (primary) or us1-crd088081 (backup), notify the MCM CRIMS Support \u2013 External chat that the alert has been received and the broadcaster is currently active. Also note that you will continue to monitor it's status. \r\nIf the status is Not Running, notify the MCM CRIMS Support chat immediately and proceed to investigate further.\r\nMessage Broadcaster not running screenshot here\r\n\r\nStep 2: Consistent Communication\r\nMaintain regular communication with the external Moore chat, providing updates every few minutes if the broadcaster remains down, if the root cause is still being investigated, or what actions are being taken\r\n\r\nScenarios for Investigation:\r\n\r\nScenario 1: CTM Blocking\r\nIf you find blocking in the Support mailbox, identify whether the SPIDs with a Blocker value of 0 are CTM related or not (captured below). If they are proceed with the following:\r\nAccess the prod database using the CRDADMIN login and terminate the blocking SPIDs.\r\nEscalate to the following team members if you do not have prod CRDADMIN credentials:\r\nUS: Andrew, Anuja\r\nDubai: Raed, Mike, Mark (Moore)\r\n\r\n\r\nScenario 2: Non-CTM Blocking\r\nIf the command is not a CTM command, escalate to Andrew and/or Moore contacts (Maher or Prasad) for confirmation on what the process is before killing it.\r\nCommands that should not be killed without explicit approval include (but are not limited to):\r\nTRIG_TS_ORDER_FIRM_POSITION\r\nTS_ORDER_AU\r\nFn_Append_Allocation_Fields\r\nBroadcast Queries\r\nAdd new examples here\r\n\r\n\r\nScenario 3: No Blocking but Long-Running Transactions\r\nNavigate to Web Admin > Monitor and the Support mailbox to identify any existing long-running transactions.\r\nIf the transaction is broadcast query related, it should be killed.\r\nBroadcast queries can be killed in the case of long-running transactions vs. a blocking because as a long running transaction, the process has not committed yet.\r\nIf unrelated, escalate to Andrew, Maher, or Prasad to get confirmation if the process can be terminated.\r\n\r\n\r\nScenario 4: No Blocking, No Long-Running Transactions\r\nReview the Message Logs and Server Logs for any errors.\r\nIf errors are found, resolve appropriately (examples include restarting services, reboot middle tier, or adjust broadcast queries with Maher).\r\nIf no errors are found, initiate a failover to the backup middle tier.\r\nInclude steps here\r\nNeed to include a screenshot of server logs with errors\n\nWhat is Message Broadcaster\r\nMoore has the Message broadcaster which passes information to their external Process Server. This external process server expects a specific schema. That schema not being present means it will ignore the extraneous messages. Meaning if the Broadcaster isn\u2019t configured properly the messages won\u2019t be consumed at all and will not throw an error.\r\n\r\nAlert: Msg Broadcaster Down or Inactive\r\nIf you receive the alert below indicating that the message broadcaster is down, and you find that the Message Broadcaster is inactive, please follow the steps outlined below to address the issue.\r\n\r\nWhy Are We Getting These Alerts\r\nMsg Broadcaster alert is configured based on the heartbeat being stale by a minute. Ongoing major system activity has been shown to impact the heartbeat just as much as the broadcaster itself choking on CTM or its own queries. General system slowness has been also reported.",
+   "seconds": 27.8
+  },
+  "chat": {
+   "collections_queried": [
+    "obsidian",
+    "kb_docs"
+   ],
+   "collection": "obsidian",
+   "method": "retrieval",
+   "answer_kind": "doc",
+   "answer": "To address the message broadcaster down issue:\n\n\"Check the TS_FILL table in the db, and if a minute or two before that we have thousand or more fills, it could be a potential reason.\"\n\n\"Also check the logs for CTM traffic from cs_message logs, as many send to post-trade and accounting immediately.\"",
+   "seconds": 30.0
+  }
+ },
+ {
+  "id": "DL-09",
+  "question": "how to merge a ticket in HaloITSM",
+  "expected": "Merge ticket KB article",
+  "ask": {
+   "collection": "kb_docs",
+   "method": "semantic",
+   "answer": "Source: Kb Docs\n\nHow to Merge a Ticket in HaloITSM\n\nIdentify the Tickets you wish to Merge From and Into.For the Tickets you wish to Merge INTO another ticket, checkbox them.Hover your Mouse over the Edit Icon and navigate to the Merge Button, Click that.Once you've selected the merge button you will find this merge ticket(s) screen. Locate the ticket by its ID or Summary Title that you wish to merge the chosen ticket(s) into. (Be sure to adjust the filters as necessary). Click on the chosen ticket and then confirm selection.The system will close the tickets you merged and leave a note on the ticket they were merged into, including adding all of the history of the original ticket.\n\nWhen you want to Merge a ticket into another one.",
+   "seconds": 25.2
+  },
+  "chat": {
+   "collections_queried": [
+    "kb_docs",
+    "obsidian"
+   ],
+   "collection": "kb_docs",
+   "method": "retrieval",
+   "answer_kind": "doc",
+   "answer": "To merge a ticket in HaloITSM:\n1. Identify the Tickets you wish to Merge From and Into.\n2. Checkbox the tickets you wish to Merge INTO another ticket.\n3. \"Hover your Mouse over the Edit Icon and navigate to the Merge Button, Click that.\"\n4. On the merge ticket(s) screen, \"Locate the ticket by its ID or Summary Title that you wish to merge the chosen ticket(s) into.\" Adjust filters as necessary, click on the chosen ticket, then confirm selection.\nThe system will close the tickets you merged and leave a note on the ticket they were merged into, including adding all of the history of the original ticket.",
+   "seconds": 36.9
+  }
+ },
+ {
+  "id": "DL-10",
+  "question": "NGC 2064",
+  "expected": "catalog entry (type, coordinates)",
+  "ask": {
+   "collection": "astro_catalog",
+   "method": "lexical_short",
+   "answer": "Source: Entity record\n\nREFLECTION NEBULA",
+   "seconds": 16.6
+  },
+  "chat": {
+   "collections_queried": [
+    "astro_catalog",
+    "obsidian"
+   ],
+   "collection": "astro_catalog",
+   "method": "retrieval",
+   "answer_kind": "doc",
+   "answer": "The retrieved data does not provide specific information about NGC 2064. It mentions \"REFLECTION NEBULA\" but does not link it to NGC 2064 or offer details about this particular celestial object.",
+   "seconds": 30.2
+  }
+ },
+ {
+  "id": "PP-01",
+  "question": "that goldman activity file, whats the tidal job for it",
+  "expected": "gsact.txt -> 019_W_RECON_GOLDMAN_PRIO_PULL",
+  "ask": {
+   "collection": "recon_assist_file",
+   "method": "semantic",
+   "answer": "No exact match found for 'that goldman activity file, whats the tidal job for it'. Closest results:\n- gsact_sd.txt: 019_W_RECON_GOLDMAN_PRIO_PULL\n- gsact.txt: 019_W_RECON_GOLDMAN_PRIO_PULL\n- gsrepopos.txt: \n- gsd_wires.txt: 020_W_RECON_GOLDMAN_PB_PULL\n- gsact_fx.txt: 020_W_RECON_GOLDMAN_PB_PULL",
+   "seconds": 80.8
+  },
+  "chat": {
+   "collections_queried": [
+    "kb_docs",
+    "obsidian"
+   ],
+   "collection": "kb_docs",
+   "method": "retrieval",
+   "answer_kind": "doc",
+   "answer": "The tidal job for the Goldman activity file is part of the \"TRAIANA_TRADE_FEED\" sub-job group under the \"TRADES_FX_Forwards\" parent job group. Specifically, it involves three jobs: \n\n- \"030_U_PY_TRAIANA_TRADE_ALERT\"\n- \"020_U_CR_TRANSMIT_TRAIANA_FILE\"\n- \"010_U_PY_CREATE_TRAIANA_FILE\"\n\nIf there is an issue with the 030 job, it should be set to Completed Normally and wait for the next run.",
+   "seconds": 209.0
+  }
+ },
+ {
+  "id": "PP-02",
+  "question": "whats teh fix tag for order quantity",
+  "expected": "OrderQty tag 38",
+  "ask": {
+   "collection": "xml_test",
+   "method": "semantic",
+   "answer": "Tag 53 is Quantity.\n\nDescription: Overall/total quantity (e.g. number of shares)\n(Prior to FIX 4.2 this field was of type int)",
+   "seconds": 4.0
+  },
+  "chat": {
+   "collections_queried": [
+    "xml_test",
+    "kb_docs"
+   ],
+   "collection": "xml_test",
+   "method": "retrieval",
+   "answer_kind": "structured",
+   "answer": "Here is what I found:\n\nThe fix tag for order quantity is Tag 53, which is described as \"Overall/total quantity (e.g. number of shares).\" \n\nNote: Prior to FIX 4.2, this field was of type int.\n\nThis should provide the information you need regarding the fix tag for order quantity.",
+   "seconds": 26.1
+  }
+ },
+ {
+  "id": "PP-03",
+  "question": "brodcaster acting up agian",
+  "expected": "broadcaster troubleshooting",
+  "ask": {
+   "collection": "kb_docs",
+   "method": "semantic",
+   "answer": "Source: Kb Docs\n\nCRD Middle Tier -  Restart Servers Manually\n\nServices are Running but Unable to Connect to WebAdmin If the services were running but still you weren\u2019t able to connect to Webadmin, check the configuration for the master cluster and its other Middle Tiers, to see if they are pointing at the right middle tier for the Master. Login to Middle Tier Server. Navigate to Install of Middle Tier ex. C:\\Charles River\\21R2\\serverapps. Navigate to the bin folder. Navigate to crd_configure.bat > Right-click and open as Administrator. Check the Utilities drop down \u201cCluster Configuration\u201d If the Middle Tier master is not pointed at itself (In this instance us2uat-cr03:8081) then we need to repoint it there. Save that. Stop the Middle Tier Service if running, Make sure the CharlesriverMiddleTier.exe is not running in Task Manager. Start up Service.\n\nRestart the Servers Manually:\r\nPROD: (This applies to all 18 crd PROD servers)\r\nUsing Passwordstate, log in to server us1-crd02: (or the server you want to restart) using NYCCRD\r\nCheck Task Manager to see if there is an instance of Charles River Running, if there is, kill it.\r\n\r\n\r\n\r\nGo to services, search for SMS Agent Host.\r\nRight click on SMS Agent Host and change Startup Type to Manual then click on Stop .\r\n\r\n\r\n\r\n\r\nGo to Services, search for CharlesRiverUS1CRD028081. Right click on 'Start'.\r\n\r\n\r\n\r\nGo to PROD CR Web Admin to check if us1-crd02 server is up.\r\nhttp://us1-crd02:8081/crts\r\nIf the server is up, go back to services and Start SMS Agent Host\r\nUAT: (This applies to all 3 crd UAT servers)\r\nUsing Remote Desktop, log in to server us2uat-cr03: (or the server you want to restart)\r\nUsername: NYCCRD\r\nPassword: N*****\r\nRepeat steps 2.a.ii to 2.a.viii but this time start CharlesRiverUS2UATCR038081 and check if the server is running from http://us2uat-cr03:8081/crts.\r\nDEV: (This applies to all 5 crd dev servers)\r\nUsing Remote Desktop, log in to server us2dev-crd02: (or the server you want to restart)\r\nUsername: NYCCRD\r\nPassword: N*****\r\nRepeat steps 2.a.ii to 2.a.viii but this time start CharlesRiverUS2DEVCR028081 and check if the server is running from http://us2dev-cr02:80081/crts.",
+   "seconds": 23.8
+  },
+  "chat": {
+   "collections_queried": [
+    "obsidian",
+    "kb_docs"
+   ],
+   "collection": "obsidian",
+   "method": "retrieval",
+   "answer_kind": "doc",
+   "answer": "The retrieved data does not contain information about a broadcaster acting up. It appears to be documentation related to table workflow implementation and testing for financial or astronomical operations. Your question seems unrelated to the provided document content.",
+   "seconds": 46.0
+  }
+ },
+ {
+  "id": "PP-04",
+  "question": "CR wont let me cancel a fix trade",
+  "expected": "Cancel FIX Trades in CRD When Blocked",
+  "ask": {
+   "collection": "kb_docs",
+   "method": "semantic",
+   "answer": "Source: Kb Docs\n\nHow to Cancel FIX Trades in CRD When Cancel Action Is Blocked\n\nCAUTION: This email originated from outside of the organization. Do not click links or open attachments unless you recognize the sender, and know the content is safe. Hi The below order has flowed into CR from a bad vcon, please cancel, it won\u2019t let us: Thanks Chris *** Moore Europe Legal Disclaimer and Other Information*** Moore Europe comprises of Moore Europe Capital Management, LLP and MECM, Limited; these are investment management firms, who buy and sell equities and other financial instruments. Please do not provide us any inside information or material nonpublic information. We may buy or sell financial instruments based on the information you provide. We intend our securities and futures trading to remain unrestricted, and we do not agree to restrict our activities in any way. Please do not send us any information you are obliged to keep confidential, are not authorised to disclose to us, or are not authorised to have, whether any such restriction is imposed by law, agreement, government or company policy. This applies to information you obtain from any source. We are under no obligation to keep any information we receive from you confidential unless we sign a confidentiality agreement in advance. We ask that you provide to us only information that fully complies with these requirements and restrictions and that does not constitute inside information or material nonpublic information. . Moore Europe Capital Management, LLP - One Curzon Street, London, W1J 5HA, is registered as a limited liability partnership in England and Wales (No: OC322533) with its registered office at 27 Old Gloucester Street, London, United Kingdom, WC1N 3AX and is authorised and regulated by the Financial Conduct Authority. MECM, Limited - One Curzon Street, London, W1J 5HA, is registered as a private limited company in England and Wales (No: 03144922) with its registered office at 27 Old Gloucester Street, London, United Kingdom, WC1N 3AX. Disclaimer Link: To see Legal Disclaimer and other important information, click the link below or copy and paste the link into your browser's address line. https://d.moorecap.com/ukdisclaimer.html\n\nCRD will not allow a cancellation if there are active or pending FIX messages associated with the order. \r\nIn these scenarios, the cancellation must be processed using FIX Override.\r\n\r\n\r\nCRD also requires that the Exec Broker on the placement level matches the original broker used for the fill (e.g., BBGFIT for VCON orders).\r\nIf the Exec Broker is incorrect (for example, set to GSIL instead of BBGFIT), CRD will disable the FIX Override button, preventing the user from cancelling the order.\r\n\r\n\r\n\r\nPlease follow the steps below\r\n1. Check the Exec Broker StatusBefore proceeding:\r\nIf the Exec Broker on the placement level is correct \u2192 You may proceed directly with FIX Override (Step 3).\r\nIf the Exec Broker on the placement level is incorrect or empty \u2192 CRD disables FIX Override. The Exec Broker on the placement level must be corrected to the original broker the order was filled with before the cancellation can be performed (Step 2).\r\n2. Re-enable the FIX Override ButtonIf the Override buttons are greyed out, Update the Exec Broker at the placement level:\r\nOpen the order.\r\nLocate the OP__EXEC_BROKER\r\nSet the Exec Broker to the original broker associated with the fill.\r\nSave\r\n\r\nFor example, for VCON-originated orders, set Exec Broker to BBGFIT\r\nUpdating this value typically re-enables the FIX Override button.\r\n\r\n\r\n3. Apply FIX OverrideOnce the button is active:\r\nClick the Override button\r\nEnter your user initials and the click \"Proceed with FIX Override\"\r\nProceed with the Cancel action by changing the status on the order to CNCL via dropdown\r\nSave\n\nClients may request assistance cancelling a trade that has come into CRD from FIX when they are unable to cancel it themselves and get an error prompt (as shown in the example screenshots).\r\n\r\nExample request:\r\n\r\n\r\n\r\nError after cancel attempt by changing from status column (set to \"cncl\" status) from the blotter and not the Custom Button \"MCM Cancel Acctg\":",
+   "seconds": 24.5
+  },
+  "chat": {
+   "collections_queried": [
+    "obsidian",
+    "kb_docs"
+   ],
+   "collection": "obsidian",
+   "method": "retrieval",
+   "answer_kind": "doc",
+   "answer": "\"The issue you're experiencing with cancelling a fix trade in CR may be due to the GSAPAC override setting the trade order duration to 'Day Only.' This is noted in the instruction tab of the FIX mapping under the broker.\" Quoted from: \"Also, the GSAPAC overrides the trade order duration and it is set to Day Only. This is noted in instruction tab of the FIX mapping under the broker.\"",
+   "seconds": 32.1
+  }
+ },
+ {
+  "id": "PP-05",
+  "question": "the us1 proc server thing for recon",
+  "expected": "4.2 Checking Files on us1-proc02 / KB 2.2",
+  "ask": {
+   "collection": "obsidian",
+   "method": "semantic",
+   "answer": "Source: Obsidian Notes\n\n4.1 Checking the Tidal Recon Job\n\n# Summary Action\n\nCategory: Moore\n\nTidal Jobs errors are observed. Next step is to check the files on the us1-proc02 machine here: [[7. us1-proc02 Login]]\n\nRefer to the below for details on this step.\n\n# Detailed Action\n\nThe TIDAL Jobs responsible for pulling files are:\n\n| **Prime Broker** | **TIDAL Job Name** |\n| -------------------------------------------------------------------------- | ---------------------------------------------------------------- |\n| CITI | 010_W_RECON_CITI_PB_PULL |\n| Goldman (different files use different Tidal jobs, batch and Script files) | 020_W_RECON_GOLDMAN_PB_PULL 019_W_RECON_GOLDMAN_PRIO_PULL |\n| JPM | 090_W_RECON_JPM_PB_PULL |\n| Morgan | 070_W_RECON_MORGAN_PB_PULL |\n| Chase | 050_W_RECON_CHASE_PB_PULL |\n| BOA | 005_W_RECON_BOA_PB_PULL |\n\nThe tidal jobs that pull the files are the first thing to check. They are all under the Group \u201cRECON_DAILY_BATCH > PB_RECON_FILE_RETRIEVAL\u201d .\n\n[Embedded image OCR from: Recon Tidal jobs.png]\n\nIn Tidal, we first select the PB retrieval job that is suspect from the email alert.\n\n1. Note the job Status: Check if job has completed normally, abnormally, or not run at all.\n\n1. Note that an abnormal completion indicates an error that needs to be investigated\n\n2. Normal completion does not rule out file issues. If a job completes normally, investigation into missing / bad date files is still needed as per the alert email.\n\n2. Right-click on the job, select \u201cDetails\u201d and select the \u201cOutput\u201d tab. This tab will show what the job has done. Example outputs: (in the below Run 3 is the latest, Run 2 is the previous and Run 1 is the first.\n\n[Embedded image OCR from: Recon Tidal Job output downloaded files.png]\n\n[Embedded image OCR from: Recon Tidal Job output tab content.png]\n\n[Embedded image OCR from: Recon Tidal job Output tab content1.png]\n\n3. 1. Not all errors can be accurate so Tidal job output errors need to also be confirmed by checking actual events on the US2-PROC2 server. This is explained in the [[4.2 Checking Files on us1-proc02]] Section.\n\nRelated notes:\n- 7. us1-proc02 Login\n- Recon Tidal jobs.png\n- Recon Tidal Job output downloaded files.png\n- Recon Tidal Job output tab content.png\n- Recon Tidal job Output tab content1.png",
+   "seconds": 4.7
+  },
+  "chat": {
+   "collections_queried": [
+    "obsidian",
+    "kb_docs"
+   ],
+   "collection": "obsidian",
+   "method": "retrieval",
+   "answer_kind": "doc",
+   "answer": "To check the US1 proc server for recon issues, follow these steps:\n\n1. \"Check if job has completed normally, abnormally, or not run at all.\"\n2. If abnormal completion is noted, investigate further.\n3. Even with normal completion, verify missing/bad date files as per the alert email.\n4. Refer to [[4.2 Checking Files on us1-proc02]] Section for confirming errors by checking actual events on the US2-PROC2 server.\n\nThe TIDAL Jobs responsible for pulling files are under the Group \u201cRECON_DAILY_BATCH > PB_RECON_FILE_RETRIEVAL\u201d.",
+   "seconds": 59.9
+  }
+ },
+ {
+  "id": "PP-06",
+  "question": "goldman prio pull job",
+  "expected": "019_W_RECON_GOLDMAN_PRIO_PULL record",
+  "ask": {
+   "collection": "recon_assist_file",
+   "method": "semantic",
+   "answer": "Moore file name gsact.txt is 019_W_RECON_GOLDMAN_PRIO_PULL.\n\nActive: YES\n\nPrime Broker: Goldman\n\nDate Column to Check: Column 1\n\nRecon Tool Data Source: Transaction\n\nRecon Tool File Format: GS Cash Activity\n\nIncluded in Email Alert: YES\n\nMove Script (K:/Recon/FTP): GSCopy_srpb.bat\n\nAlso known as: SRPB_4000_1200105898_DATA_Custody_Tra_286534_156520.xls\n\nType: Goldman",
+   "seconds": 3.9
+  },
+  "chat": {
+   "collections_queried": [
+    "kb_docs",
+    "obsidian"
+   ],
+   "collection": "kb_docs",
+   "method": "retrieval",
+   "answer_kind": "doc",
+   "answer": "To manually pull the goldman prio files, follow these steps:\n\n1. Use the command: `mget filename*.pgp` to move the files to the bin directory.\n2. Navigate to the bin directory using: `cd bin`.\n3. Move the files to the download directory with: `mv *filename* ../download`.\n4. Decrypt the files if encrypted, using: `gpg filename`.\n\nThese steps are part of manually pulling files when the PB_PULL job fails, as stated in the document:\n\"These steps are a direct continuation of the process in page 3.3, proceed using the same terminal environment after where you left off from in page 3.3.\"",
+   "seconds": 61.1
+  }
+ },
+ {
+  "id": "PP-07",
+  "question": "jennison morning stuff failing",
+  "expected": "Jennison Morning Batch escalation/runbook",
+  "ask": {
+   "collection": "kb_docs",
+   "method": "semantic",
+   "answer": "Source: Kb Docs\n\nJennison Daily Task List\n\nMKTData job related issue ticket: 47284\n\nStart Time (DXB Time)Scheduled Task NameTask / Job NameExpected End Time (DXB Time)Escalation Critical TimeEscalation Point of ContactDependency Task / Job Name09:30 AMJennison - Market Data and YB Morning Checks - MMDDYYYYmktdata_fi_analytics_yieldbook_execute and rdc_fi_yb_analytics_load_check10:15 AM11:00 AMTristian (Phone / Teams)MarketDataTechSupport@jennison.comCRDTech@jennison.com MKTData Jobmktdata_yieldbook_analytics_rdc_request_file > mkrdata_yieldbook_request_file_data_threshholdRDC Jobmktdata_fi_analytics_yieldbook_execute10:00 AMJennison Batch Health Checkpointcrd_eod_proc_box10:50 AM9:30 AMJay/Tristian (Phone/Teams)rdc_fi_yb_analytics_load_check takes 5 minutes to run then next job: rdc_fi_yb_analytics_fut_upload takes 4 minutes to run after which crd_rdc_price_stage will start running10:40 AMJennison APL File Autosys Jobcrd_apl_liab_box > crd_watch_apl_liab_partials12:45 PM1:00 PMJay/Tristian (Phone / Teams)crd_topline_analytic11:00 AMJennison DXB Daily File Checks - Account 2084 and DOW7crd_watch_apl_liab_partials12:45 PM1:00 PMJay/Tristian (Phone / Teams)DailyPartials file to be generated once files are generate the job will complete. (Time varies depending on the file size) .1:15 PM Jennison Start of Day Checkoutcrd_bmk_late_box > fibmk_late_composite_blend2:30 PMASAPTristian (Phone / Teams)crd_bod_box\n\nThe document lists details of the daily tasks for SD to Jennison.",
+   "seconds": 28.3
+  },
+  "chat": {
+   "collections_queried": [
+    "obsidian",
+    "kb_docs"
+   ],
+   "collection": "obsidian",
+   "method": "retrieval",
+   "answer_kind": "doc",
+   "answer": "For the issue with Jennison morning stuff failing, specifically if you're encountering RDP connection errors, contact zgong@Jennison.com and kkalaitzidis@jennison.com as specified in the document:\n\n\"If the RDP fails to connect gives you an error such as the one below, contact zgong@Jennison.com and [kkalaitzidis@jennison.com](mailto:kkalaitzidis@jennison.com \"mailto:kkalaitzidis@jennison.com\")\"",
+   "seconds": 37.3
+  }
+ },
+ {
+  "id": "PP-08",
+  "question": "that lock file error on recon jobs",
+  "expected": "2.5 Clearing Lock Files",
+  "ask": {
+   "collection": "kb_docs",
+   "method": "semantic",
+   "answer": "Source: Kb Docs\n\n2.5 TIDAL Recon - Bad Dates - Clearing Lock Files\n\nSteps to clear the lock file:\r\n\r\nOpen PasswordState, and navigate to the Recon folder found in the menu on the left. Log into us1-proc02, as NYCProc. Open K Recon folder, shortcut found in desktop, go to FTP \u2192 Clear Lockfiles, and run the ClearLockfile.bat of the Prime Broker we are facing the issue for:\r\nOpen image-20220627-101130.pngIn case there was no ClearLockfile.bat of the prime broker we are facing the issue for, follow the below steps:\r\nOpen the PB_PULL job to see what .bat file is it running. Ex: we had the job 010_W_RECON_CITI_PB_PULL and it was running CitiCopy.bat. \r\nOpen image-20220627-082354.pngGo to us1-proc02 server, open K Recon shortcut folder found in desktop, go to FTP, right click on the .bat file, and select edit. \r\nOpen image-20220627-094850.pngSelect the first plink statement and stop at dropoff (as highlighted below) then copy it:\r\nOpen image-20220627-095106.pngOpen command window, paste the copied plink statement, and hit enter:\r\nOpen image-20220627-095351.pngType in the below commands:\r\nbash\r\ncd workdir\r\nrm -rf *\r\nls (to check if the workdir directory is empty, it should be empty)\r\nRerun PB_PULL Tidal job.\n\nSometimes, when rerunning the failed PB_PULL job, the job may fail due to the below error, shown in tidal job output:\r\n\r\nOpen image-20220627-080841.pngA lock file is generated in the download directory of the Prime Broker upon running the PB_PULL job for the first time. When rerunning the PB_PULL job for the second time (or more), the lockfile will block the download process. In this case, we have to clear the lockfile and rerun the job again.",
+   "seconds": 27.0
+  },
+  "chat": {
+   "collections_queried": [
+    "obsidian",
+    "kb_docs"
+   ],
+   "collection": "obsidian",
+   "method": "retrieval",
+   "answer_kind": "doc",
+   "answer": "To resolve the lock file error on recon jobs:\n\n\"Log in to us1-proc02 as NYCProc and open K Recon folder, shortcut found in desktop, go to FTP \u2192 Clear Lockfiles, and run the ClearLockfile.bat of the Prime Broker we are facing the issue for.\"\n\nIf there is no ClearLockfile.bat available:\n- Open the PB_PULL job to identify the .bat file it's running.\n- Edit this .bat file by stopping at the dropoff in the first plink statement.\n- Copy and paste this plink statement into a command window, then execute it followed by `bashcd workdir` and `rm -rf *`.\n- Verify with `ls` that the workdir directory is empty.\n- Rerun PB_PULL Tidal job.",
+   "seconds": 43.5
+  }
+ },
+ {
+  "id": "PR-01",
+  "question": "how can I check if gsact.txt is on the sftp",
+  "expected": "4.3.1 Checking sFTP / KB 2.3 (procedure, not mapping)",
+  "ask": {
+   "collection": "obsidian",
+   "method": "semantic",
+   "answer": "Source: Obsidian Notes\n\n4.3.1 Checking sFTP for Activity\n\nLanding on this page means:\n\nCategory: Moore\n\n- PB folders do not contain correct files AND/OR\n\n- PB Incoming folders do not have correct files\n\n- Require checking files on the FTP server to identify what is available, at what time were files available, and have they been downloaded or not.\n\n# Checking Files in sFTP:\n\n1. Identify the batch file for the missing/bad files in question.\n\n1. In the Tidal Job details, under the Override tab, note the batch file referenced. in the example below we will check the CitiCopy.bat file.\n\n[Embedded image OCR from: Pasted image 20251229203435.png]\n\n2. A simpler way to determine the batch file per file is to check the [RECON File Mappings](https://moorecap.atlassian.net/wiki/spaces/MAS/pages/1047658497 \"https://moorecap.atlassian.net/wiki/spaces/MAS/pages/1047658497\") Excel Sheet. Columns D and E contain the batch file and script name used to pull this file, and Tidal job names by file.\n\n[Embedded image OCR from: Pasted image 20251229203456.png]\n\n3. As of today, the path to where the Batch files are is:\n\n[Embedded image OCR from: Pasted image 20251229203512.png]\n\n2. [[7. us1-proc02 Login|Login to us1-proc02]]\n\n3. Navigate to the path above\n\n4. Right-click the relevant batch file (PB.bat) and edit in notepad(++). Two things to note:\n\n[Embedded image OCR from: Pasted image 20251229204229.png]\n\n1. 1. The name of the script (.sh) file that contains the steps to pull files from sFTP site (./bin/GetDcCh.sh in the example above)\n\n2. Copy the part of the line from the beginning until just after the word dropoff. All quotes before the word dropoff need to included, but not any quotes after the word dropoff.\n\n1. Some batch files have a path before the plink, and that should be copied as well.\n\n[Embedded image OCR from: Pasted image 20251229204300.png]\n\n5. paste the copied plink from step 4b. into a CMD window prompt:\n\n[Embedded image OCR from: example .sh file and copy.png]\n\n[Embedded image OCR from: Pasted image 20251229204335.png]\n\n6. Find the FTP command path and the login credentials. The net quick steps are:\n\n1. Type \"bash\u201d then hit enter, then (sometimes the cmd opens in bash mode)\n\n2. Type \u201ccd bin\u201d > that takes us into the bin directory where the .sh files are found\n\n3. Type both or the second item from the 2 points below:\n\n1. ls > lists the files in the current directory (bin in our case) to confirm the .sh file required os in the current directory (can be skipped for familiar users), or\n\n2. ```cat filename.sh``` (in our example, ```cat GetDcCh.sh```) > this will\n\n1. Relevant .sh file is listed in the [[3. RECON File Mappings|Recon File Mapping]] Sheet in Column I.\n\n2. list the content of the .sh file that contains the the FTP command location and\n\n3. the login credentials for the PB FTP site in question.\n\n4. It also shows the path inside the FTP where the files will be dropped by the PB and is usually mentioned just after the ```username@domain>:/ ``` part (eg. inbound, incoming, or direct on the FTP without any subfolder like the case is in our example from Citi.\n\n[Embedded image OCR from: Pasted image 20251229205723.png]\n\n[Embedded image OCR from: Recon sFTP login creds from sh file.png]\n\n7. From current cmd line, enter the path of the sftp command followed by the value observed in the file. The cursor should change from \u201cbash $:\u201d to sftp> along with a message confirming connection established\n\n[Embedded image OCR from: Pasted image 20251230004645.png]\n\n8. 1. Navigate to the folder where the PBs will drop the file. Not required for the example above from Citi, but for GS for example, the folder is outgoing: sftp> cd outgoing, followed by enter.\n\n9. Searching for the file with bad dates for PBs occurs here using the ls command. Type \u201cls -ltr filename\u201d followed by enter, or \u201cls -ltr \"first few characters from filename\u201d\" followed by enter, and this will show us matching files, size and time they were added on the sftp server.\n\n1. Time value can be used to determine if the file was on the sftp server before the pull job was executed in Tidal.\n\n1. for example of the file timestamp of the file in question is 6:35 and the Tidal job run timestamps is 6:40, this most likely suggests that the file should have been pulled when the Tidal job ran.\n\n2. If the Tidal job runtime timestamp is before the file timestamp on sftp, this likely means that the pull job at runtime did not pull the file in question.\n\n10. Action following investigation:\n\n1. If File was on sftp before the runtime of the Tidal PB Pull job, then we need to confirm why the file was not pulled after rechecking the files in the PB and incoming folders do not reflect the file in the sftp server.\n\n2. If the file was on sftp after the runtime of the Tidal PB Pull job, then we need to take the following actions:\n\n1. Rerun the Tidal PB Pull job that is responsible for pulling the files in question. If this fails, then\n\n2. Manually download the file from sftp and move it to the appropriate folders for the Recon.\n\nRelated notes:\n- Pasted image 20251229203435.png\n- Pasted image 20251229203456.png\n- Pasted image 20251229203512.png\n- 7. us1-proc02 Login\n- Pasted image 20251229204229.png",
+   "seconds": 6.2
+  },
+  "chat": {
+   "collections_queried": [
+    "obsidian",
+    "kb_docs",
+    "recon_assist_file"
+   ],
+   "collection": "obsidian",
+   "method": "retrieval",
+   "answer_kind": "doc",
+   "answer": "To check if gsact.txt is on the sFTP, follow these steps:\n\n1. Navigate to the relevant batch file (PB.bat) and edit in notepad(++). Copy the part of the line from the beginning until just after the word \"dropoff\" including all quotes before it.\n2. Paste this copied plink into a CMD window prompt.\n3. In the cmd, type \"bash\", then \"cd bin\", and finally `cat GetDcCh.sh` to find the FTP command path and login credentials for the PB FTP site in question.\n4. Enter the sftp command followed by the observed value from the file. The cursor should change to \"sftp>\" confirming connection.\n5. Navigate to the folder where files will be dropped, e.g., `cd outgoing`.\n6. Search for gsact.txt using the command: `ls -ltr gsact.txt` or `ls -ltr \"gs\"` followed by enter.\n\n\"Searching for the file with bad dates for PBs occurs here using the ls command.\"",
+   "seconds": 76.4
+  }
+ },
+ {
+  "id": "PR-02",
+  "question": "recon file missing, what do I do",
+  "expected": "Bad Dates workflow steps 1-4",
+  "ask": {
+   "collection": "kb_docs",
+   "method": "semantic",
+   "answer": "Source: Kb Docs\n\n2.1 - TIDAL Recon - Bad Dates - Step 1: Tidal Job Checks (DRAFT)\n\nCheck the job: PB_RECON_FILE_RETRIEVAL (Under RECON_DAILY_BATCH group) in Tidal.Select the job of the targeted broker, the one mentioned in the alert (in ticket).Note job status.Check job output to check if files were downloaded and look for failure messages. If job failed and output shows failure is due to lock file (error shown below), clear the lock files as per the instructions in this page..List of files, as shown below, is present in output, a 100% is shown next to each file name to indicate it was downloaded. If it's not a 100%, it wasn't downloaded. Double check, if it wasn't downloaded, using steps in 3.2 to make sure files aren't present. Check for the files mentioned initially in the ticket. If job is not running or waiting on dependencies, attempt to rerun it, if possible as sometimes rerunning could be greyed out. (Say no to running dependencies). If this doesn't work, proceed to steps in 3.2.If job completed normally and output shows files were downloaded properly, as per step 6, proceed to steps in 3.2.\n\nThe reconciliation jobs that we frequently encounter issues with are defined in Tidal under the group name \"RECON_DAILY_BATCH\". Each job is responsible for pulling specific files from a designated prime broker, and the name of the prime broker is included in the job name for easy identification.\r\n\r\n\r\n\r\nThe process for checking these jobs and taking action is the same each time, however, depending on which primer broker is mentioned in the alert, the steps should be performed for the job associated with that specific Prime Broker. \r\n\r\nThe following steps and checks should be carried out whenever any of the previously mentioned errors\u2014bad dates or missing file alerts\u2014are encountered in the incoming ticket.\r\n\r\nThe following page provides an introduction about the expected alerts for Recon - Bad Dates ticket:\r\nRecon - Bad Dates - Intro\r\n\r\nExpected Scenarios:\r\nJob failed with lock file output.Job completed normally and output shows files were downloaded.Job is stuck on waiting on dependencies or didn't run.Job output shows files were not downloaded.",
+   "seconds": 27.1
+  },
+  "chat": {
+   "collections_queried": [
+    "recon_assist_file",
+    "kb_docs"
+   ],
+   "collection": "kb_docs",
+   "method": "retrieval",
+   "answer_kind": "doc",
+   "answer": "If your recon file is missing, first check the job: PB_RECON_FILE_RETRIEVAL (Under RECON_DAILY_BATCH group) in Tidal for the targeted broker mentioned in the alert. Note the job status and check job output to see if files were downloaded. If it shows a failure due to lock files, clear them as per instructions. If the job completed normally but the output indicates files weren't downloaded (a 100% is not shown next to file names), proceed to steps in section 3.2. \"If job failed and output shows failure is due to lock file (error shown below)\" - follow those specific instructions for clearing lock files.",
+   "seconds": 38.7
+  }
+ },
+ {
+  "id": "PR-03",
+  "question": "how to rerun a tidal recon job",
+  "expected": "4.1 Checking the Tidal Recon Job",
+  "ask": {
+   "collection": "obsidian",
+   "method": "semantic",
+   "answer": "Source: Obsidian Notes\n\n4.1 Checking the Tidal Recon Job\n\n# Summary Action\n\nCategory: Moore\n\nTidal Jobs errors are observed. Next step is to check the files on the us1-proc02 machine here: [[7. us1-proc02 Login]]\n\nRefer to the below for details on this step.\n\n# Detailed Action\n\nThe TIDAL Jobs responsible for pulling files are:\n\n| **Prime Broker** | **TIDAL Job Name** |\n| -------------------------------------------------------------------------- | ---------------------------------------------------------------- |\n| CITI | 010_W_RECON_CITI_PB_PULL |\n| Goldman (different files use different Tidal jobs, batch and Script files) | 020_W_RECON_GOLDMAN_PB_PULL 019_W_RECON_GOLDMAN_PRIO_PULL |\n| JPM | 090_W_RECON_JPM_PB_PULL |\n| Morgan | 070_W_RECON_MORGAN_PB_PULL |\n| Chase | 050_W_RECON_CHASE_PB_PULL |\n| BOA | 005_W_RECON_BOA_PB_PULL |\n\nThe tidal jobs that pull the files are the first thing to check. They are all under the Group \u201cRECON_DAILY_BATCH > PB_RECON_FILE_RETRIEVAL\u201d .\n\n[Embedded image OCR from: Recon Tidal jobs.png]\n\nIn Tidal, we first select the PB retrieval job that is suspect from the email alert.\n\n1. Note the job Status: Check if job has completed normally, abnormally, or not run at all.\n\n1. Note that an abnormal completion indicates an error that needs to be investigated\n\n2. Normal completion does not rule out file issues. If a job completes normally, investigation into missing / bad date files is still needed as per the alert email.\n\n2. Right-click on the job, select \u201cDetails\u201d and select the \u201cOutput\u201d tab. This tab will show what the job has done. Example outputs: (in the below Run 3 is the latest, Run 2 is the previous and Run 1 is the first.\n\n[Embedded image OCR from: Recon Tidal Job output downloaded files.png]\n\n[Embedded image OCR from: Recon Tidal Job output tab content.png]\n\n[Embedded image OCR from: Recon Tidal job Output tab content1.png]\n\n3. 1. Not all errors can be accurate so Tidal job output errors need to also be confirmed by checking actual events on the US2-PROC2 server. This is explained in the [[4.2 Checking Files on us1-proc02]] Section.\n\nRelated notes:\n- 7. us1-proc02 Login\n- Recon Tidal jobs.png\n- Recon Tidal Job output downloaded files.png\n- Recon Tidal Job output tab content.png\n- Recon Tidal job Output tab content1.png",
+   "seconds": 6.1
+  },
+  "chat": {
+   "collections_queried": [
+    "kb_docs",
+    "obsidian"
+   ],
+   "collection": "kb_docs",
+   "method": "retrieval",
+   "answer_kind": "doc",
+   "answer": "To rerun a tidal recon job, refer to the specific instructions for each job in the list. For example, for \"Completed Abnormally / 010_U_PY_GET_SI_DAILY\", the document states: \"Rerun a couple of times, if still abnormal, escalate.\" Follow this guidance verbatim for the relevant job you are dealing with.",
+   "seconds": 64.2
+  }
+ },
+ {
+  "id": "PR-04",
+  "question": "how to manually load a file in the recon tool",
+  "expected": "5. Manual File Loading in RECON Tool",
+  "ask": {
+   "collection": "obsidian",
+   "method": "semantic",
+   "answer": "Source: Obsidian Notes\n\n5. Manual File Loading in RECON Tool\n\nCategory: Moore\n\nOnce the correct files are in the PBs folders, we may be requested by Patrick to manually load the files into the RECON Tool.\nTo open the RECON tool, simply click the icon on the windows bar\n\n[Embedded image OCR from: Recon Tool app icon.png]\n\nWhen we first open the RECON Tool, just click >>LOGIN. Credentials are automatically filled. This is the opening page of the RECON Tool:\n\n[Embedded image OCR from: Recon Tool UI screenshot.png]\n\nThe Two Sections below:\n\n- Sanity Check Before Loading Files, and\n\n- Sanity Check Completed - Loading of Files\n\nHave to be performed for every file that is required to be loaded.\n\n# Sanity Check Before Loading Files\n\nBefore any loading takes place, a due diligence that none of the missing / bad date files have already been loaded is required.\n\n1. Navigate to Tasks > Undo Read. Wait a few seconds and another window will open\n\n[Embedded image OCR from: Recon navigating Undo read.png]\n\n1. Check required to ensure the files to be loaded are not already loaded\n\n[Embedded image OCR from: Recon Undo Read search fields.png]\n\n2. We will fill in 3 fields in the opened Window (Undo Read) based on the mappings found columns F, G and H in the [[3. RECON File Mappings |Recon File Mappingd]] Sheet that are available per file:\n\n[Embedded image OCR from: Recon File format and batch job name.png]\n\n3. 1. Fill in the three fields in the following order:\n\n1. Batch Job > from Column H\n\n2. Data Source > from Column F\n\n3. File Format > from Column G\n\n4. Check the results:\n\n1. Find the file we are planning to load\n\n2. Confirm that column \u201cRead In\u201d does not include current data\n\n[Embedded image OCR from: Recon checking for loaded data.png]\n\n3. 1. We can see that latest read in file is 12/22/2025 in our example. so if the file needs to be loaded for 12/23/2025, then we are ok to move to load.\n\n1. 1. Close the Undo Read window by clicking the red X on the top right of the window or clicking the \u201cClose\u201d button on the lower right side of the window.\n\n2. Navigate to Tasks > Data Load\n\n[Embedded image OCR from: RECON navigating for data load.png]\n\n3. three sections of that Data Load window need to be modified:\n\n[Embedded image OCR from: Recon Data Load Screen.png]\n\n1. 1. File Load Type will remain as \u201cFile\u201d\n\n2. Data Source will be set to the value in column F for the required file (Transaction, Cash or Holding)\n\n3. File Format will be set as per the value in Column G, in our case \u201cGS Cash Activity\u201d\n\n4. Select the required file from the three dots option in the File Name(s) section.\n\n4. Click Load and monitor the output in the bottom section of the window \u201cData Load Progress Status\u201d. there will be skipped rows, and then loaded rows.\n\n5. If there are no errors and we can see loaded and skipped rows, then once all required files are loaded, update Patrick that File is loaded and if he can confirm and state if there are any additional requirements for us to check.\n\n6. If the file shows it is Read In on current date we want to load the file for, then confirm with Patrick that we see the same file loaded in RECON tool having the current Read In date.\n\n1. Stop here. Do not load. Wait for Confirmation from Patrick on required actions. Escalate as necessary to ensure proper resolution.\n\nRelated notes:\n- Recon Tool app icon.png\n- Recon Tool UI screenshot.png\n- Recon navigating Undo read.png\n- Recon Undo Read search fields.png\n- 3. RECON File Mappings",
+   "seconds": 7.4
+  },
+  "chat": {
+   "collections_queried": [
+    "kb_docs",
+    "obsidian"
+   ],
+   "collection": "kb_docs",
+   "method": "retrieval",
+   "answer_kind": "doc",
+   "answer": "To manually load a file in the Recon tool, follow these steps:\n\n1. Use the command: `mget filename*.pgp` to pull files into the bin directory.\n2. Navigate to the bin directory with: `cd bin`.\n3. Move the files to the download directory using: `mv *filename* ../download`.\n4. Confirm file transfer by listing contents of the download directory: `ls`.\n\nFor decryption and further processing, refer to the highlighted commands in the Copy.bat script as detailed in the retrieved data.",
+   "seconds": 58.3
+  }
+ },
+ {
+  "id": "PR-05",
+  "question": "weekend restart procedure for moore prod",
+  "expected": "Automated 21R2 Weekend Restart (PROD)",
+  "ask": {
+   "collection": "kb_docs",
+   "method": "semantic",
+   "answer": "Source: Kb Docs\n\nAutomated 21R2 Weekend Restart\n\nErrors Encountered If you see that the Tidal Job did not run try to rerun the job and if that doesn't work try to use the scripts to manually restart the services. You can find the steps in this page: https://agent.omnivista.com/kb?id=80 If Tidal is down, notify helpdesk@moorecap.com , helpdesk-london@moorecap.co.uk . You can proceed with checks and restart servers manually instead.\n\nJob Did Not Run\r\nIf the received emails indicate that the job group was successful, please proceed to 'Server Checks'. However, if the job group completed abnormally, please check Tidal to see if the jobs ran and if they ran and completed normally proceed with checks. If it completed abnormally, try to rerun the job and see if it completed normally, if not, please call Zahraa Awad.\r\nTidal Job is CRD_WEEKLY_RESTART\r\n\r\n\r\n\r\nServer Checks\r\n1. Log in to your assigned Moore machine:\r\nGo to NetScaler AAA \r\n\r\n\r\n\r\nb. Log in using your Moore username (ex. omni_zawad) and password.\r\n\r\n2. Access each of UAT, QA, and PROD CRD Web Admin to check that the services are running:\r\nPROD:\r\nUsing Google Chrome, go to us1-crd02:8081/crts/ \r\nLog in with your individual user credentials\r\nYou should see 18 active CharlesRiver services:\r\nus1-crd028081\r\nus1-crd038081\r\nus1-crd038082\r\nus1-crd048081\r\nus1-crd048082\r\nus1-crd058081\r\nus1-crd058082\r\nus1-crd068081\r\nus1-crd068082\r\nus1-crd078081\r\nus1-crd088081\r\nus1-crd088082\r\nus1-crd108081\r\nus1-crd118081\r\nus1-crd118082\r\nus1-crd128081\r\nus1-crd128082\r\nus1-crdfix018081\r\n\r\n\r\n\r\nb. On us1-crd02:8081/crts/ Webadmin, we need to check the below:\r\nRTAPI status should be 1/1 running for all services except us1-crd108081, us1-crd118081, us1-crd118082, and us1-crdfix018081.\r\nIf RTAPI status on one of the services is 0/1 running, go to that service's RTAPI on Webadmin, Stop it then start it and click save.\r\nMessage Broadcaster should have status Active for us1-crd078081. (Note - if you see it Active in us1-crd088081 that means that was due to a recent failover, okay to proceed.) \r\nMessage Processors should have status 1 running for us1-crd078081. (Note - if you see it Active in us1-crd088081 that means that was due to a recent failover, okay to proceed.) \r\nTrade Gateway should be 3 configured for all middle tiers.\r\nCTM is Active.\r\nGo to Trade Gateway on us1-crd118082.\r\nGo to CTM.\r\nIt should have Connection Status and Status Request as Active and Auto-Start Status Requestor is set to Yes.\r\n\r\nIf they are not in active status, stop Status Requestor \u2192 Unlock Credentials \u2192 Start Status Requestor.If step iv didn\u2019t work, reach out to ops@moorecap.com, cc Maher (maher.almanakly@moorecap.com) and inform them.Workflow Rules should have status Active for us1-crd108081.Ensure the \"Table Event Publisher\" is active on US1-CRD118081. If it is not Active, refer to this PageRandomly check 4 to 5 of the MTs' \"cr_server.log\" files once the previous checks are completed, and make sure we do not see Errors in the log that are repeating regularly after the section \"Java started with\" from the log file. The errors could be multiple errors, so it is not currently possible to list all, but the log should look similar to the below, where no errors are observed and confirmation on the \"Artemis\" service is connected (check red rectangle).Search he log for \"DistributedLock\", and make sure the client and server both point to prod MTs and that there are no UAT servers mentioned:If we do see errors after the restart kick in, then likely a manual restart of all the MTs is required. Refer to this document.\r\nMOVE TO NEXT SECTION\r\n\r\n3. UAT:\r\nUsing Google Chrome, go to us2uat-cr03:8081/crts/ \r\nLog in with your individual user credentials\r\nYou should see 6 active CharlesRiver services:\r\nus2uat-cr038081\r\nus2uat-cr048081\r\nus2uat-cr048082\r\nus2uat-cr058081\r\nus2uat-cr058082\r\nus2uat-cr068081\r\n\r\n\r\n\r\n4. QA:\r\nUsing Google Chrome, go to us2qa-cr01:8081/crts/ \r\nLog in with your individual user credentials\r\nYou should see 2 active Charles River services:\r\nus2qa-cr018081\r\nus2qa-cr028081\r\n\r\n\r\n\r\nSending Out Email\r\n If you have access to Halo, there will be a ticket for the Weekend Restart, make sure to Triage, Take Ownership and do the needed steps for the ticket.\r\nIf you do not have access to Halo, send an email to Maher (maher.almanakly@moorecap.com), Andrew (andrew.adams@omnivista.com), charlesriversupport@moorecap.com and cc omv-moore-support@omnivistasolutions.com to inform that the restart was completed successfully.\r\nSubject: Weekly CRD Restart Checks - Sunday July 2nd, 2023\r\nBody:\r\nHello Maher and Andrew,\r\nPlease note that the weekly restart completed normally. All CRD services are running and triggers and audit parameters are enabled.\n\nEvery Sunday, we initiate a restart of the Moore CRD servers for three environments: QA, UAT, and PROD. This process occurs at 12:30 am EST, which corresponds to 8:30 AM Dubai time, facilitated by Tidal jobs. The jobs are expected to conclude by 12:50 am EST, and subsequently, we anticipate receiving an email confirming the successful completion of the jobs. (Please note the time changes during daylight savings)\r\nTo ensure that the jobs have been completed successfully and that all the necessary services are active and running, we need to conduct several checks before 3 am EST which is 11 am Dubai time.\r\nTo execute the weekend restart checks, follow the below steps:\r\nCheck that we receive the success/failure emails for the weekly restart job group. These emails should be sent to charlesriversupport@moorecap.com. We will be receiving three emails, one for each environment (QA/UAT, PROD). Example emails are seen in the screenshots below.\r\nQA/UAT: The email is sent from SchedulerQA@moorecap.com.\r\nPROD: The email is sent from Scheduler@moorecap.com.",
+   "seconds": 28.7
+  },
+  "chat": {
+   "collections_queried": [
+    "kb_docs",
+    "obsidian"
+   ],
+   "collection": "kb_docs",
+   "method": "retrieval",
+   "answer_kind": "doc",
+   "answer": "To perform the weekend restart procedure for Moore prod:\n\n1. Check that you receive the success/failure emails for the weekly restart job group, which should be sent to charlesriversupport@moorecap.com by 12:50 am EST (8:50 AM Dubai time). \"We will be receiving three emails, one for each environment (QA/UAT, PROD).\" \n2. If the email indicates success and the job group was successful, proceed to 'Server Checks' as detailed in the document.\n3. For PROD server checks, log into us1-crd02:8081/crts/ using your credentials and verify that all 18 CharlesRiver services are running with specified statuses for RTAPI, Message Broadcaster, Message Processors, Trade Gateway, CTM, Workflow Rules, and Table Event Publisher.",
+   "seconds": 51.2
+  }
+ },
+ {
+  "id": "PR-06",
+  "question": "how do I copy FIX logs to my machine",
+  "expected": "How to copy FIX Logs to local machine",
+  "ask": {
+   "collection": "kb_docs",
+   "method": "semantic",
+   "answer": "Source: Kb Docs\n\nHow to copy FIX Logs to local machine\n\nFIX Log LocationsWhen logged into a Soros virtual workstation, open File Explorer to access the FIX message logs at the below locations:\r\nProd File Location: \\\\vsompcrv05\\logs\\cameron_buy.log\r\nArchived Prod Logs: \\\\nyc-sor-vlog-01\\Logs\\CharlesRiver\\ProdV17\\FIX\r\nUAT File Location: \\\\vrchdcrv01\\CharlesRiver\\17_mt1\\serverapps\\logs\r\nSoros moves FIX logs that are more than 3 days old into an Archive folder. If you don\u2019t see the logs for the date that you need in the Prod file location, they were likely moved to the Archive folder.\r\n\r\nAccessing FIX logviewer.batNavigate to the following location inside of the UAT Middle tier:\r\nC:\\CharlesRiver\\17_mt1\\serverapps\\fix\\bin\\logviewer.bat\r\n\r\nCopying the FIX LogsWhenever you are viewing FIX logs, it is important to copy them to a local location first before viewing. Otherwise, if you open them directly, the FIX Engine will no longer be able to write to them, which can cause catastrophic breaks.\r\n\r\nThere two ways we can copy the FIX logs to a safe, location:\r\nVia Command Prompt\r\nVia File Explorer\r\n\r\nCopying Via File ExplorerOpen File Explorer\r\nType in the FIX Log Location that you need.\r\nThen copy the cameron_buy.log file and paste it to your virtual workstation in a location of your preference. For example, you may paste it directly to your Desktop for quick access and then move it to a more organized subfolder later. \r\nCopying Via Command PromptThis method has a few extra steps due to the fact that we can\u2019t access our user working folders from the command prompt (this is because they are on a separate network drive). However, this method is safer than the above since you don\u2019t run the risk of mis-clicking when attempting to copy the file.\r\nFrom the Start Menu on your Soros virtual workstation, launch Command Prompt\r\nIdentify your preferred file location.\r\nIn the example below, the preferred file location is the 'Documents' folder, i.e., C:\\User\\ \\Documents\r\nExecute the following command: copy \\\\ /Y \r\nIn this example, the command is 'copy \\\\vsompcrv05\\logs\\cameron_buy.log /Y C:\\Users\\torrek\\Documents'\r\nThe target environment is Production, so we access 'vsompcrv05'. \r\nWe want the latest FIX logs, so we target 'cameron_buy.log'. Prior days' logs will be appended with the date (e.g. 'cameron_buy.log.06-25-2025'). \r\nKathleen Torres is the user in this example, so she is using her own Documents folder for the destination folder. \r\nThe '/Y' flag suppresses prompts that would confirm whether you want to overwrite existing files in the destination folder.\r\nYou can learn more about the 'copy' command by searching online for 'Windows Commands copy'.\r\n\r\nTo make the logs accessible for viewing in the UAT middle tier, you will need to then copy and paste this file into your User Working folder.\r\nOpen image-202501-220737.pn",
+   "seconds": 23.7
+  },
+  "chat": {
+   "collections_queried": [
+    "kb_docs",
+    "obsidian"
+   ],
+   "collection": "kb_docs",
+   "method": "retrieval",
+   "answer_kind": "doc",
+   "answer": "To copy FIX logs to your machine:\n\nVia File Explorer:\n\"Type in the FIX Log Location that you need. Then copy the cameron_buy.log file and paste it to your virtual workstation in a location of your preference.\"\n\nVia Command Prompt:\n\"From the Start Menu on your Soros virtual workstation, launch Command Prompt. Identify your preferred file location. Execute the following command: copy \\\\vsompcrv05\\logs\\cameron_buy.log /Y C:\\Users\\torrek\\Documents.\" \n\nEnsure you replace 'C:\\Users\\torrek\\Documents' with your actual Documents folder path and '\\\\vsompcrv05\\logs\\cameron_buy.log' with the correct log location if different.",
+   "seconds": 41.3
+  }
+ },
+ {
+  "id": "PR-07",
+  "question": "steps for one madison data load failure",
+  "expected": "One Madison Data Load Status FAILURE article",
+  "ask": {
+   "collection": "kb_docs",
+   "method": "semantic",
+   "answer": "Source: Kb Docs\n\nOne Madison Daily File Load Failure \u2013 Error Format Correction & Reload to Snowflake\n\nAccess the File in AWS S3:\r\nNavigate to the daily-files-to-snowflake/load folder.\r\nLocate the file, select it, and download it to your local machine.\r\nOpen the File:\r\nWhen prompted, click \u2018Don\u2019t Convert\u2019 to maintain original formatting.\r\nIdentify the Issue:\r\nBased on the error message, locate the column that is erroring.\r\nApply filters to find the problematic row(s).\r\nCorrect the Format:\r\nOpen the file erroring using Notepad++, and identify where the issue is, if it's a field that is causing the error, fix it, in this case it was a trailing empty Row at the end of the excel file, we removed it and uploaded the file, as shown below row 1549 is the empty row that we removed.\r\nSave the Corrected File:\r\nSave the file with a new version name by adding V2 before the date.\r\nExample:JSC-Position_as_on_2025.02.21.csv \u2794 JSC-Position_as_on_V2_2025.02.21.csv\r\nReplace the File in AWS S3:\r\nDelete the original file from S3 (confirm deletion by typing \u2018delete\u2019).\r\nUpload the corrected V2 file to the same location.\r\nLoad the File into Snowflake:\r\nTrigger the file load process.\r\nEnsure you receive the message: \u2018Files Loaded Successfully\u2019.\r\nVerify the Data Load:\r\nRun the provided SELECT statement in Snowflake should show the same date as the file date which usually is the previous day.\r\nSELECT MAX(TRADEDATE) FROM DBO.VITEOS_POSITIONS\r\n\r\nCommunicate Completion:\r\nOnce verified, send a confirmation email to Scott indicating successful resolution.\r\n\r\n\r\n\r\nOther issues faced and their resolutions:\r\nIssue: Invalid UTF8 detected in string.\r\n\r\nExcel file showing a weird Dash \u2013 instead of -\r\n\r\n\r\nResolution:\r\nReplace all weird \u2013 with - using find and replace all in excel, and then follow the same process of deleting the file from the bucket, renaming the correct file with V2 and then upload it to the bucket and run the related snowflake job.\n\nEach day around 7 AM EST (3 PM Dubai Time), we receive automated emails via Halo regarding the One Madison file load status. If the status indicates:\r\n\u201cOverall Status: Successful, no additional action required\u201d, no further steps are needed.\r\nHowever, if a failure ticket is generated, typically due to incorrect data formats (e.g., date vs. timestamp), immediate action is required to correct the file and reload it into Snowflake. This ensures proper data processing and system continuity.",
+   "seconds": 28.5
+  },
+  "chat": {
+   "collections_queried": [
+    "kb_docs",
+    "obsidian"
+   ],
+   "collection": "kb_docs",
+   "method": "retrieval",
+   "answer_kind": "doc",
+   "answer": "Steps for correcting a One Madison Data Load Failure:\n\n1. \"Navigate to the daily-files-to-snowflake/load folder.\"\n2. \"Identify the Issue: Based on the error message, locate the column that is erroring. Apply filters to find the problematic row(s).\"\n3. \"Correct the Format: Open the file erroring using Notepad++, and identify where the issue is... fix it.\"\n4. \"Save the Corrected File: Save the file with a new version name by adding V2 before the date.\"\n5. \"Replace the File in AWS S3: Delete the original file from S3 (confirm deletion by typing \u2018delete\u2019). Upload the corrected V2 file to the same location.\"\n6. \"Load the File into Snowflake: Trigger the file load process. Ensure you receive the message: \u2018Files Loaded Successfully\u2019. \"\n7. \"Verify the Data Load: Run the provided SELECT statement in Snowflake should show the same date as the file date which usually is the previous day.\"",
+   "seconds": 44.9
+  }
+ },
+ {
+  "id": "PR-08",
+  "question": "how to check charles river logs on a user machine",
+  "expected": "CR Log Folder for Errors note",
+  "ask": {
+   "collection": "obsidian",
+   "method": "semantic",
+   "answer": "Source: Obsidian Notes\n\nCharles River Log Folder for Errors\n\nThere are more than one way to check for logs on a user's local machine:\n\nCategory: Moore\n\n1. Navigate on the local Machine to: C:\\ \"Program Files (x86) > CharlesRiver > 21R2 (or install version) > client > logs:\n\n[Embedded image OCR from: path_to_logs1.png]\n\n2. Navigate to C:\\ \"Program Files (x86) > CharlesRiver > 21R2 (or install version) > client\n\n3. Look for file cr.ini:\n\n[Embedded image OCR from: cr.ini_file.png]\n\nRelated notes:\n- path_to_logs1.png\n- cr.ini_file.png",
+   "seconds": 6.3
+  },
+  "chat": {
+   "collections_queried": [
+    "kb_docs",
+    "obsidian"
+   ],
+   "collection": "kb_docs",
+   "method": "retrieval",
+   "answer_kind": "doc",
+   "answer": "To check Charles River logs on a user machine, navigate to the local path where the logs are stored manually or automatically:\n\nFor manual archive: \"X:\\Technology\\OmniAppSupport\\Charles River\\Fix\\Logs\\CR PROD Fix Log Archive\" (files from 2021 and moved every few months).\n\nFor automated current logs: \"X:\\Technology\\OmniAppSupport\\Charles River|Logs\\PROD\\[Year]\\[Month]\\us1-crdfix01\". For example, August 2025 logs are located at \"X:\\Technology\\OmniAppSupport\\Charles River|Logs\\PROD\\2025\\08\\us1-crdfix01\".",
+   "seconds": 60.1
+  }
+ },
+ {
+  "id": "AG-01",
+  "question": "how many KB articles are there",
+  "expected": "178 active articles (NOT 348 chunks)",
+  "ask": {
+   "collection": "kb_docs",
+   "method": "metadata_sql",
+   "answer": "There are 178 matching identifier(s).",
+   "seconds": 14.6
+  },
+  "chat": {
+   "collections_queried": [
+    "kb_docs",
+    "obsidian"
+   ],
+   "collection": "kb_docs",
+   "method": "retrieval",
+   "answer_kind": "doc",
+   "answer": "There are 178 matching identifier(s).",
+   "seconds": 34.4
+  }
+ },
+ {
+  "id": "AG-02",
+  "question": "how many articles mention FIX",
+  "expected": "SQL truth: distinct articles with fix in nlp_text",
+  "ask": {
+   "collection": "kb_docs",
+   "method": "metadata_sql",
+   "answer": "There are 48 matching identifier(s) for nlp_text contains FIX.",
+   "seconds": 9.1
+  },
+  "chat": {
+   "collections_queried": [
+    "kb_docs",
+    "xml_test"
+   ],
+   "collection": "kb_docs",
+   "method": "retrieval",
+   "answer_kind": "doc",
+   "answer": "There are 48 matching identifier(s) for nlp_text contains FIX.",
+   "seconds": 35.1
+  }
+ },
+ {
+  "id": "AG-03",
+  "question": "how many FIX tags are there",
+  "expected": "947 (namespace=tag)",
+  "ask": {
+   "collection": "xml_test",
+   "method": "metadata_sql",
+   "answer": "There are 947 matching identifier(s) for identifier_namespace = tag.",
+   "seconds": 8.9
+  },
+  "chat": {
+   "collections_queried": [
+    "xml_test",
+    "kb_docs"
+   ],
+   "collection": "xml_test",
+   "method": "retrieval",
+   "answer_kind": "doc",
+   "answer": "There are 947 matching identifier(s) for identifier_namespace = tag.",
+   "seconds": 30.4
+  }
+ },
+ {
+  "id": "AG-04",
+  "question": "how many Goldman files are in the recon mapping",
+  "expected": "16 (15 if NULL row uncounted \u2014 CODE-024)",
+  "ask": {
+   "collection": "recon_assist_file",
+   "method": "metadata_sql",
+   "answer": "There are 16 matching identifier(s) for Prime Broker = Goldman.",
+   "seconds": 16.5
+  },
+  "chat": {
+   "collections_queried": [
+    "recon_assist_file",
+    "kb_docs"
+   ],
+   "collection": "recon_assist_file",
+   "method": "retrieval",
+   "answer_kind": "doc",
+   "answer": "There are 16 matching identifier(s) for Prime Broker = Goldman.",
+   "seconds": 35.2
+  }
+ },
+ {
+  "id": "AG-05",
+  "question": "how many images do I have for M42",
+  "expected": "verify astro_test",
+  "ask": {
+   "collection": "astro_test",
+   "method": "metadata_sql",
+   "answer": "There are 1 matching identifier(s) for file_target = M42.",
+   "seconds": 30.1
+  },
+  "chat": {
+   "collections_queried": [
+    "astro_catalog",
+    "obsidian"
+   ],
+   "collection": "astro_catalog",
+   "method": "retrieval",
+   "answer_kind": "doc",
+   "answer": "There are 1 matching identifier(s) for nlp_text contains M42.",
+   "seconds": 46.3
+  }
+ },
+ {
+  "id": "AG-06",
+  "question": "how many galaxies are in the catalog",
+  "expected": "count type=Gx in astro_catalog",
+  "ask": {
+   "collection": "astro_catalog",
+   "method": "metadata_sql",
+   "answer": "There are 13226 matching identifier(s).",
+   "seconds": 7.2
+  },
+  "chat": {
+   "collections_queried": [
+    "astro_catalog",
+    "kb_docs"
+   ],
+   "collection": "astro_catalog",
+   "method": "retrieval",
+   "answer_kind": "doc",
+   "answer": "There are 13226 matching identifier(s).",
+   "seconds": 29.2
+  }
+ },
+ {
+  "id": "AG-07",
+  "question": "list all prime brokers in the recon file",
+  "expected": "BOA, BONY, CHASE, CITCO, CITI, CS, DB, Goldman, JPM, MIZUHO, Morgan",
+  "ask": {
+   "collection": "recon_assist_file",
+   "method": "metadata_sql",
+   "answer": "11 value(s):\n\n- `BOA`\n- `BONY`\n- `CHASE`\n- `CITCO`\n- `CITI`\n- `Credit Suisse`\n- `Deutsche`\n- `Goldman`\n- `JPM`\n- `MIZUHO`\n- `Morgan`",
+   "seconds": 6.6
+  },
+  "chat": {
+   "collections_queried": [
+    "recon_assist_file"
+   ],
+   "collection": "recon_assist_file",
+   "method": "retrieval",
+   "answer_kind": "doc",
+   "answer": "11 value(s):\n\n- `BOA`\n- `BONY`\n- `CHASE`\n- `CITCO`\n- `CITI`\n- `Credit Suisse`\n- `Deutsche`\n- `Goldman`\n- `JPM`\n- `MIZUHO`\n- `Morgan`",
+   "seconds": 14.4
+  }
+ },
+ {
+  "id": "AG-08",
+  "question": "which broker has the most recon files",
+  "expected": "group-by type, Goldman likely",
+  "ask": {
+   "collection": "recon_assist_file",
+   "method": "metadata_sql",
+   "answer": "- `Goldman`: 16\n- `CITI`: 15\n- `JPM`: 14\n- `Credit Suisse`: 9\n- `Morgan`: 6\n- `Deutsche`: 3\n- `BOA`: 3\n- `MIZUHO`: 3\n- `CHASE`: 3\n- `BONY`: 2\n- `CITCO`: 1",
+   "seconds": 8.2
+  },
+  "chat": {
+   "collections_queried": [
+    "recon_assist_file",
+    "bbg_fields"
+   ],
+   "collection": "recon_assist_file",
+   "method": "retrieval",
+   "answer_kind": "doc",
+   "answer": "- `Goldman`: 16\n- `CITI`: 15\n- `JPM`: 14\n- `Credit Suisse`: 9\n- `Morgan`: 6\n- `Deutsche`: 3\n- `BOA`: 3\n- `MIZUHO`: 3\n- `CHASE`: 3\n- `BONY`: 2\n- `CITCO`: 1",
+   "seconds": 38.5
+  }
+ },
+ {
+  "id": "AG-09",
+  "question": "how many images with gain 100",
+  "expected": "verify astro_test file_gain",
+  "ask": {
+   "collection": "astro_test",
+   "method": "metadata_sql",
+   "answer": "There are 1 matching identifier(s) for gain = 100.",
+   "seconds": 11.2
+  },
+  "chat": {
+   "collections_queried": [
+    "M51",
+    "obsidian"
+   ],
+   "collection": "M51",
+   "method": "retrieval",
+   "answer_kind": "doc",
+   "answer": "There are 301 matching identifier(s) for gain = 100.",
+   "seconds": 48.5
+  }
+ },
+ {
+  "id": "AG-10",
+  "question": "how many fields are in FIX 4.4",
+  "expected": "Fields_FIX44 count",
+  "ask": {
+   "collection": "xml_test",
+   "method": "metadata_sql",
+   "answer": "There are 47 matching identifier(s) for source_file contains Messages_FIX44.xml.",
+   "seconds": 13.6
+  },
+  "chat": {
+   "collections_queried": [
+    "xml_test",
+    "kb_docs"
+   ],
+   "collection": "xml_test",
+   "method": "retrieval",
+   "answer_kind": "doc",
+   "answer": "There are 47 matching identifier(s) for source_file contains Messages_FIX44.xml.",
+   "seconds": 33.9
+  }
+ },
+ {
+  "id": "XC-01",
+  "question": "I'm missing gsact.txt from Goldman, what can I do",
+  "expected": "mapping record + Tidal/sFTP procedure",
+  "ask": {
+   "collection": "recon_assist_file",
+   "method": "identifier_lookup",
+   "answer": "Moore file name gsact.txt is 019_W_RECON_GOLDMAN_PRIO_PULL.\n\nActive: YES\n\nPrime Broker: Goldman\n\nDate Column to Check: Column 1\n\nRecon Tool Data Source: Transaction\n\nRecon Tool File Format: GS Cash Activity\n\nIncluded in Email Alert: YES\n\nMove Script (K:/Recon/FTP): GSCopy_srpb.bat\n\nAlso known as: SRPB_4000_1200105898_DATA_Custody_Tra_286534_156520.xls\n\nType: Goldman",
+   "seconds": 0.2
+  },
+  "chat": {
+   "collections_queried": [
+    "recon_assist_file",
+    "kb_docs"
+   ],
+   "collection": "recon_assist_file",
+   "method": "retrieval",
+   "answer_kind": "structured",
+   "answer": "Here is what I found:\n\nThe file you're looking for, \"gsact.txt,\" from Goldman is known as \"019_W_RECON_GOLDMAN_PRIO_PULL.\" It's active and part of the reconciliation process with Goldman as the Prime Broker. The date column to check is Column 1, and it's a GS Cash Activity file format used in Transaction data source for the Recon Tool.\n\nIncluded in Email Alert: YES\n\nMove Script (K:/Recon/FTP): GSCopy_srpb.bat\n\nAlso known as: SRPB_4000_1200105898_DATA_Custody_Tra_286534_156520.xls\n\nType: Goldman\n\nIf you're missing the file, ensure that the GSCopy_srpb.bat script has run successfully on the K:/Recon/FTP directory. This script handles moving and processing the \"gsact.txt\" file.",
+   "seconds": 54.9
+  }
+ },
+ {
+  "id": "XC-02",
+  "question": "what tidal job pulls jpm files and how do I check if it ran",
+  "expected": "JPM job name + 4.1 checking procedure",
+  "ask": {
+   "collection": "recon_assist_file",
+   "method": "semantic",
+   "answer": "No exact match found for 'what tidal job pulls jpm files and how do I check if it ran'. Closest results:\n- jpm_cfd_position: 090_W_RECON_JPM_PB_PULL\n- : \n- jpm_fi_activity.xlsx: 090_W_RECON_JPM_PB_PULL\n- jpmfx_act.csv: 090_W_RECON_JPM_PB_PULL\n- jpm_bal.xlsx: 090_W_RECON_JPM_PB_PULL",
+   "seconds": 5.7
+  },
+  "chat": {
+   "collections_queried": [
+    "kb_docs",
+    "obsidian"
+   ],
+   "collection": "kb_docs",
+   "method": "retrieval",
+   "answer_kind": "doc",
+   "answer": "The Tidal job that pulls JPM files is part of the \"RECON_DAILY_BATCH\" group, specifically named including \"JPM\" in its title. To check if it ran:\n\n\"Check the job: PB_RECON_FILE_RETRIEVAL (Under RECON_DAILY_BATCH group) in Tidal.\"\n\"Note job status. Check job output to check if files were downloaded and look for failure messages.\" \n\nIf JPM is part of the broker mentioned, select the corresponding job and follow these steps verbatim from the document.",
+   "seconds": 64.0
+  }
+ },
+ {
+  "id": "XC-03",
+  "question": "what is tag 38 and are there KB articles about FIX order issues",
+  "expected": "tag def + FIX-related KB articles",
+  "ask": {
+   "collection": "xml_test",
+   "method": "structured_namespace_lookup",
+   "answer": "Tag 38 is OrderQty.\n\nDescription: Quantity ordered. This represents the number of shares for equities or par, face or nominal value for FI instruments.\n(Prior to FIX 4.2 this field was of type int)",
+   "seconds": 10.1
+  },
+  "chat": {
+   "collections_queried": [
+    "kb_docs",
+    "xml_test"
+   ],
+   "collection": "xml_test",
+   "method": "retrieval",
+   "answer_kind": "structured",
+   "answer": "Here is what I found:\n\nTag 38: OrderQty\n\nDescription: Quantity ordered. This represents the number of shares for equities or par, face or nominal value for FI instruments.\n\nRegarding KB articles about FIX order issues, there is no specific mention in the retrieved data provided. Please check the official support channels or documentation for more detailed information on this topic.",
+   "seconds": 40.2
+  }
+ },
+ {
+  "id": "XC-04",
+  "question": "show me the M51 catalog entry and do I have images of it",
+  "expected": "catalog entry + M51 images",
+  "ask": {
+   "collection": "astro_catalog",
+   "method": "semantic",
+   "answer": "Source: Entity record\n\nUNIDENTIFIED",
+   "seconds": 15.6
+  },
+  "chat": {
+   "collections_queried": [
+    "M51",
+    "astro_catalog"
+   ],
+   "collection": "astro_catalog",
+   "method": "retrieval",
+   "answer_kind": "doc",
+   "answer": "The retrieved data does not contain a specific M51 catalog entry or any information regarding images of M51. The provided excerpt is incomplete and labeled as \"UNIDENTIFIED.\" Please provide more detailed records for accurate assistance.",
+   "seconds": 31.2
+  }
+ },
+ {
+  "id": "XC-05",
+  "question": "bad dates alert for citi, which file and what steps",
+  "expected": "citi mapping + bad dates workflow",
+  "ask": {
+   "collection": "recon_assist_file",
+   "method": "semantic",
+   "answer": "No exact match found for 'bad dates alert for citi, which file and what steps'. Closest results:\n- citi_dcm_fees.csv: 010_W_RECON_CITI_PB_PULL \u2014 Dates should be today's date\n- : \n- eq_pos_gross.csv: 010_W_RECON_CITI_PB_PULL\n- fi_pos_bal.csv: 013_U_PYETL_CITI_NET_FI_HOLDINGS \u2014 Netted: Download > Netted (live folder) > copies to PB folder / 014\n- csfb_act.txt: ",
+   "seconds": 3.9
+  },
+  "chat": {
+   "collections_queried": [
+    "kb_docs",
+    "obsidian"
+   ],
+   "collection": "kb_docs",
+   "method": "retrieval",
+   "answer_kind": "doc",
+   "answer": "For Citi, if there are \"Files With Bad Dates\" alerts:\n\n\"The alert is most likely due to Tidal Jobs pulling a file from a previous day. This also means that the primebrokers didn\u2019t send their files for the day.\"\n\nSteps:\n1. Identify which specific Citi files have bad dates.\n2. Contact Citi (the primebroker) to ensure they resend the correct, current-day files.\n\nNo specific file name is mentioned for Citi in the provided data.",
+   "seconds": 55.8
+  }
+ },
+ {
+  "id": "XC-06",
+  "question": "broadcaster is down, who do I contact and what do I check",
+  "expected": "checklist article + contacts",
+  "ask": {
+   "collection": "kb_docs",
+   "method": "semantic",
+   "answer": "Source: Kb Docs\n\nMessage Broadcaster Down\n\nStep 1: Initial Status Check\r\nVerify the status of the Message Broadcaster in Web Admin and open the Support mailbox simultaneously.\r\nIf the broadcaster is Active on us1-crd078081 (primary) or us1-crd088081 (backup), notify the MCM CRIMS Support \u2013 External chat that the alert has been received and the broadcaster is currently active. Also note that you will continue to monitor it's status. \r\nIf the status is Not Running, notify the MCM CRIMS Support chat immediately and proceed to investigate further.\r\nMessage Broadcaster not running screenshot here\r\n\r\nStep 2: Consistent Communication\r\nMaintain regular communication with the external Moore chat, providing updates every few minutes if the broadcaster remains down, if the root cause is still being investigated, or what actions are being taken\r\n\r\nScenarios for Investigation:\r\n\r\nScenario 1: CTM Blocking\r\nIf you find blocking in the Support mailbox, identify whether the SPIDs with a Blocker value of 0 are CTM related or not (captured below). If they are proceed with the following:\r\nAccess the prod database using the CRDADMIN login and terminate the blocking SPIDs.\r\nEscalate to the following team members if you do not have prod CRDADMIN credentials:\r\nUS: Andrew, Anuja\r\nDubai: Raed, Mike, Mark (Moore)\r\n\r\n\r\nScenario 2: Non-CTM Blocking\r\nIf the command is not a CTM command, escalate to Andrew and/or Moore contacts (Maher or Prasad) for confirmation on what the process is before killing it.\r\nCommands that should not be killed without explicit approval include (but are not limited to):\r\nTRIG_TS_ORDER_FIRM_POSITION\r\nTS_ORDER_AU\r\nFn_Append_Allocation_Fields\r\nBroadcast Queries\r\nAdd new examples here\r\n\r\n\r\nScenario 3: No Blocking but Long-Running Transactions\r\nNavigate to Web Admin > Monitor and the Support mailbox to identify any existing long-running transactions.\r\nIf the transaction is broadcast query related, it should be killed.\r\nBroadcast queries can be killed in the case of long-running transactions vs. a blocking because as a long running transaction, the process has not committed yet.\r\nIf unrelated, escalate to Andrew, Maher, or Prasad to get confirmation if the process can be terminated.\r\n\r\n\r\nScenario 4: No Blocking, No Long-Running Transactions\r\nReview the Message Logs and Server Logs for any errors.\r\nIf errors are found, resolve appropriately (examples include restarting services, reboot middle tier, or adjust broadcast queries with Maher).\r\nIf no errors are found, initiate a failover to the backup middle tier.\r\nInclude steps here\r\nNeed to include a screenshot of server logs with errors\n\nWhat is Message Broadcaster\r\nMoore has the Message broadcaster which passes information to their external Process Server. This external process server expects a specific schema. That schema not being present means it will ignore the extraneous messages. Meaning if the Broadcaster isn\u2019t configured properly the messages won\u2019t be consumed at all and will not throw an error.\r\n\r\nAlert: Msg Broadcaster Down or Inactive\r\nIf you receive the alert below indicating that the message broadcaster is down, and you find that the Message Broadcaster is inactive, please follow the steps outlined below to address the issue.\r\n\r\nWhy Are We Getting These Alerts\r\nMsg Broadcaster alert is configured based on the heartbeat being stale by a minute. Ongoing major system activity has been shown to impact the heartbeat just as much as the broadcaster itself choking on CTM or its own queries. General system slowness has been also reported.",
+   "seconds": 27.3
+  },
+  "chat": {
+   "collections_queried": [
+    "kb_docs",
+    "obsidian"
+   ],
+   "collection": "kb_docs",
+   "method": "retrieval",
+   "answer_kind": "doc",
+   "answer": "**Initial Contact and Check:**\nNotify MCM CRIMS Support \u2013 External chat immediately if the Message Broadcaster status is Not Running, and continue monitoring its status. \"If the status is Not Running, notify the MCM CRIMS Support chat immediately and proceed to investigate further.\"\n\n**Next Steps Based on Scenario:**\n- **CTM Blocking:** If blocking SPIDs are CTM related, terminate them using prod database with CRDADMIN login or escalate to US team members Andrew, Anuja or Dubai team members Raed, Mike, Mark. (Scenario 1)\n- **Non-CTM Blocking:** Escalate to Andrew and/or Moore contacts for confirmation before killing non-CTM commands. (Scenario 2)\n- **Long-Running Transactions:** Identify long-running transactions in Web Admin > Monitor and take appropriate action as detailed. (Scenario 3)\n- **No Blocking, No Long-Running Transactions:** Review Message Logs and Server Logs for errors and resolve accordingly or initiate a failover to the backup middle tier. (Scenario 4)",
+   "seconds": 45.4
+  }
+ },
+ {
+  "id": "NA-01",
+  "question": "what is FIX tag 99999",
+  "expected": "not found \u2014 tag doesn't exist",
+  "ask": {
+   "collection": "xml_test",
+   "method": "semantic",
+   "answer": "No exact match found for 'what is FIX tag 99999'. Closest results:\n- 371: RefTagID \u2014 The tag number of the FIX field being referenced.\n- 258: TradedFlatSwitch \u2014 Driver and part of trade in the event that the Security Master file was wrong at\n- 141: ResetSeqNumFlag \u2014 Indicates that the both sides of the FIX session should reset sequence numbers.\n- 232: NoStipulations \u2014 Number of stipulation entries\n(Note tag # was reserved in FIX 4.1, added in FIX \n- 236: Yield \u2014 Yield percentage.\n(Note tag # was reserved in FIX 4.1, added in FIX 4.3)",
+   "seconds": 4.9
+  },
+  "chat": {
+   "collections_queried": [
+    "xml_test",
+    "astro_test"
+   ],
+   "collection": "xml_test",
+   "method": "retrieval",
+   "answer_kind": "doc",
+   "answer": "There is no exact match for \"FIX tag 99999\" in the retrieved data. The closest results do not include a tag numbered 99999. Tags mentioned are within the range of 141 to 258, with specific functions as quoted:\n\n- \"371: RefTagID \u2014 The tag number of the FIX field being referenced.\"\n- \"258: TradedFlatSwitch \u2014 Driver and part of trade in the event that the Security Master file was wrong at\"\n- \"141: ResetSeqNumFlag \u2014 Indicates that the both sides of the FIX session should reset sequence numbers.\"\n\nThe document does not contain information about a FIX tag 99999.",
+   "seconds": 35.9
+  }
+ },
+ {
+  "id": "NA-02",
+  "question": "what is the recon mapping for barclays_fx_swap.txt",
+  "expected": "not found \u2014 must not invent a job",
+  "ask": {
+   "collection": "recon_assist_file",
+   "method": "semantic",
+   "answer": "No exact match found for 'what is the recon mapping for barclays_fx_swap.txt'. Closest results:\n- gsact_fx.txt: 020_W_RECON_GOLDMAN_PB_PULL\n- mscfdact.txt: 070_W_RECON_MORGAN_PB_PULL\n- gsbal_fx.txt: 020_W_RECON_GOLDMAN_PB_PULL\n- ms_fut_pos.csv: 070_W_RECON_MORGAN_PB_PULL\n- ms_fut_trades.csv: 070_W_RECON_MORGAN_PB_PULL",
+   "seconds": 3.8
+  },
+  "chat": {
+   "collections_queried": [
+    "recon_assist_file",
+    "kb_docs"
+   ],
+   "collection": "kb_docs",
+   "method": "retrieval",
+   "answer_kind": "doc",
+   "answer": "The retrieved data does not provide a specific recon mapping for \"barclays_fx_swap.txt\". The document lists mappings for various files from different prime brokers but does not include an entry for \"barclays_fx_swap.txt\". To find the exact mapping, you would need to follow the procedure described in the document to check the script running during the FTP process for Barclays.",
+   "seconds": 59.8
+  }
+ },
+ {
+  "id": "NA-03",
+  "question": "how do I restart the Bloomberg terminal server",
+  "expected": "not found \u2014 no such procedure",
+  "ask": {
+   "collection": "kb_docs",
+   "method": "semantic",
+   "answer": "Source: Kb Docs\n\nFIX Connection Contacts\n\nBloomberg/EMSX\r\nMike McCarthy mimccarthy@bloomberg.net; --- rep\r\nEMSX Help desk - emsx@bloomberg.net;\r\nNon-EMSX Help Desk - blpsupport@bloomberg.net\r\nBidFX - askfx@bidfx.com \r\nFIDESSA/RBFC/RBFC44\r\nglobal.support@fidessa.com\r\nGLMX\r\nsupport@glmx.com\r\nrobert@glmx.com\r\ntom@glmx.com\r\nintegration@glmx.com\r\nHSBC\r\nfix.support@hsbcib.com\r\nfix.connectivity@hsbcib.com\r\nREDI\r\nredi-fix@lseg.com \r\nTRREDI-FIX@lseg.com\r\nSPIDER ROCK\r\ncs@spiderrock.net\r\ntyler.jaswal@spiderrock.net\r\nmark.ward@spiderrock.net\r\n\r\nTradeweb\r\nCRGroup@tradeweb.com \r\nIntegration@Tradeweb.com \r\nUSNetworkOperations@tradeweb.com \r\nusnetwork@tradeweb.com \r\necs.ecs@tradeweb.com (UK/EU Support)\r\nTRUMID\r\nLauren Burd lburd@trumid.co\r\nJasen Conners JConners@trumid.com\r\nDhruv Kapoor dkapoor@trumid.com\r\nGermanico Garzon GGarzon@trumid.com\r\nCMEDirect\r\nWebICE\r\nCarnegie - fix@carnegie.se\r\nTrading Technologies:\r\n Vincent Tang vincent.tang@tradingtechnologies.com\r\nAmericas Support: +1 312-476-1002",
+   "seconds": 23.9
+  },
+  "chat": {
+   "collections_queried": [
+    "kb_docs",
+    "obsidian"
+   ],
+   "collection": "kb_docs",
+   "method": "retrieval",
+   "answer_kind": "doc",
+   "answer": "The retrieved data does not contain instructions on how to restart the Bloomberg terminal server. It provides contact information for various FIX connection support teams but lacks details on restarting the Bloomberg terminal server. Please refer to your local IT support or contact Bloomberg directly for assistance with this task.",
+   "seconds": 31.1
+  }
+ },
+ {
+  "id": "NA-04",
+  "question": "what are the FIX 5.0 SP2 changes",
+  "expected": "not found \u2014 only 4.2/4.4 ingested",
+  "ask": {
+   "collection": "xml_test",
+   "method": "discovery_list",
+   "answer": "{'total_matches': 0, 'results': []}",
+   "seconds": 16.6
+  },
+  "chat": {
+   "collections_queried": [
+    "xml_test",
+    "kb_docs"
+   ],
+   "collection": "xml_test",
+   "method": "retrieval",
+   "answer_kind": "doc",
+   "answer": "The retrieved data does not contain any information about the changes in FIX 5.0 SP2.",
+   "seconds": 52.1
+  }
+ },
+ {
+  "id": "MI-01",
+  "question": "what are tags 22, 35 and 54",
+  "expected": "SecurityIDSource + MsgType + Side",
+  "ask": {
+   "collection": "xml_test",
+   "method": "discovery_list",
+   "answer": "{'total_matches': 42, 'results': [{'score': 8.0, 'doc_type': 'structured', 'identifier': '220', 'primary_name': 'BenchmarkCurveCurrency', 'source_type': None, 'source_file': '_merged_fields', 'preview': 'Identifies currency used for benchmark curve. See \"Appendix 6-A: Valid Currency Codes\" for information on obtaining valid values. (Note tag # was reserved in FIX 4.1, added in FIX 4.3)', 'payload': {'text': 'BenchmarkCurveCurrency\\n\\nIdentifies currency used for benchmark curve. See \"Appendix 6-A: Valid Currency Codes\" for information on obtaining valid values.\\n(Note tag # was reserved in FIX 4.1, added in FIX 4.3)', 'type': None, 'doc_type': 'structured', 'link_keys': ['tag:220'], 'identifier': '220', 'type_field': None, 'description': 'Identifies currency used for benchmark curve. See \"Appendix 6-A: Valid Currency Codes\" for information on obtaining valid values.\\n(Note tag # was reserved in FIX 4.1, added in FIX 4.3)', 'enum_values': [], 'source_file': '_merged_fields', 'primary_name': 'BenchmarkCurveCurrency', 'source_files': ['_merged_fields'], 'ingest_source': '_merged_fields', 'identifier_field': 'Tag', 'related_link_keys': [], 'primary_name_field': 'Name', 'related_file_paths': [], 'identifier_namespace': 'tag', 'related_source_files': [], 'related_image_targets': [], 'collection_name': 'xml_test', '_bm25_score': 0.075990885}, 'rank': 1}, {'score': 8.0, 'doc_type': 'structured', 'identifier': '222', 'primary_name': 'BenchmarkCurvePoint', 'source_type': None, 'source_file': '_merged_fields', 'preview': 'Point on benchmark curve. Free form values: e.g. \"Y\", \"7Y\", \"INTERPOLATED\". Sample values: M = combination of a number between 1-12 and a \"M\" for month Y = combination of number between 1-100 and a \"Y\" for year} 10Y-OLD ...', 'payload': {'text': 'BenchmarkCurvePoint\\n\\nPoint on benchmark curve. Free form values: e.g. \"Y\", \"7Y\", \"INTERPOLATED\".\\nSample values:\\nM = combination of a number between 1-12 and a \"M\" for month\\nY = combination of number between 1-100 and a \"Y\" for year}\\n10Y-OLD = see above, then add \"-OLD\" when appropriate\\nINTERPOLATED = the point is mathematically derived\\n2/2031 5 3/8 = the point is stated via a combination of maturity month / year and coupon\\nSee Fixed Income-specific documentation at http://www.fixprotocol.org for additional values.\\n(Note tag # was reserved in FIX 4.1, added in FIX 4.3)', 'type': None, 'doc_type': 'structured', 'link_keys': ['tag:222'], 'identifier': '222', 'type_field': None, 'description': 'Point on benchmark curve. Free form values: e.g. \"Y\", \"7Y\", \"INTERPOLATED\".\\nSample values:\\nM = combination of a number between 1-12 and a \"M\" for month\\nY = combination of number between 1-100 and a \"Y\" for year}\\n10Y-OLD = see above, then add \"-OLD\" when appropriate\\nINTERPOLATED = the point is mathematically derived\\n2/2031 5 3/8 = the point is stated via a combination of maturity month / year and coupon\\nSee Fixed Income-specific documentation at http://www.fixprotocol.org for additional values.\\n(Note tag # was reserved in FIX 4.1, added in FIX 4.3)', 'enum_values': [], 'source_file': '_merged_fields', 'primary_name': 'BenchmarkCurvePoint', 'source_files': ['_merged_fields'], 'ingest_source': '_merged_fields', 'identifier_field': 'Tag', 'related_link_keys': [], 'primary_name_field': 'Name', 'related_file_paths': [], 'identifier_namespace': 'tag', 'related_source_files': [], 'related_image_targets': [], 'collection_name': 'xml_test', '_bm25_score': 0.075990885}, 'rank': 2}, {'score': 8.0, 'doc_type': 'structured', 'identifier': '224', 'primary_name': 'CouponPaymentDate', 'source_type': None, 'source_file': '_merged_fields', 'preview': 'Date interest is to be paid. Used in identifying Corporate Bond issues. (Note tag # was reserved in FIX 4.1, added in FIX 4.3) (prior to FIX 4.4 field was of type UTCDate)', 'payload': {'text': 'CouponPaymentDate\\n\\nDate interest is to be paid. Used in identifying Corporate Bond issues.\\n(Note tag # was reserved in FIX 4.1, added in FIX 4.3)\\n(prior to FIX 4.4 field was of type UTCDate)', 'type': None, 'doc_type': 'structured', 'link_keys': ['tag:224'], 'identifier': '224', 'type_field': None, 'description': 'Date interest is to be paid. Used in identifying Corporate Bond issues.\\n(Note tag # was reserved in FIX 4.1, added in FIX 4.3)\\n(prior to FIX 4.4 field was of type UTCDate)', 'enum_values': [], 'source_file': '_merged_fields', 'primary_name': 'CouponPaymentDate', 'source_files': ['_merged_fields'], 'ingest_source': '_merged_fields', 'identifier_field': 'Tag', 'related_link_keys': [], 'primary_name_field': 'Name', 'related_file_paths': [], 'identifier_namespace': 'tag', 'related_source_files': [], 'related_image_targets': [], 'collection_name': 'xml_test', '_bm25_score': 0.075990885}, 'rank': 3}, {'score': 8.0, 'doc_type': 'structured', 'identifier': '225', 'primary_name': 'IssueDate', 'source_type': None, 'source_file': '_merged_fields', 'preview': 'The date on which a bond or stock offering is issued. It may or may not be the same as the effective date (\"Dated Date\") or the date on which interest begins to accrue (\"Interest Accrual Date\") (Note tag # was reserved i...', 'payload': {'text': 'IssueDate\\n\\nThe date on which a bond or stock offering is issued. It may or may not be the same as the effective date (\"Dated Date\") or the date on which interest begins to accrue (\"Interest Accrual Date\")\\n(Note tag # was reserved in FIX 4.1, added in FIX 4.3)\\n(prior to FIX 4.4 field was of type UTCDate)', 'type': None, 'doc_type': 'structured', 'link_keys': ['tag:225'], 'identifier': '225', 'type_field': None, 'description': 'The date on which a bond or stock offering is issued. It may or may not be the same as the effective date (\"Dated Date\") or the date on which interest begins to accrue (\"Interest Accrual Date\")\\n(Note tag # was reserved in FIX 4.1, added in FIX 4.3)\\n(prior to FIX 4.4 field was of type UTCDate)', 'enum_values': [], 'source_file': '_merged_fields', 'primary_name': 'IssueDate', 'source_files': ['_merged_fields'], 'ingest_source': '_merged_fields', 'identifier_field': 'Tag', 'related_link_keys': [], 'primary_name_field': 'Name', 'related_file_paths': [], 'identifier_namespace': 'tag', 'related_source_files': [], 'related_image_targets': [], 'collection_name': 'xml_test', '_bm25_score': 0.075990885}, 'rank': 4}, {'score': 8.0, 'doc_type': 'structured', 'identifier': '226', 'primary_name': 'RepurchaseTerm', 'source_type': None, 'source_file': '_merged_fields', 'preview': '*** DEPRECATED FIELD - See \"Deprecated (Phased-out) Features and Supported Approach\" *** Number of business days before repurchase of a repo. (Note tag # was reserved in FIX 4.1, added in FIX 4.3)', 'payload': {'text': 'RepurchaseTerm\\n\\n*** DEPRECATED FIELD - See \"Deprecated (Phased-out) Features and Supported Approach\" ***\\nNumber of business days before repurchase of a repo.\\n(Note tag # was reserved in FIX 4.1, added in FIX 4.3)', 'type': None, 'doc_type': 'structured', 'link_keys': ['tag:226'], 'identifier': '226', 'type_field': None, 'description': '*** DEPRECATED FIELD - See \"Deprecated (Phased-out) Features and Supported Approach\" ***\\nNumber of business days before repurchase of a repo.\\n(Note tag # was reserved in FIX 4.1, added in FIX 4.3)', 'enum_values': [], 'source_file': '_merged_fields', 'primary_name': 'RepurchaseTerm', 'source_files': ['_merged_fields'], 'ingest_source': '_merged_fields', 'identifier_field': 'Tag', 'related_link_keys': [], 'primary_name_field': 'Name', 'related_file_paths': [], 'identifier_namespace': 'tag', 'related_source_files': [], 'related_image_targets': [], 'collection_name': 'xml_test', '_bm25_score': 0.075990885}, 'rank': 5}, {'score': 8.0, 'doc_type': 'structured', 'identifier': '227', 'primary_name': 'RepurchaseRate', 'source_type': None, 'source_file': '_merged_fields', 'preview': '*** DEPRECATED FIELD - See \"Deprecated (Phased-out) Features and Supported Approach\" *** Percent of par at which a Repo will be repaid. Represented as a percent, e.g. .9525 represents 95-/4 percent of par. (Note tag # wa...', 'payload': {'text': 'RepurchaseRate\\n\\n*** DEPRECATED FIELD - See \"Deprecated (Phased-out) Features and Supported Approach\" ***\\nPercent of par at which a Repo will be repaid. Represented as a percent, e.g. .9525 represents 95-/4 percent of par.\\n(Note tag # was reserved in FIX 4.1, added in FIX 4.3)', 'type': None, 'doc_type': 'structured', 'link_keys': ['tag:227'], 'identifier': '227', 'type_field': None, 'description': '*** DEPRECATED FIELD - See \"Deprecated (Phased-out) Features and Supported Approach\" ***\\nPercent of par at which a Repo will be repaid. Represented as a percent, e.g. .9525 represents 95-/4 percent of par.\\n(Note tag # was reserved in FIX 4.1, added in FIX 4.3)', 'enum_values': [], 'source_file': '_merged_fields', 'primary_name': 'RepurchaseRate', 'source_files': ['_merged_fields'], 'ingest_source': '_merged_fields', 'identifier_field': 'Tag', 'related_link_keys': [], 'primary_name_field': 'Name', 'related_file_paths': [], 'identifier_namespace': 'tag', 'related_source_files': [], 'related_image_targets': [], 'collection_name': 'xml_test', '_bm25_score': 0.075990885}, 'rank': 6}, {'score': 8.0, 'doc_type': 'structured', 'identifier': '228', 'primary_name': 'Factor', 'source_type': None, 'source_file': '_merged_fields', 'preview': 'For Fixed Income: Amorization Factor for deriving Current face from Original face for ABS or MBS securities, note the fraction may be greater than, equal to or less than . In TIPS securities this is the Inflation index. ...', 'payload': {'text': 'Factor\\n\\nFor Fixed Income: Amorization Factor for deriving Current face from Original face for ABS or MBS securities, note the fraction may be greater than, equal to or less than . In TIPS securities this is the Inflation index.\\nQty * Factor * Price = Gross Trade Amount\\nFor Derivatives: Contract Value Factor by which price must be adjusted to determine the true nominal value of one futures/options contract.\\n(Qty * Price) * Factor = Nominal Value\\n(Note tag # was reserved in FIX 4.1, added in FIX 4.3)', 'type': None, 'doc_type': 'structured', 'link_keys': ['tag:228'], 'identifier': '228', 'type_field': None, 'description': 'For Fixed Income: Amorization Factor for deriving Current face from Original face for ABS or MBS securities, note the fraction may be greater than, equal to or less than . In TIPS securities this is the Inflation index.\\nQty * Factor * Price = Gross Trade Amount\\nFor Derivatives: Contract Value Factor by which price must be adjusted to determine the true nominal value of one futures/options contract.\\n(Qty * Price) * Factor = Nominal Value\\n(Note tag # was reserved in FIX 4.1, added in FIX 4.3)', 'enum_values': [], 'source_file': '_merged_fields', 'primary_name': 'Factor', 'source_files': ['_merged_fields'], 'ingest_source': '_merged_fields', 'identifier_field': 'Tag', 'related_link_keys': [], 'primary_name_field': 'Name', 'related_file_paths': [], 'identifier_namespace': 'tag', 'related_source_files': [], 'related_image_targets': [], 'collection_name': 'xml_test', '_bm25_score': 0.075990885}, 'rank': 7}, {'score': 8.0, 'doc_type': 'structured', 'identifier': '229', 'primary_name': 'TradeOriginationDate', 'source_type': None, 'source_file': '_merged_fields', 'preview': 'Used with Fixed Income for Muncipal New Issue Market. Agreement in principal between counter-parties prior to actual trade date. (Note tag # was reserved in FIX 4.1, added in FIX 4.3) (prior to FIX 4.4 field was of type ...', 'payload': {'text': 'TradeOriginationDate\\n\\nUsed with Fixed Income for Muncipal New Issue Market. Agreement in principal between counter-parties prior to actual trade date.\\n(Note tag # was reserved in FIX 4.1, added in FIX 4.3)\\n(prior to FIX 4.4 field was of type UTCDate)', 'type': None, 'doc_type': 'structured', 'link_keys': ['tag:229'], 'identifier': '229', 'type_field': None, 'description': 'Used with Fixed Income for Muncipal New Issue Market. Agreement in principal between counter-parties prior to actual trade date.\\n(Note tag # was reserved in FIX 4.1, added in FIX 4.3)\\n(prior to FIX 4.4 field was of type UTCDate)', 'enum_values': [], 'source_file': '_merged_fields', 'primary_name': 'TradeOriginationDate', 'source_files': ['_merged_fields'], 'ingest_source': '_merged_fields', 'identifier_field': 'Tag', 'related_link_keys': [], 'primary_name_field': 'Name', 'related_file_paths': [], 'identifier_namespace': 'tag', 'related_source_files': [], 'related_image_targets': [], 'collection_name': 'xml_test', '_bm25_score': 0.075990885}, 'rank': 8}, {'score': 8.0, 'doc_type': 'structured', 'identifier': '254', 'primary_name': 'LegRedemptionDate', 'source_type': None, 'source_file': '_merged_fields', 'preview': '*** DEPRECATED FIELD - See \"Deprecated (Phased-out) Features and Supported Approach\" *** Multileg instrument\\'s individual leg security\u2019s RedemptionDate. See RedemptionDate (240) field for description (Note tag # was rese...', 'payload': {'text': 'LegRedemptionDate\\n\\n*** DEPRECATED FIELD - See \"Deprecated (Phased-out) Features and Supported Approach\" ***\\nMultileg instrument\\'s individual leg security\u2019s RedemptionDate.\\nSee RedemptionDate (240) field for description\\n(Note tag # was reserved in FIX 4.1, added in FIX 4.3)\\n(prior to FIX 4.4 field was of type UTCDate)', 'type': None, 'doc_type': 'structured', 'link_keys': ['tag:254'], 'identifier': '254', 'type_field': None, 'description': '*** DEPRECATED FIELD - See \"Deprecated (Phased-out) Features and Supported Approach\" ***\\nMultileg instrument\\'s individual leg security\u2019s RedemptionDate.\\nSee RedemptionDate (240) field for description\\n(Note tag # was reserved in FIX 4.1, added in FIX 4.3)\\n(prior to FIX 4.4 field was of type UTCDate)', 'enum_values': [], 'source_file': '_merged_fields', 'primary_name': 'LegRedemptionDate', 'source_files': ['_merged_fields'], 'ingest_source': '_merged_fields', 'identifier_field': 'Tag', 'related_link_keys': ['tag:240'], 'primary_name_field': 'Name', 'related_file_paths': [], 'identifier_namespace': 'tag', 'related_source_files': [], 'related_image_targets': [], 'collection_name': 'xml_test', '_bm25_score': 0.075990885}, 'rank': 9}, {'score': 8.0, 'doc_type': 'structured', 'identifier': '544', 'primary_name': 'CashMargin', 'source_type': None, 'source_file': '_merged_fields', 'preview': 'Identifies whether an order is a margin order or a non-margin order. This is primarily used when sending orders to Japanese exchanges to indicate sell margin or buy to cover. The same tag could be assigned also by buy-si...', 'payload': {'text': 'CashMargin\\n\\nIdentifies whether an order is a margin order or a non-margin order. This is primarily used when sending orders to Japanese exchanges to indicate sell margin or buy to cover. The same tag could be assigned also by buy-side to indicate the intent to sell or buy margin and the sell-side to accept or reject (base on some validation criteria) the margin request.', 'type': None, 'doc_type': 'structured', 'link_keys': ['tag:544'], 'identifier': '544', 'type_field': None, 'description': 'Identifies whether an order is a margin order or a non-margin order. This is primarily used when sending orders to Japanese exchanges to indicate sell margin or buy to cover. The same tag could be assigned also by buy-side to indicate the intent to sell or buy margin and the sell-side to accept or reject (base on some validation criteria) the margin request.', 'enum_values': [{'enum_name': 'Cash', 'enum_value': '1', 'description': 'Cash'}, {'enum_name': 'MarginOpen', 'enum_value': '2', 'description': 'Margin Open'}, {'enum_name': 'MarginClose', 'enum_value': '3', 'description': 'Margin Close'}], 'source_file': '_merged_fields', 'primary_name': 'CashMargin', 'source_files': ['_merged_fields'], 'ingest_source': '_merged_fields', 'identifier_field': 'Tag', 'related_link_keys': [], 'primary_name_field': 'Name', 'related_file_paths': [], 'identifier_namespace': 'tag', 'related_source_files': [], 'related_image_targets': [], 'collection_name': 'xml_test', '_bm25_score': 0.075990885}, 'rank': 10}, {'score': 6.5, 'doc_type': 'structured', 'identifier': '241', 'primary_name': 'UnderlyingCouponPaymentDate', 'source_type': None, 'source_file': '_merged_fields', 'preview': 'Underlying security\u2019s CouponPaymentDate. See CouponPaymentDate (224) field for description (Note tag # was reserved in FIX 4.1, added in FIX 4.3) (prior to FIX 4.4 field was of type UTCDate)', 'payload': {'text': 'UnderlyingCouponPaymentDate\\n\\nUnderlying security\u2019s CouponPaymentDate.\\nSee CouponPaymentDate (224) field for description\\n(Note tag # was reserved in FIX 4.1, added in FIX 4.3)\\n(prior to FIX 4.4 field was of type UTCDate)', 'type': None, 'doc_type': 'structured', 'link_keys': ['tag:241'], 'identifier': '241', 'type_field': None, 'description': 'Underlying security\u2019s CouponPaymentDate.\\nSee CouponPaymentDate (224) field for description\\n(Note tag # was reserved in FIX 4.1, added in FIX 4.3)\\n(prior to FIX 4.4 field was of type UTCDate)', 'enum_values': [], 'source_file': '_merged_fields', 'primary_name': 'UnderlyingCouponPaymentDate', 'source_files': ['_merged_fields'], 'ingest_source': '_merged_fields', 'identifier_field': 'Tag', 'related_link_keys': ['tag:224'], 'primary_name_field': 'Name', 'related_file_paths': [], 'identifier_namespace': 'tag', 'related_source_files': [], 'related_image_targets': [], 'collection_name': 'xml_test', '_bm25_score': 0.075990885}, 'rank': 11}, {'score': 6.5, 'doc_type': 'structured', 'identifier': '242', 'primary_name': 'UnderlyingIssueDate', 'source_type': None, 'source_file': '_merged_fields', 'preview': 'Underlying security\u2019s IssueDate. See IssueDate (225) field for description (Note tag # was reserved in FIX 4.1, added in FIX 4.3) (prior to FIX 4.4 field was of type UTCDate)', 'payload': {'text': 'UnderlyingIssueDate\\n\\nUnderlying security\u2019s IssueDate.\\nSee IssueDate (225) field for description\\n(Note tag # was reserved in FIX 4.1, added in FIX 4.3)\\n(prior to FIX 4.4 field was of type UTCDate)', 'type': None, 'doc_type': 'structured', 'link_keys': ['tag:242'], 'identifier': '242', 'type_field': None, 'description': 'Underlying security\u2019s IssueDate.\\nSee IssueDate (225) field for description\\n(Note tag # was reserved in FIX 4.1, added in FIX 4.3)\\n(prior to FIX 4.4 field was of type UTCDate)', 'enum_values': [], 'source_file': '_merged_fields', 'primary_name': 'UnderlyingIssueDate', 'source_files': ['_merged_fields'], 'ingest_source': '_merged_fields', 'identifier_field': 'Tag', 'related_link_keys': ['tag:225'], 'primary_name_field': 'Name', 'related_file_paths': [], 'identifier_namespace': 'tag', 'related_source_files': [], 'related_image_targets': [], 'collection_name': 'xml_test', '_bm25_score': 0.075990885}, 'rank': 12}, {'score': 6.5, 'doc_type': 'structured', 'identifier': '244', 'primary_name': 'UnderlyingRepurchaseTerm', 'source_type': None, 'source_file': '_merged_fields', 'preview': '*** DEPRECATED FIELD - See \"Deprecated (Phased-out) Features and Supported Approach\" *** Underlying security\u2019s RepurchaseTerm. See RepurchaseTerm (226) field for description (Note tag # was reserved in FIX 4.1, added in ...', 'payload': {'text': 'UnderlyingRepurchaseTerm\\n\\n*** DEPRECATED FIELD - See \"Deprecated (Phased-out) Features and Supported Approach\" ***\\nUnderlying security\u2019s RepurchaseTerm.\\nSee RepurchaseTerm (226) field for description\\n(Note tag # was reserved in FIX 4.1, added in FIX 4.3)', 'type': None, 'doc_type': 'structured', 'link_keys': ['tag:244'], 'identifier': '244', 'type_field': None, 'description': '*** DEPRECATED FIELD - See \"Deprecated (Phased-out) Features and Supported Approach\" ***\\nUnderlying security\u2019s RepurchaseTerm.\\nSee RepurchaseTerm (226) field for description\\n(Note tag # was reserved in FIX 4.1, added in FIX 4.3)', 'enum_values': [], 'source_file': '_merged_fields', 'primary_name': 'UnderlyingRepurchaseTerm', 'source_files': ['_merged_fields'], 'ingest_source': '_merged_fields', 'identifier_field': 'Tag', 'related_link_keys': ['tag:226'], 'primary_name_field': 'Name', 'related_file_paths': [], 'identifier_namespace': 'tag', 'related_source_files': [], 'related_image_targets': [], 'collection_name': 'xml_test', '_bm25_score': 0.075990885}, 'rank': 13}, {'score': 6.5, 'doc_type': 'structured', 'identifier': '245', 'primary_name': 'UnderlyingRepurchaseRate', 'source_type': None, 'source_file': '_merged_fields', 'preview': '*** DEPRECATED FIELD - See \"Deprecated (Phased-out) Features and Supported Approach\" *** Underlying security\u2019s RepurchaseRate. See RepurchaseRate (227) field for description (Note tag # was reserved in FIX 4.1, added in ...', 'payload': {'text': 'UnderlyingRepurchaseRate\\n\\n*** DEPRECATED FIELD - See \"Deprecated (Phased-out) Features and Supported Approach\" ***\\nUnderlying security\u2019s RepurchaseRate.\\nSee RepurchaseRate (227) field for description\\n(Note tag # was reserved in FIX 4.1, added in FIX 4.3)', 'type': None, 'doc_type': 'structured', 'link_keys': ['tag:245'], 'identifier': '245', 'type_field': None, 'description': '*** DEPRECATED FIELD - See \"Deprecated (Phased-out) Features and Supported Approach\" ***\\nUnderlying security\u2019s RepurchaseRate.\\nSee RepurchaseRate (227) field for description\\n(Note tag # was reserved in FIX 4.1, added in FIX 4.3)', 'enum_values': [], 'source_file': '_merged_fields', 'primary_name': 'UnderlyingRepurchaseRate', 'source_files': ['_merged_fields'], 'ingest_source': '_merged_fields', 'identifier_field': 'Tag', 'related_link_keys': ['tag:227'], 'primary_name_field': 'Name', 'related_file_paths': [], 'identifier_namespace': 'tag', 'related_source_files': [], 'related_image_targets': [], 'collection_name': 'xml_test', '_bm25_score': 0.075990885}, 'rank': 14}, {'score': 6.5, 'doc_type': 'structured', 'identifier': '246', 'primary_name': 'UnderlyingFactor', 'source_type': None, 'source_file': '_merged_fields', 'preview': 'Underlying security\u2019s Factor. See Factor (228) field for description (Note tag # was reserved in FIX 4.1, added in FIX 4.3)', 'payload': {'text': 'UnderlyingFactor\\n\\nUnderlying security\u2019s Factor.\\nSee Factor (228) field for description\\n(Note tag # was reserved in FIX 4.1, added in FIX 4.3)', 'type': None, 'doc_type': 'structured', 'link_keys': ['tag:246'], 'identifier': '246', 'type_field': None, 'description': 'Underlying security\u2019s Factor.\\nSee Factor (228) field for description\\n(Note tag # was reserved in FIX 4.1, added in FIX 4.3)', 'enum_values': [], 'source_file': '_merged_fields', 'primary_name': 'UnderlyingFactor', 'source_files': ['_merged_fields'], 'ingest_source': '_merged_fields', 'identifier_field': 'Tag', 'related_link_keys': ['tag:228'], 'primary_name_field': 'Name', 'related_file_paths': [], 'identifier_namespace': 'tag', 'related_source_files': [], 'related_image_targets': [], 'collection_name': 'xml_test', '_bm25_score': 0.075990885}, 'rank': 15}, {'score': 6.5, 'doc_type': 'structured', 'identifier': '248', 'primary_name': 'LegCouponPaymentDate', 'source_type': None, 'source_file': '_merged_fields', 'preview': \"Multileg instrument's individual leg security\u2019s CouponPaymentDate. See CouponPaymentDate (224) field for description (Note tag # was reserved in FIX 4.1, added in FIX 4.3) (prior to FIX 4.4 field was of type UTCDate)\", 'payload': {'text': \"LegCouponPaymentDate\\n\\nMultileg instrument's individual leg security\u2019s CouponPaymentDate.\\nSee CouponPaymentDate (224) field for description\\n(Note tag # was reserved in FIX 4.1, added in FIX 4.3)\\n(prior to FIX 4.4 field was of type UTCDate)\", 'type': None, 'doc_type': 'structured', 'link_keys': ['tag:248'], 'identifier': '248', 'type_field': None, 'description': \"Multileg instrument's individual leg security\u2019s CouponPaymentDate.\\nSee CouponPaymentDate (224) field for description\\n(Note tag # was reserved in FIX 4.1, added in FIX 4.3)\\n(prior to FIX 4.4 field was of type UTCDate)\", 'enum_values': [], 'source_file': '_merged_fields', 'primary_name': 'LegCouponPaymentDate', 'source_files': ['_merged_fields'], 'ingest_source': '_merged_fields', 'identifier_field': 'Tag', 'related_link_keys': ['tag:224'], 'primary_name_field': 'Name', 'related_file_paths': [], 'identifier_namespace': 'tag', 'related_source_files': [], 'related_image_targets': [], 'collection_name': 'xml_test', '_bm25_score': 0.075990885}, 'rank': 16}, {'score': 6.5, 'doc_type': 'structured', 'identifier': '249', 'primary_name': 'LegIssueDate', 'source_type': None, 'source_file': '_merged_fields', 'preview': \"Multileg instrument's individual leg security\u2019s IssueDate. See IssueDate (225) field for description (Note tag # was reserved in FIX 4.1, added in FIX 4.3) (prior to FIX 4.4 field was of type UTCDate)\", 'payload': {'text': \"LegIssueDate\\n\\nMultileg instrument's individual leg security\u2019s IssueDate.\\nSee IssueDate (225) field for description\\n(Note tag # was reserved in FIX 4.1, added in FIX 4.3)\\n(prior to FIX 4.4 field was of type UTCDate)\", 'type': None, 'doc_type': 'structured', 'link_keys': ['tag:249'], 'identifier': '249', 'type_field': None, 'description': \"Multileg instrument's individual leg security\u2019s IssueDate.\\nSee IssueDate (225) field for description\\n(Note tag # was reserved in FIX 4.1, added in FIX 4.3)\\n(prior to FIX 4.4 field was of type UTCDate)\", 'enum_values': [], 'source_file': '_merged_fields', 'primary_name': 'LegIssueDate', 'source_files': ['_merged_fields'], 'ingest_source': '_merged_fields', 'identifier_field': 'Tag', 'related_link_keys': ['tag:225'], 'primary_name_field': 'Name', 'related_file_paths': [], 'identifier_namespace': 'tag', 'related_source_files': [], 'related_image_targets': [], 'collection_name': 'xml_test', '_bm25_score': 0.075990885}, 'rank': 17}, {'score': 6.5, 'doc_type': 'structured', 'identifier': '251', 'primary_name': 'LegRepurchaseTerm', 'source_type': None, 'source_file': '_merged_fields', 'preview': '*** DEPRECATED FIELD - See \"Deprecated (Phased-out) Features and Supported Approach\" *** Multileg instrument\\'s individual leg security\\'s RepurchaseTerm. See RepurchaseTerm (226) field for description (Note tag # was rese...', 'payload': {'text': 'LegRepurchaseTerm\\n\\n*** DEPRECATED FIELD - See \"Deprecated (Phased-out) Features and Supported Approach\" ***\\nMultileg instrument\\'s individual leg security\\'s RepurchaseTerm.\\nSee RepurchaseTerm (226) field for description\\n(Note tag # was reserved in FIX 4.1, added in FIX 4.3)', 'type': None, 'doc_type': 'structured', 'link_keys': ['tag:251'], 'identifier': '251', 'type_field': None, 'description': '*** DEPRECATED FIELD - See \"Deprecated (Phased-out) Features and Supported Approach\" ***\\nMultileg instrument\\'s individual leg security\\'s RepurchaseTerm.\\nSee RepurchaseTerm (226) field for description\\n(Note tag # was reserved in FIX 4.1, added in FIX 4.3)', 'enum_values': [], 'source_file': '_merged_fields', 'primary_name': 'LegRepurchaseTerm', 'source_files': ['_merged_fields'], 'ingest_source': '_merged_fields', 'identifier_field': 'Tag', 'related_link_keys': ['tag:226'], 'primary_name_field': 'Name', 'related_file_paths': [], 'identifier_namespace': 'tag', 'related_source_files': [], 'related_image_targets': [], 'collection_name': 'xml_test', '_bm25_score': 0.075990885}, 'rank': 18}, {'score': 6.5, 'doc_type': 'structured', 'identifier': '252', 'primary_name': 'LegRepurchaseRate', 'source_type': None, 'source_file': '_merged_fields', 'preview': '*** DEPRECATED FIELD - See \"Deprecated (Phased-out) Features and Supported Approach\" *** Multileg instrument\\'s individual leg security\u2019s RepurchaseRate. See RepurchaseRate (227) field for description (Note tag # was rese...', 'payload': {'text': 'LegRepurchaseRate\\n\\n*** DEPRECATED FIELD - See \"Deprecated (Phased-out) Features and Supported Approach\" ***\\nMultileg instrument\\'s individual leg security\u2019s RepurchaseRate.\\nSee RepurchaseRate (227) field for description\\n(Note tag # was reserved in FIX 4.1, added in FIX 4.3)', 'type': None, 'doc_type': 'structured', 'link_keys': ['tag:252'], 'identifier': '252', 'type_field': None, 'description': '*** DEPRECATED FIELD - See \"Deprecated (Phased-out) Features and Supported Approach\" ***\\nMultileg instrument\\'s individual leg security\u2019s RepurchaseRate.\\nSee RepurchaseRate (227) field for description\\n(Note tag # was reserved in FIX 4.1, added in FIX 4.3)', 'enum_values': [], 'source_file': '_merged_fields', 'primary_name': 'LegRepurchaseRate', 'source_files': ['_merged_fields'], 'ingest_source': '_merged_fields', 'identifier_field': 'Tag', 'related_link_keys': ['tag:227'], 'primary_name_field': 'Name', 'related_file_paths': [], 'identifier_namespace': 'tag', 'related_source_files': [], 'related_image_targets': [], 'collection_name': 'xml_test', '_bm25_score': 0.075990885}, 'rank': 19}, {'score': 6.5, 'doc_type': 'structured', 'identifier': '253', 'primary_name': 'LegFactor', 'source_type': None, 'source_file': '_merged_fields', 'preview': \"Multileg instrument's individual leg security\u2019s Factor. See Factor (228) field for description (Note tag # was reserved in FIX 4.1, added in FIX 4.3)\", 'payload': {'text': \"LegFactor\\n\\nMultileg instrument's individual leg security\u2019s Factor.\\nSee Factor (228) field for description\\n(Note tag # was reserved in FIX 4.1, added in FIX 4.3)\", 'type': None, 'doc_type': 'structured', 'link_keys': ['tag:253'], 'identifier': '253', 'type_field': None, 'description': \"Multileg instrument's individual leg security\u2019s Factor.\\nSee Factor (228) field for description\\n(Note tag # was reserved in FIX 4.1, added in FIX 4.3)\", 'enum_values': [], 'source_file': '_merged_fields', 'primary_name': 'LegFactor', 'source_files': ['_merged_fields'], 'ingest_source': '_merged_fields', 'identifier_field': 'Tag', 'related_link_keys': ['tag:228'], 'primary_name_field': 'Name', 'related_file_paths': [], 'identifier_namespace': 'tag', 'related_source_files': [], 'related_image_targets': [], 'collection_name': 'xml_test', '_bm25_score': 0.075990885}, 'rank': 20}]}",
+   "seconds": 20.6
+  },
+  "chat": {
+   "collections_queried": [
+    "xml_test",
+    "kb_docs"
+   ],
+   "collection": "xml_test",
+   "method": "retrieval",
+   "answer_kind": "multi_item",
+   "answer": "**what is tag 22**\nTag 22 is SecurityIDSource.\n\nDescription: Identifies class or source of the SecurityID (48) value. Required if SecurityID is specified.\n\n**what is tag 35**\nTag 35 is MsgType.\n\nDescription: Defines message type ALWAYS THIRD FIELD IN MESSAGE. (Always unencrypted)\nNote: A \"U\" as the first character in the MsgType field (i.e. U, U2, etc) indicates that the message format is privately defined between the sender and receiver.\n\n**what is tag 54**\nTag 54 is Side.\n\nDescription: Side of order",
+   "seconds": 46.3
+  }
+ },
+ {
+  "id": "MI-02",
+  "question": "give me the tidal jobs for gsact.txt and gspos.txt",
+  "expected": "both Goldman job names",
+  "ask": {
+   "collection": "recon_assist_file",
+   "method": "discovery_list",
+   "answer": "{'total_matches': 0, 'results': []}",
+   "seconds": 24.8
+  },
+  "chat": {
+   "collections_queried": [
+    "obsidian",
+    "kb_docs",
+    "recon_assist_file"
+   ],
+   "collection": "obsidian",
+   "method": "retrieval",
+   "answer_kind": "multi_item",
+   "answer": "**what is the tidal job for gsact.txt**\nThe tidal job for GS (Goldman Sachs) in gsact.txt is either \"020_W_RECON_GOLDMAN_PB_PULL\" or \"019_W_RECON_GOLDMAN_PRIO_PULL\", as stated verbatim: \n\n| **Prime Broker** | **TIDAL Job Name** |\n| -------------------------------------------------------------------------- | ---------------------------------------------------------------- |\n| Goldman (different files use different Tidal jobs, batch and Script files) | 020_W_RECON_GOLDMAN_PB_PULL 019_W_RECON_GOLDMAN_PRIO_PULL |\n\nThese jobs are under the Group \"RECON_DAILY_BATCH > PB_RECON_FILE_RETRIEVAL\".\n\n**what is the tidal job for gspos.txt**\nThe tidal job for gspos.txt is not listed in the provided document. The document specifies tidal jobs for other prime brokers like CITI, Goldman, JPM, Morgan, Chase, and BOA but does not mention a specific tidal job related to \"gspos.txt\". \n\nRelevant quote: \n\"The TIDAL Jobs responsible for pulling files are:\n| **Prime Broker** | **TIDAL Job Name** |\n| -------------------------------------------------------------------------- | ---------------------------------------------------------------- |\n[... list of prime brokers and their respective tidal jobs ...]\"",
+   "seconds": 120.9
+  }
+ },
+ {
+  "id": "MI-03",
+  "question": "compare FIX tag 38 and tag 152",
+  "expected": "OrderQty vs CashOrderQty",
+  "ask": {
+   "collection": "xml_test",
+   "method": "structured_namespace_lookup",
+   "answer": "Tag 38 is OrderQty.\n\nDescription: Quantity ordered. This represents the number of shares for equities or par, face or nominal value for FI instruments.\n(Prior to FIX 4.2 this field was of type int)",
+   "seconds": 4.1
+  },
+  "chat": {
+   "collections_queried": [
+    "xml_test",
+    "kb_docs"
+   ],
+   "collection": "xml_test",
+   "method": "retrieval",
+   "answer_kind": "multi_item",
+   "answer": "**what is FIX tag 38**\nTag 38 is OrderQty.\n\nDescription: Quantity ordered. This represents the number of shares for equities or par, face or nominal value for FI instruments.\n(Prior to FIX 4.2 this field was of type int)\n\n**what is FIX tag 152**\nTag 152 is CashOrderQty.\n\nDescription: Specifies the approximate order quantity desired in total monetary units vs. as tradeable units (e.g. number of shares). The broker or fund manager (for CIV orders) would be responsible for converting and calculating a tradeable unit (e.g. share) quantity (OrderQty (38)) based upon this amount to be used for the actual order and subsequent messages.",
+   "seconds": 32.1
+  }
+ },
+ {
+  "id": "MI-04",
+  "question": "what are the moore filenames for goldman and jpm activity",
+  "expected": "both mappings (known gate gap: no identifier tokens)",
+  "ask": {
+   "collection": "recon_assist_file",
+   "method": "discovery_list",
+   "answer": "{'total_matches': 0, 'results': []}",
+   "seconds": 17.1
+  },
+  "chat": {
+   "collections_queried": [
+    "recon_assist_file"
+   ],
+   "collection": "recon_assist_file",
+   "method": "retrieval",
+   "answer_kind": "doc",
+   "answer": "The retrieved data does not contain any information about Moore filenames for Goldman and JPM activity.",
+   "seconds": 26.2
+  }
+ }
+]

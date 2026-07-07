@@ -63,6 +63,14 @@ def render_ask_panel():
         meta.text = f"method: {resp.get('method', '?')}" if isinstance(resp, dict) else ""
         payload = resp.get("answer_payload") if isinstance(resp, dict) else None
 
+        # Low-coverage banner must survive the LLM synthesis below — strip it
+        # from the text the LLM sees, re-prepend after (the LLM summarizes it
+        # away otherwise).
+        from core.retrieval.router import LOW_COVERAGE_PREFIX
+        low_coverage = isinstance(result, str) and result.startswith(LOW_COVERAGE_PREFIX)
+        if low_coverage:
+            result = result[len(LOW_COVERAGE_PREFIX):].lstrip()
+
         # Doc/procedural answers: focus them (concise answer from the document), then
         # show the full entry (with images) in an expander below. Structured answers and
         # discovery/analytics dicts are left as-is.
@@ -76,6 +84,9 @@ def render_ask_panel():
                     retrieved_answer=result, primary_answer=result, answer_kind="doc"))
             except Exception:
                 is_doc = False  # fall back to full text inline on synthesis error
+
+        if low_coverage and isinstance(result, str):
+            result = f"**⚠ {LOW_COVERAGE_PREFIX}**\n\n{result}"
 
         if is_doc and result.strip() != full_text.strip():
             render_answer(answer_box, result, [], show_ocr=True)
