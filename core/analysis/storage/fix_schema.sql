@@ -6,6 +6,7 @@ CREATE TABLE IF NOT EXISTS analysis_sessions (
 
     source_type TEXT,
     source_name TEXT,
+    source_hash TEXT,
 
     summary TEXT,
     warning_count INTEGER NOT NULL DEFAULT 0,
@@ -97,6 +98,13 @@ CREATE TABLE IF NOT EXISTS analysis_message_tags (
 CREATE INDEX IF NOT EXISTS idx_analysis_sessions_created_at
     ON analysis_sessions(created_at DESC);
 
+ALTER TABLE analysis_sessions
+    ADD COLUMN IF NOT EXISTS source_hash TEXT;
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_analysis_sessions_source_hash
+    ON analysis_sessions(source_hash)
+    WHERE source_hash IS NOT NULL;
+
 CREATE INDEX IF NOT EXISTS idx_analysis_messages_session_id
     ON analysis_messages(session_id);
 
@@ -132,3 +140,5 @@ CREATE INDEX IF NOT EXISTS idx_analysis_message_tags_tag
 
 CREATE INDEX IF NOT EXISTS idx_analysis_message_tags_tag_value
     ON analysis_message_tags(tag, value);
+
+

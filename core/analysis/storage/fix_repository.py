@@ -1,9 +1,19 @@
+import hashlib
 import json
 from typing import Any, Dict
 
 from core.db import get_conn
 
+def _analysis_source_hash(messages: list) -> str:
+    raw_parts = []
 
+    for msg in messages or []:
+        raw_parts.append(str(msg.get("raw_text") or "").strip())
+
+    raw_text = "\n---FIX_MESSAGE---\n".join(raw_parts).strip()
+
+    return hashlib.sha256(raw_text.encode("utf-8")).hexdigest()
+    
 def _json(value: Any) -> str:
     return json.dumps(value or {}, ensure_ascii=False)
 
@@ -11,6 +21,15 @@ def _json(value: Any) -> str:
 def _json_list(value: Any) -> str:
     return json.dumps(value or [], ensure_ascii=False)
 
+def _analysis_source_hash(messages: list) -> str:
+    raw_parts = []
+
+    for msg in messages or []:
+        raw_parts.append(str(msg.get("raw_text") or "").strip())
+
+    raw_text = "\n---FIX_MESSAGE---\n".join(raw_parts).strip()
+
+    return hashlib.sha256(raw_text.encode("utf-8")).hexdigest()
 
 def save_fix_analysis_result(
     result: Dict[str, Any],
@@ -41,10 +60,26 @@ def save_fix_analysis_result(
             "decoded_rows": result.get("decoded_rows") or [],
         }]
 
+    source_hash = _analysis_source_hash(messages)
     warnings = result.get("warnings") or []
 
     with get_conn() as conn:
         with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT id
+                FROM analysis_sessions
+                WHERE source_hash = %s
+                LIMIT 1
+                """,
+                (source_hash,),
+            )
+
+            existing = cur.fetchone()
+
+            if existing:
+                return existing[0]
+
             cur.execute(
                 """
                 INSERT INTO analysis_sessions (
@@ -52,12 +87,13 @@ def save_fix_analysis_result(
                     analysis_mode,
                     source_type,
                     source_name,
+                    source_hash,
                     summary,
                     warning_count,
                     message_count,
                     group_count
                 )
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
                 RETURNING id
                 """,
                 (
@@ -65,6 +101,7 @@ def save_fix_analysis_result(
                     analysis_mode,
                     source_type,
                     source_name,
+                    source_hash,
                     result.get("summary") or "",
                     len(warnings),
                     len(messages),
