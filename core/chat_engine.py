@@ -158,6 +158,35 @@ def select_collections(question: str, history: list, available_collections: list
             if _hit:
                 _tier1_hits.append(_col)
 
+    # --- Tier 1.25: question words that match record identifiers are anchors.
+    # A content word that prefix-matches identifiers in a collection ('jpm' ->
+    # jpm_cfd_position, 'citi' -> citi_dcm_fees.csv) pins that collection the
+    # same way a filename does. Data-driven: matched against each collection's
+    # own record keys, nothing named in code.
+    try:
+        from core.query_helpers import load_doc_query_hints
+        _h = load_doc_query_hints()
+        _noise_words = set()
+        for _k in ("discovery_noise_words", "question_words",
+                   "structured_namespace_terms", "stopwords"):
+            _noise_words.update(_h.get(_k, []))
+    except Exception:
+        _noise_words = set()
+    _q_words = [w for w in re.findall(r"[a-z0-9]{3,}", question.lower())
+                if w not in _noise_words]
+    for _w in _q_words:
+        for _col in available_collections:
+            if _col in _tier1_hits:
+                continue
+            # identifier COLUMN only — matching primary_name here routed xml
+            # via 'check' -> CheckSum. Record keys are the anchor, not names.
+            _hit = _fetchall(
+                """SELECT 1 FROM chunks WHERE collection_name = %s
+                   AND identifier ILIKE %s LIMIT 1""",
+                (_col, _w + "%"))
+            if _hit:
+                _tier1_hits.append(_col)
+
     # Also add collections linked via confirmed cross-links (either direction —
     # links are edges, not arrows)
     for _id in _identifiers:
@@ -174,10 +203,48 @@ def select_collections(question: str, history: list, available_collections: list
             if col in available_collections and col not in _tier1_hits:
                 _tier1_hits.append(col)
 
+    # --- Tier 1.5: deterministic concept-centroid routing ---
+    # One question embedding vs every collection's concept centroids (pgvector).
+    # When the signal is clear (config thresholds), the Tier 2 LLM call is
+    # SKIPPED entirely — deterministic routing + one less LLM call per turn.
+    # Scores come from the collections' own concept vectors; nothing named.
+    from core.system_config import load_system_config
+    _rt_cfg = load_system_config().get("centroid_routing", {})
+    if _rt_cfg.get("enabled", True):
+        _min_sim = float(_rt_cfg.get("min_sim", 0.6))
+        _margin = float(_rt_cfg.get("margin", 0.08))
+        _max_cols = int(_rt_cfg.get("max_collections", 3))
+        try:
+            from core.embedder import embed_text
+            _qv = str(embed_text(question))
+            _rows = _fetchall(
+                """SELECT collection, MAX(1 - (centroid <=> %s::vector)) AS best_sim
+                   FROM concept_vectors GROUP BY collection ORDER BY best_sim DESC""",
+                (_qv,))
+            _rows = [r for r in _rows if r["collection"] in available_collections]
+            if DEBUG and _rows:
+                print("DEBUG centroid routing:",
+                      [(r["collection"], round(float(r["best_sim"]), 3)) for r in _rows[:5]])
+            if _rows and float(_rows[0]["best_sim"]) >= _min_sim:
+                _lead = float(_rows[0]["best_sim"])
+                _picked = [r["collection"] for r in _rows
+                           if _lead - float(r["best_sim"]) <= _margin][:_max_cols]
+                # Merge Tier 1 identifier anchors (after ranking, per CODE-027);
+                # an anchor never gets dropped by the cap.
+                for _col in _tier1_hits:
+                    if _col not in _picked:
+                        if len(_picked) >= max(_max_cols, 3):
+                            _picked[-1] = _col
+                        else:
+                            _picked.append(_col)
+                return _picked[:max(_max_cols, 3)]
+        except Exception as _e:
+            print(f"[ROUTING] centroid scoring failed ({type(_e).__name__}): {_e}")
+
     # Don't return early — let Tier 2 LLM determine ordering
     # Tier 1 hits will be merged after Tier 2
 
-    # --- Tier 2: concept vector cluster LLM routing ---
+    # --- Tier 2: concept vector cluster LLM routing (fallback for murky cases) ---
     history_text = "\n".join([
         f"{m['role'].upper()}: {m['content'][:100]}"
         for m in history[-3:]
@@ -305,6 +372,52 @@ def run_parallel_queries(collections: list, question: str, single_item: bool = F
             except Exception as e:
                 results[col] = {"result": f"Error querying {col}: {e}", "related_sections": []}
 
+    # Keep runner-up STRUCTURED answers (records/metadata — verifiable facts)
+    # for post-synthesis composition. Doc runner-ups are excluded: appending a
+    # second procedure invites step-blending; they surface as related links
+    # instead. The LLM never sees these — appended verbatim after synthesis.
+    def _collect_secondary_answers(results_by_col, best_col_):
+        import re as _re
+        try:
+            from core.query_helpers import load_doc_query_hints
+            _h = load_doc_query_hints()
+            _noise = set()
+            for _k in ("discovery_noise_words", "question_words",
+                       "structured_namespace_terms", "stopwords"):
+                _noise.update(_h.get(_k, []))
+        except Exception:
+            _noise = set()
+        _qw = {w for w in _re.findall(r"[a-z0-9]{3,}", question.lower())
+               if w not in _noise}
+
+        out = []
+        for col_ in collections:
+            if col_ == best_col_:
+                continue
+            r_ = results_by_col.get(col_, {})
+            kind_ = classify_answer_kind(r_.get("method"), r_.get("answer_payload"))
+            if r_.get("method") == "metadata_sql" or kind_ == "structured":
+                txt_ = _result_to_text(r_.get("result", ""))
+                # NOTE: "No exact match found" is NOT excluded — that fallback
+                # carries the closest-records listing (e.g. the citi file list),
+                # which is precisely what cross-collection composition needs.
+                if not txt_ or any(m in txt_ for m in (
+                        "No answer found", "No record found",
+                        "Found 0", "0 record(s)", "0 value(s)")):
+                    continue
+                # Relevance gate — IDENTIFIERS ONLY, PREFIX match. A question
+                # word must be the prefix of a listed record key ('citi' ->
+                # citi_dcm_fees.csv). Names/descriptions are excluded: 'check'
+                # inside 'CheckSum' or 'date' inside a field description is
+                # coincidence, not evidence.
+                _ids = _re.findall(r"(?:^|\n)- ([\w.\-]+):", txt_)
+                _ids += _re.findall(r"^([\w.\-]+)", txt_)  # record answers' lead token
+                _ids = [i.lower() for i in _ids]
+                if _qw and not any(i.startswith(w) for i in _ids for w in _qw):
+                    continue
+                out.append({"collection": col_, "answer": txt_})
+        return out[:2]
+
     # Pick best result: prefer collections whose answer is not one of the
     # system's own empty/zero-result phrasings, then first collection wins.
     def _is_empty_answer(text: str) -> bool:
@@ -343,6 +456,7 @@ def run_parallel_queries(collections: list, question: str, single_item: bool = F
     best_result["collection"] = best_col
     best_result["collections_queried"] = collections
     best_result["related_sections"] = merged_related
+    best_result["secondary_answers"] = _collect_secondary_answers(results, best_col)
     return best_result
 
 _CONTEXTUALIZE_FORMAT = {
@@ -924,6 +1038,17 @@ def chat_turn(question: str, history: list, available_collections: list) -> dict
         response = generate_conversational_response(
             question, effective_history, retrieved_answer=retrieved,
             primary_answer=primary_answer, answer_kind=answer_kind)
+
+    # Post-synthesis composition: runner-up STRUCTURED answers appended
+    # verbatim (the LLM never sees them — no contamination, no blending).
+    # Cross-collection questions get record + procedure in one response;
+    # doc runner-ups remain related links only.
+    _secondary = query_run.get("secondary_answers") or []
+    if _secondary and "couldn't find" not in str(response):
+        for _sec in _secondary:
+            if _sec["collection"] != collection:
+                response = (str(response) + f"\n\n---\n**From {_sec['collection']}:**\n\n"
+                            + _sec["answer"][:1500])
     # Step 1 (retrieval-quality rework): related previews are NO LONGER appended into
     # the answer body — that was concatenating whole, often unrelated, articles.
 

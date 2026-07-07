@@ -475,6 +475,10 @@ def route_query(
     Returns a string answer.
     """
     q = question.lower().strip()
+    # Reset per call — early-return paths otherwise leave the PREVIOUS
+    # question's payload on the function attribute (stale cross-link
+    # enrichment, wrong answer_kind classification downstream).
+    route_query._last_answer_payload = None
 
     field_maps = load_field_maps()
 
@@ -507,6 +511,9 @@ def route_query(
             identifier = pl.get("identifier") or ""
             desc = str(pl.get("description") or "")[:80]
             lines.append(f"- {identifier}: {name} — {desc}" if desc else f"- {identifier}: {name}")
+        # Mark the answer as structured for downstream classification — this
+        # listing is record data (used by cross-collection composition).
+        route_query._last_answer_payload = payload
         return "\n".join(lines)
 
 

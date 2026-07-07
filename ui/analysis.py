@@ -14,7 +14,7 @@ from core.analysis.ocr.rapidocr_adapter import ocr_image_with_rapidocr
 from core.analysis.ocr.pdf_rapidocr_adapter import ocr_pdf_with_rapidocr
 from ui.analysis_renderers import render_compare_result, render_sequence_result
 from core.analysis.analyzers.fix.sequence_analyzer import analyze_fix_sequence
-
+from core.analysis.storage.fix_repository import save_fix_analysis_result
 
 @app.post("/analysis/clipboard-image-ocr")
 async def clipboard_image_ocr(request: Request):
@@ -526,6 +526,9 @@ def render_analysis_panel():
             else:
                 result = analyze_fix_message(raw_a)
 
+            if result.get("input_type") != "fix_compare" and result.get("input_type") != "fix_sequence":
+                result["raw_text"] = raw_a
+
             result_area.clear()
 
             with result_area:
@@ -535,6 +538,21 @@ def render_analysis_panel():
 
                 if result.get("input_type") == "fix_sequence":
                     render_sequence_result(result)
+
+                    def save_current_sequence_result():
+                        session_id = save_fix_analysis_result(
+                            result,
+                            analysis_mode="Multi-Message Sequence",
+                            source_type="ui",
+                            source_name="Analysis tab",
+                        )
+                        ui.notify(f"Saved FIX analysis session {session_id}.", color="positive")
+
+                    ui.button(
+                        "Save Analysis",
+                        on_click=save_current_sequence_result,
+                    ).props("color=primary outline").classes("q-mt-md")
+
                     return
 
                 ui.label("Plain-English Summary").classes("text-lg font-bold")
@@ -740,6 +758,20 @@ def render_analysis_panel():
                     json.dumps(business_object, indent=2, ensure_ascii=False),
                     language="json",
                 ).classes("w-full max-h-96 overflow-auto")
+
+                def save_current_single_result():
+                    session_id = save_fix_analysis_result(
+                        result,
+                        analysis_mode="Single Message",
+                        source_type="ui",
+                        source_name="Analysis tab",
+                    )
+                    ui.notify(f"Saved FIX analysis session {session_id}.", color="positive")
+
+                ui.button(
+                    "Save Analysis",
+                    on_click=save_current_single_result,
+                ).props("color=primary outline").classes("q-mt-md")
 
         ui.timer(0.1, do_analysis, once=True)
 

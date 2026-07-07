@@ -436,9 +436,30 @@ identifier=Moore file name · primary_name=Tidal Job Name (manual pin — proven
 
 **Chapter 2 (next):** concept-vector quality (bbg 169 hierarchical-path clusters; recon clusters polluted by CODE-024 merged-cell fallthrough incl. source-data typo 'Transction'), kb↔obsidian twin routing, Tier 2 stability. Also: KG review grouping collapse (UI-05, cosmetic dup rows), preview-images gap (markers stripped from previews — mitigated by full-article links).
 
+---
+
+## Session 2026-07-07 (cont.) — Chapter 2: deterministic routing + cross-collection composition
+
+### Tier 1.5 — concept-centroid routing (chat)
+Dry-run on 8 eval questions justified it: centroid similarity ranked the right collection in 5-6/8, including three the Tier 2 LLM was failing (PP-06, DL-07, XC-05). Implemented in `select_collections`: one question embedding vs ALL collections' concept-vector centroids (single pgvector SQL); when the leader clears `centroid_routing.min_sim` (0.6), collections within `margin` (0.08) are selected (max 3) and **the Tier 2 LLM call is skipped entirely** — deterministic routing + one less LLM call per turn (SPEED-01's first win). Murky cases fall through to the LLM exactly as before. Tier 1 anchors merge in and are never dropped by the cap. Verified: PP-06 ✅ (was ❌), DL-07 chat ✅ (was ❌), DL-08 held, multi 18/18.
+Twins bonus: kb/obsidian centroid scores sit adjacent (0.769/0.775) so top-3 naturally includes both; the fan-out's best-answer pick arbitrates.
+
+### Tier 1.25 — identifier-prefix anchors (chat)
+Question content words (config noise lists excluded) that prefix-match a collection's **identifier column** pin that collection like a filename does ('jpm' -> jpm_cfd_position, 'citi' -> citi_dcm_fees.csv). identifier column ONLY — matching primary_name routed xml via 'check' -> CheckSum during calibration.
+
+### Cross-collection composition (XC bucket structural gap — closed)
+Raed's design, better than the LLM-context merge first proposed: **compose, don't blend.** Runner-up STRUCTURED answers (records/metadata only — never a second procedure doc, which invites step-blending; see PR-03 💀) are appended verbatim AFTER synthesis as "**From {collection}:**" blocks — the LLM never sees them, zero contamination. Doc runner-ups remain related links. Includes the "No exact match — closest results" record listings (that's where the file lists live). Relevance gate: a question word must be the PREFIX of a LISTED IDENTIFIER — names/descriptions excluded ('check' in 'CheckSum', 'date' in a field description = coincidence, not evidence). Router fixes en route: the no-exact-match branch now sets `_last_answer_payload` (was unclassifiable downstream) and `_last_answer_payload` resets per call (stale-payload leak across questions — latent cross-link-enrichment bug).
+**Verified: XC-02 ✅ (procedure + jpm records + 090_W_RECON_JPM_PB_PULL), XC-05 ✅ (workflow + citi file records), bbg/xml noise gated out, single-item + multi 18/18 unaffected.**
+
+### Lesson (paid for twice tonight)
+Loose string matchers MULTIPLY: a prefix-match on names ('check'->CheckSum) routed noise in, and a substring gate ('check' ⊂ 'checksum') waved it through. Identifier-anchored, prefix-only matching composed cleanly on the first try. If a deterministic guard needs a third refinement round, disable it behind config and take it to the design board.
+
+### Cosmetics parked
+`- : ` empty rows in record listings = CODE-024 NULL-identifier rows; stray low-ranked concept links (correctly demoted to list bottom by confirmed-first ranking); KG review grouping dup rows (UI-05).
+
 ## Next Session Priorities
 
-0. **Cross-links + concept vectors block — chapter 2** — concept-vector quality, kb↔obsidian twin routing, Tier 2 stability; acceptance tests: PP-01, PP-03 routing, PP-06 chat, XC-02/05.
+0. **Chapter 3** — concept-vector quality pass (bbg 169 hierarchical-path clusters; recon cluster pollution via CODE-024/25 ffill), VOCAB-01 (spell-correct → fixes PP-03 for real + helps centroid routing on typos), PP-01 remains the acceptance bar.
 1. **MODEL-01** — fix `schema_model` config; re-ingest Datatypes_FIX44 (DATA-01) as the 32B's first live test before CTM.
 2. **Eval retest** (NAS_AI_Retrieval_Eval_v1.md) — full pass: MI bucket should flip to ✅; DL-02/05, AG/RECON buckets re-scored; XC remains the largest unaddressed group.
 3. **Chat routing hardening** — DL-08/PP-03 no-collection fallback; kb_docs/obsidian wrong-twin ranking.
