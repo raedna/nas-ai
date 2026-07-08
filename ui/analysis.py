@@ -540,13 +540,17 @@ def render_analysis_panel():
                     render_sequence_result(result)
 
                     def save_current_sequence_result():
-                        session_id = save_fix_analysis_result(
+                        session_id, created = save_fix_analysis_result(
                             result,
                             analysis_mode="Multi-Message Sequence",
                             source_type="ui",
                             source_name="Analysis tab",
                         )
-                        ui.notify(f"Saved FIX analysis session {session_id}.", color="positive")
+
+                        if created:
+                            ui.notify(f"Saved new FIX analysis session {session_id}.", color="positive")
+                        else:
+                            ui.notify(f"Analysis already exists as session {session_id}. Save skipped.", color="info")
 
                     ui.button(
                         "Save Analysis",
@@ -760,13 +764,17 @@ def render_analysis_panel():
                 ).classes("w-full max-h-96 overflow-auto")
 
                 def save_current_single_result():
-                    session_id = save_fix_analysis_result(
+                    session_id, created = save_fix_analysis_result(
                         result,
                         analysis_mode="Single Message",
                         source_type="ui",
                         source_name="Analysis tab",
                     )
-                    ui.notify(f"Saved FIX analysis session {session_id}.", color="positive")
+
+                    if created:
+                        ui.notify(f"Saved new FIX analysis session {session_id}.", color="positive")
+                    else:
+                        ui.notify(f"Analysis already exists as session {session_id}. Save skipped.", color="info")
 
                 ui.button(
                     "Save Analysis",

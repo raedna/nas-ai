@@ -1,7 +1,6 @@
 import hashlib
 import json
-from typing import Any, Dict
-
+from typing import Any, Dict, Tuple
 from core.db import get_conn
 
 def _analysis_source_hash(messages: list) -> str:
@@ -156,7 +155,7 @@ def save_fix_analysis_result(
     analysis_mode: str,
     source_type: str = "manual",
     source_name: str = "",
-) -> int:
+) -> Tuple[int, bool]:
     """
     Save a FIX analysis result into:
     - analysis_sessions
@@ -164,7 +163,8 @@ def save_fix_analysis_result(
     - analysis_message_tags
 
     Returns:
-        session_id
+        (session_id, created)
+        created = False when an identical analysis already exists and was skipped.
     """
     messages = result.get("messages") or []
 
@@ -198,7 +198,7 @@ def save_fix_analysis_result(
             existing = cur.fetchone()
 
             if existing:
-                return existing[0]
+                return existing[0], False
 
             cur.execute(
                 """
@@ -367,4 +367,4 @@ def save_fix_analysis_result(
 
         conn.commit()
 
-    return session_id
+    return session_id, True
