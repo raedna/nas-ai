@@ -95,6 +95,15 @@ CREATE TABLE IF NOT EXISTS analysis_message_tags (
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+ALTER TABLE analysis_messages
+    ADD COLUMN IF NOT EXISTS exec_broker TEXT,
+    ADD COLUMN IF NOT EXISTS ex_destination TEXT,
+    ADD COLUMN IF NOT EXISTS security_exchange TEXT,
+    ADD COLUMN IF NOT EXISTS security_type TEXT,
+    ADD COLUMN IF NOT EXISTS security_desc TEXT,
+    ADD COLUMN IF NOT EXISTS issuer TEXT,
+    ADD COLUMN IF NOT EXISTS currency TEXT;
+
 CREATE INDEX IF NOT EXISTS idx_analysis_sessions_created_at
     ON analysis_sessions(created_at DESC);
 
@@ -141,4 +150,29 @@ CREATE INDEX IF NOT EXISTS idx_analysis_message_tags_tag
 CREATE INDEX IF NOT EXISTS idx_analysis_message_tags_tag_value
     ON analysis_message_tags(tag, value);
 
+CREATE INDEX IF NOT EXISTS idx_analysis_messages_exec_broker
+    ON analysis_messages(exec_broker);
+
+CREATE INDEX IF NOT EXISTS idx_analysis_messages_ex_destination
+    ON analysis_messages(ex_destination);
+
+CREATE INDEX IF NOT EXISTS idx_analysis_messages_security_exchange
+    ON analysis_messages(security_exchange);
+
+CREATE INDEX IF NOT EXISTS idx_analysis_messages_security_type
+    ON analysis_messages(security_type);
+
+CREATE INDEX IF NOT EXISTS idx_analysis_messages_route_security
+    ON analysis_messages(sender, target, security_id);
+
+CREATE INDEX IF NOT EXISTS idx_analysis_messages_route_symbol_exchange
+    ON analysis_messages(sender, target, symbol, security_exchange);
+
+CREATE INDEX IF NOT EXISTS idx_analysis_messages_route_broker_symbol
+    ON analysis_messages(sender, target, exec_broker, symbol);
+
+CREATE INDEX IF NOT EXISTS idx_analysis_messages_route_destination_symbol
+    ON analysis_messages(sender, target, ex_destination, symbol);
+
+    
 

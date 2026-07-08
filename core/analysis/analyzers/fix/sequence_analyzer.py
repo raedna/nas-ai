@@ -347,6 +347,13 @@ def analyze_fix_sequence(raw_text: str) -> Dict[str, Any]:
             "symbol": _get_nested(business_object, "trade", "symbol"),
             "security_id": _get_nested(business_object, "trade", "security_id"),
             "side": _get_nested(business_object, "trade", "side"),
+            "exec_broker": _get_tag_value(decoded_rows, "76"),
+            "ex_destination": _get_tag_value(decoded_rows, "100"),
+            "security_exchange": _get_tag_value(decoded_rows, "207"),
+            "security_type": _get_tag_value(decoded_rows, "167"),
+            "security_desc": _get_tag_value(decoded_rows, "107"),
+            "issuer": _get_tag_value(decoded_rows, "106"),
+            "currency": _get_tag_value(decoded_rows, "15"),
             "order_qty": (
                 _get_nested(business_object, "trade", "order_quantity")
                 or _get_tag_value(decoded_rows, "38")

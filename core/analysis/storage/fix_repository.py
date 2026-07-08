@@ -2,6 +2,7 @@ import hashlib
 import json
 from typing import Any, Dict, Tuple
 from core.db import get_conn
+from core.db import fetchall, fetchone
 
 def _analysis_source_hash(messages: list) -> str:
     raw_parts = []
@@ -131,6 +132,34 @@ def _enrich_single_message(msg: Dict[str, Any]) -> Dict[str, Any]:
             _get_nested(business_object, "trade", "leaves_quantity")
             or _get_tag_value(decoded_rows, "151")
         ),
+        "exec_broker": (
+            _get_nested(business_object, "trade", "exec_broker")
+            or _get_tag_value(decoded_rows, "76")
+        ),
+        "ex_destination": (
+            _get_nested(business_object, "trade", "ex_destination")
+            or _get_tag_value(decoded_rows, "100")
+        ),
+        "security_exchange": (
+            _get_nested(business_object, "trade", "security_exchange")
+            or _get_tag_value(decoded_rows, "207")
+        ),
+        "security_type": (
+            _get_nested(business_object, "trade", "security_type")
+            or _get_tag_value(decoded_rows, "167")
+        ),
+        "security_desc": (
+            _get_nested(business_object, "trade", "security_description")
+            or _get_tag_value(decoded_rows, "107")
+        ),
+        "issuer": (
+            _get_nested(business_object, "trade", "issuer")
+            or _get_tag_value(decoded_rows, "106")
+        ),
+        "currency": (
+            _get_nested(business_object, "trade", "currency")
+            or _get_tag_value(decoded_rows, "15")
+        ),
     }
 
 def _json(value: Any) -> str:
@@ -258,6 +287,13 @@ def save_fix_analysis_result(
                         symbol,
                         security_id,
                         security_id_source,
+                        exec_broker,
+                        ex_destination,
+                        security_exchange,
+                        security_type,
+                        security_desc,
+                        issuer,
+                        currency,
                         side,
                         order_qty,
                         last_qty,
@@ -271,6 +307,7 @@ def save_fix_analysis_result(
                     VALUES (
                         %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
                         %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                        %s, %s, %s, %s, %s, %s, %s,
                         %s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb, %s::jsonb
                     )
                     RETURNING id
@@ -297,6 +334,13 @@ def save_fix_analysis_result(
                         msg.get("symbol"),
                         msg.get("security_id"),
                         msg.get("security_id_source"),
+                        msg.get("exec_broker"),
+                        msg.get("ex_destination"),
+                        msg.get("security_exchange"),
+                        msg.get("security_type"),
+                        msg.get("security_desc"),
+                        msg.get("issuer"),
+                        msg.get("currency"),
                         msg.get("side"),
                         msg.get("order_qty"),
                         msg.get("last_qty"),
@@ -368,3 +412,345 @@ def save_fix_analysis_result(
         conn.commit()
 
     return session_id, True
+
+def list_fix_analysis_sessions(limit: int = 20):
+    return fetchall(
+        """
+        SELECT
+            id,
+            analysis_mode,
+            source_type,
+            source_name,
+            summary,
+            warning_count,
+            message_count,
+            group_count,
+            created_at
+        FROM analysis_sessions
+        ORDER BY created_at DESC
+        LIMIT %s
+        """,
+        (limit,),
+    )
+
+
+def get_fix_analysis_session(session_id: int):
+    return fetchone(
+        """
+        SELECT
+            id,
+            analysis_mode,
+            source_type,
+            source_name,
+            summary,
+            warning_count,
+            message_count,
+            group_count,
+            created_at
+        FROM analysis_sessions
+        WHERE id = %s
+        """,
+        (session_id,),
+    )
+
+
+def list_fix_analysis_messages(session_id: int):
+    return fetchall(
+        """
+        SELECT
+            id,
+            session_id,
+            message_index,
+            group_key,
+            group_label,
+            raw_text,
+            summary,
+            msg_type,
+            msg_seq_num,
+            sender,
+            target,
+            sending_time,
+            transact_time,
+            cl_ord_id,
+            order_id,
+            secondary_order_id,
+            exec_id,
+            exec_type,
+            ord_status,
+            symbol,
+            security_id,
+            security_id_source,
+            side,
+            order_qty,
+            last_qty,
+            last_px,
+            avg_px,
+            cum_qty,
+            leaves_qty,
+            warnings,
+            business_object,
+            created_at
+        FROM analysis_messages
+        WHERE session_id = %s
+        ORDER BY message_index
+        """,
+        (session_id,),
+    )
+
+
+def list_fix_message_tags(message_id: int):
+    return fetchall(
+        """
+        SELECT
+            id,
+            message_id,
+            position_index,
+            tag,
+            tag_name,
+            value,
+            value_name,
+            value_description,
+            description,
+            tag_status,
+            tag_warning,
+            has_enums,
+            enum_valid,
+            enum_warning,
+            ocr_original_tag,
+            ocr_tag_repaired,
+            ocr_repair_warning,
+            ocr_inferred,
+            ocr_score,
+            source,
+            created_at
+        FROM analysis_message_tags
+        WHERE message_id = %s
+        ORDER BY position_index
+        """,
+        (message_id,),
+    )
+
+def _clean_match_value(value: Any) -> str:
+    return str(value or "").strip()
+
+
+def find_related_saved_fix_messages(
+    message: Dict[str, Any],
+    exclude_session_id: int | None = None,
+    limit: int = 20,
+):
+    """
+    Find previously saved FIX messages related to the supplied analyzed message.
+
+    This is related-message detection, not duplicate detection.
+    Ranking is based on route + security + broker/venue fields.
+    """
+    sender = _clean_match_value(message.get("sender"))
+    target = _clean_match_value(message.get("target"))
+    symbol = _clean_match_value(message.get("symbol"))
+    security_id = _clean_match_value(message.get("security_id"))
+    security_exchange = _clean_match_value(message.get("security_exchange"))
+    security_type = _clean_match_value(message.get("security_type"))
+    exec_broker = _clean_match_value(message.get("exec_broker"))
+    ex_destination = _clean_match_value(message.get("ex_destination"))
+
+    cl_ord_id = _clean_match_value(message.get("cl_ord_id"))
+    order_id = _clean_match_value(message.get("order_id"))
+    exec_id = _clean_match_value(message.get("exec_id"))
+
+    rules = []
+
+    # Exact order/execution chain matches
+    if cl_ord_id:
+        rules.append(("exact", "Same ClOrdID", "m.cl_ord_id = %s", [cl_ord_id]))
+
+    if order_id:
+        rules.append(("exact", "Same OrderID", "m.order_id = %s", [order_id]))
+
+    if exec_id:
+        rules.append(("exact", "Same ExecID", "m.exec_id = %s", [exec_id]))
+
+    # Strong related matches
+    if sender and target and security_id:
+        rules.append((
+            "strong",
+            "Same Sender/Target/SecurityID",
+            "m.sender = %s AND m.target = %s AND m.security_id = %s",
+            [sender, target, security_id],
+        ))
+
+    if sender and target and symbol and security_exchange:
+        rules.append((
+            "strong",
+            "Same Sender/Target/Symbol/SecurityExchange",
+            "m.sender = %s AND m.target = %s AND m.symbol = %s AND m.security_exchange = %s",
+            [sender, target, symbol, security_exchange],
+        ))
+
+    if sender and target and exec_broker and symbol:
+        rules.append((
+            "strong",
+            "Same Sender/Target/ExecBroker/Symbol",
+            "m.sender = %s AND m.target = %s AND m.exec_broker = %s AND m.symbol = %s",
+            [sender, target, exec_broker, symbol],
+        ))
+
+    if sender and target and ex_destination and symbol:
+        rules.append((
+            "strong",
+            "Same Sender/Target/ExDestination/Symbol",
+            "m.sender = %s AND m.target = %s AND m.ex_destination = %s AND m.symbol = %s",
+            [sender, target, ex_destination, symbol],
+        ))
+
+    # Medium related matches
+    if sender and target and symbol:
+        rules.append((
+            "medium",
+            "Same Sender/Target/Symbol",
+            "m.sender = %s AND m.target = %s AND m.symbol = %s",
+            [sender, target, symbol],
+        ))
+
+    if security_id:
+        rules.append((
+            "medium",
+            "Same SecurityID",
+            "m.security_id = %s",
+            [security_id],
+        ))
+
+    if symbol and security_exchange:
+        rules.append((
+            "medium",
+            "Same Symbol/SecurityExchange",
+            "m.symbol = %s AND m.security_exchange = %s",
+            [symbol, security_exchange],
+        ))
+
+    if exec_broker and symbol:
+        rules.append((
+            "medium",
+            "Same ExecBroker/Symbol",
+            "m.exec_broker = %s AND m.symbol = %s",
+            [exec_broker, symbol],
+        ))
+
+    if ex_destination and symbol:
+        rules.append((
+            "medium",
+            "Same ExDestination/Symbol",
+            "m.ex_destination = %s AND m.symbol = %s",
+            [ex_destination, symbol],
+        ))
+
+    # Weak related matches
+    if sender and target:
+        rules.append((
+            "weak",
+            "Same Sender/Target",
+            "m.sender = %s AND m.target = %s",
+            [sender, target],
+        ))
+
+    if symbol:
+        rules.append((
+            "weak",
+            "Same Symbol",
+            "m.symbol = %s",
+            [symbol],
+        ))
+
+    if security_type and security_exchange:
+        rules.append((
+            "weak",
+            "Same SecurityType/SecurityExchange",
+            "m.security_type = %s AND m.security_exchange = %s",
+            [security_type, security_exchange],
+        ))
+
+    if not rules:
+        return []
+
+    strength_rank = {
+        "exact": 0,
+        "strong": 1,
+        "medium": 2,
+        "weak": 3,
+    }
+
+    found = {}
+
+    for match_strength, match_reason, where_clause, params in rules:
+        extra_filter = ""
+        query_params = list(params)
+
+        if exclude_session_id is not None:
+            extra_filter = "AND s.id <> %s"
+            query_params.append(exclude_session_id)
+
+        rows = fetchall(
+            f"""
+            SELECT
+                s.id AS session_id,
+                s.analysis_mode,
+                s.created_at,
+                m.id AS message_id,
+                m.message_index,
+                m.msg_type,
+                m.msg_seq_num,
+                m.sender,
+                m.target,
+                m.symbol,
+                m.security_id,
+                m.security_id_source,
+                m.security_exchange,
+                m.security_type,
+                m.security_desc,
+                m.issuer,
+                m.currency,
+                m.exec_broker,
+                m.ex_destination,
+                m.cl_ord_id,
+                m.order_id,
+                m.exec_id
+            FROM analysis_messages m
+            JOIN analysis_sessions s ON s.id = m.session_id
+            WHERE {where_clause}
+              {extra_filter}
+            ORDER BY s.created_at DESC, m.message_index
+            LIMIT %s
+            """,
+            tuple(query_params + [limit]),
+        )
+
+        for row in rows:
+            key = (row.get("session_id"), row.get("message_id"))
+
+            candidate = {
+                **row,
+                "match_strength": match_strength,
+                "match_reason": match_reason,
+                "match_rank": strength_rank.get(match_strength, 99),
+            }
+
+            existing = found.get(key)
+
+            if existing is None or candidate["match_rank"] < existing["match_rank"]:
+                found[key] = candidate
+
+    results = list(found.values())
+
+    results.sort(
+        key=lambda row: (
+            row.get("match_rank", 99),
+            str(row.get("created_at") or ""),
+            row.get("session_id") or 0,
+            row.get("message_index") or 0,
+        ),
+        reverse=False,
+    )
+
+    return results[:limit]
+
+    

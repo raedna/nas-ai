@@ -14,7 +14,12 @@ from core.analysis.ocr.rapidocr_adapter import ocr_image_with_rapidocr
 from core.analysis.ocr.pdf_rapidocr_adapter import ocr_pdf_with_rapidocr
 from ui.analysis_renderers import render_compare_result, render_sequence_result
 from core.analysis.analyzers.fix.sequence_analyzer import analyze_fix_sequence
-from core.analysis.storage.fix_repository import save_fix_analysis_result
+from core.analysis.storage.fix_repository import (
+    save_fix_analysis_result,
+    list_fix_analysis_sessions,
+    list_fix_analysis_messages,
+    list_fix_message_tags,
+)
 
 @app.post("/analysis/clipboard-image-ocr")
 async def clipboard_image_ocr(request: Request):
@@ -209,6 +214,7 @@ def render_analysis_panel():
     compare_input_box.visible = False
 
     result_area = ui.column().classes("w-full mt-4")
+    saved_area = ui.column().classes("w-full mt-4")
 
     async def handle_analysis_upload(e, target_box=None):
         print("=== ANALYSIS UPLOAD CALLED ===", flush=True)
@@ -792,6 +798,190 @@ def render_analysis_panel():
 
         result_area.clear()
 
+    def refresh_saved_analyses():
+        saved_area.clear()
+
+        sessions = list_fix_analysis_sessions(20)
+
+        with saved_area:
+            ui.label("Saved Analyses").classes("text-lg font-bold mt-4")
+
+            if not sessions:
+                ui.label("No saved analyses yet.").classes("text-sm text-gray-500")
+                return
+
+            rows = []
+
+            for session in sessions:
+                rows.append({
+                    "id": session.get("id"),
+                    "analysis_mode": session.get("analysis_mode"),
+                    "message_count": session.get("message_count"),
+                    "group_count": session.get("group_count"),
+                    "warning_count": session.get("warning_count"),
+                    "source_name": session.get("source_name"),
+                    "created_at": str(session.get("created_at")),
+                    "summary": (session.get("summary") or "")[:160],
+                })
+
+
+            def open_selected_session():
+                selected_rows = list(table.selected or [])
+
+                if len(selected_rows) != 1:
+                    ui.notify("Select one saved analysis first.", color="warning")
+                    return
+
+                session_id = selected_rows[0].get("id")
+
+                if not session_id:
+                    ui.notify("Could not read selected session id.", color="negative")
+                    return
+
+                messages = list_fix_analysis_messages(session_id)
+
+                result_area.clear()
+
+                with result_area:
+                    ui.label(
+                        f"Saved Analysis Session {session_id}"
+                    ).classes("text-lg font-bold")
+
+                    if not messages:
+                        ui.label("No messages found for this saved session.").classes("text-red")
+                        return
+
+                    rows = []
+
+                    for msg in messages:
+                        rows.append({
+                            "id": msg.get("id"),
+                            "message_index": msg.get("message_index"),
+                            "msg_seq_num": msg.get("msg_seq_num"),
+                            "msg_type": msg.get("msg_type"),
+                            "route": f"{msg.get('sender') or ''} → {msg.get('target') or ''}",
+                            "cl_ord_id": msg.get("cl_ord_id"),
+                            "order_id": msg.get("order_id"),
+                            "secondary_order_id": msg.get("secondary_order_id"),
+                            "exec_id": msg.get("exec_id"),
+                            "symbol": msg.get("symbol"),
+                            "order_qty": msg.get("order_qty"),
+                            "cum_qty": msg.get("cum_qty"),
+                            "leaves_qty": msg.get("leaves_qty"),
+                        })
+
+                    tag_result_area = ui.column().classes("w-full q-mt-md")
+
+                    def view_selected_message_tags():
+                        selected_rows = list(message_table.selected or [])
+
+                        if len(selected_rows) != 1:
+                            ui.notify("Select one saved message first.", color="warning")
+                            return
+
+                        message_id = selected_rows[0].get("id")
+                        message_index = selected_rows[0].get("message_index")
+
+                        if not message_id:
+                            ui.notify("Could not read selected message id.", color="negative")
+                            return
+
+                        tags = list_fix_message_tags(message_id)
+
+                        tag_result_area.clear()
+
+                        with tag_result_area:
+                            ui.label(
+                                f"Decoded Tags for Message {message_index}"
+                            ).classes("text-lg font-semibold q-mt-md")
+
+                            if not tags:
+                                ui.label("No decoded tags found for this message.").classes("text-red")
+                                return
+
+                            tag_rows = []
+
+                            for tag in tags:
+                                tag_rows.append({
+                                    "position_index": tag.get("position_index"),
+                                    "tag": tag.get("tag"),
+                                    "tag_name": tag.get("tag_name"),
+                                    "value": tag.get("value"),
+                                    "value_name": tag.get("value_name"),
+                                    "description": tag.get("description"),
+                                    "tag_warning": tag.get("tag_warning"),
+                                    "enum_warning": tag.get("enum_warning"),
+                                })
+
+                            ui.table(
+                                columns=[
+                                    {"name": "position_index", "label": "#", "field": "position_index", "align": "left", "sortable": True},
+                                    {"name": "tag", "label": "Tag", "field": "tag", "align": "left", "sortable": True},
+                                    {"name": "tag_name", "label": "Name", "field": "tag_name", "align": "left", "sortable": True},
+                                    {"name": "value", "label": "Value", "field": "value", "align": "left", "sortable": True},
+                                    {"name": "value_name", "label": "Value Name", "field": "value_name", "align": "left", "sortable": True},
+                                    {"name": "description", "label": "Description", "field": "description", "align": "left"},
+                                    {"name": "tag_warning", "label": "Tag Warning", "field": "tag_warning", "align": "left"},
+                                    {"name": "enum_warning", "label": "Enum Warning", "field": "enum_warning", "align": "left"},
+                                ],
+                                rows=tag_rows,
+                                row_key="position_index",
+                                pagination={"rowsPerPage": 0},
+                            ).classes("w-full")
+
+                    ui.label(
+                        "Select one saved message row, then click View Selected Message Tags."
+                    ).classes("text-sm text-blue-7 font-bold q-mt-md")
+
+                    ui.button(
+                        "View Selected Message Tags",
+                        on_click=view_selected_message_tags,
+                    ).props("color=primary outline")
+
+                    message_table = ui.table(
+                        columns=[
+                            {"name": "message_index", "label": "#", "field": "message_index", "align": "left", "sortable": True},
+                            {"name": "msg_seq_num", "label": "Seq", "field": "msg_seq_num", "align": "left", "sortable": True},
+                            {"name": "msg_type", "label": "MsgType", "field": "msg_type", "align": "left", "sortable": True},
+                            {"name": "route", "label": "Route", "field": "route", "align": "left", "sortable": True},
+                            {"name": "cl_ord_id", "label": "ClOrdID", "field": "cl_ord_id", "align": "left", "sortable": True},
+                            {"name": "order_id", "label": "OrderID", "field": "order_id", "align": "left", "sortable": True},
+                            {"name": "secondary_order_id", "label": "SecondaryOrderID", "field": "secondary_order_id", "align": "left", "sortable": True},
+                            {"name": "exec_id", "label": "ExecID", "field": "exec_id", "align": "left", "sortable": True},
+                            {"name": "symbol", "label": "Symbol", "field": "symbol", "align": "left", "sortable": True},
+                            {"name": "order_qty", "label": "OrderQty", "field": "order_qty", "align": "left", "sortable": True},
+                            {"name": "cum_qty", "label": "CumQty", "field": "cum_qty", "align": "left", "sortable": True},
+                            {"name": "leaves_qty", "label": "LeavesQty", "field": "leaves_qty", "align": "left", "sortable": True},
+                        ],
+                        rows=rows,
+                        row_key="id",
+                        selection="single",
+                        pagination={"rowsPerPage": 0},
+                    ).classes("w-full")
+
+            ui.button("Open Selected Saved Analysis", on_click=open_selected_session).props("outline")
+
+            table = ui.table(
+                columns=[
+                    {"name": "id", "label": "Session", "field": "id", "align": "left", "sortable": True},
+                    {"name": "analysis_mode", "label": "Mode", "field": "analysis_mode", "align": "left", "sortable": True},
+                    {"name": "message_count", "label": "Messages", "field": "message_count", "align": "left", "sortable": True},
+                    {"name": "group_count", "label": "Groups", "field": "group_count", "align": "left", "sortable": True},
+                    {"name": "warning_count", "label": "Warnings", "field": "warning_count", "align": "left", "sortable": True},
+                    {"name": "created_at", "label": "Created", "field": "created_at", "align": "left", "sortable": True},
+                    {"name": "summary", "label": "Summary", "field": "summary", "align": "left"},
+                ],
+                rows=rows,
+                row_key="id",
+                selection="single",
+                pagination=10,
+            ).classes("w-full")
+
     with ui.row().classes("mt-3 gap-2"):
         ui.button("Analyze", on_click=run_analysis).props("color=primary")
+        ui.button("Refresh Saved Analyses", on_click=refresh_saved_analyses).props("outline")
         ui.button("Clear", on_click=clear_analysis).props("outline color=secondary")
+
+    refresh_saved_analyses()
+
+        
