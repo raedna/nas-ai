@@ -108,7 +108,7 @@ Respond with JSON only:
     # Default to retrieval for operational messages
     return {"intent": "retrieval", "reason": "default fallback"}
 
-DEBUG = False
+DEBUG = True
 
 def select_collections(question: str, history: list, available_collections: list) -> list:
     """
@@ -187,6 +187,63 @@ def select_collections(question: str, history: list, available_collections: list
             if _hit:
                 _tier1_hits.append(_col)
 
+    # --- Tier 1.2: the question NAMES a collection ("...in the recon file",
+    # "which bbg fields...") — a token matching the collection's own name is
+    # an explicit anchor, same standing as an identifier.
+    for _col in available_collections:
+        if _col in _tier1_hits:
+            continue
+        _col_compact = re.sub(r"[^a-z0-9]", "", _col.lower())
+        if any(_w in _col_compact for _w in _q_words):
+            _tier1_hits.append(_col)
+
+    # --- Tier 1.2b: question words matching a SOURCE COLUMN NAME that is
+    # UNIQUE to one collection ('prime brokers' -> recon's 'Prime Broker'
+    # column). Column names shared across collections (Name, Description,
+    # Type) are not distinctive and never anchor. Name-class roles only.
+    try:
+        import json as _json2
+        _srows = _fetchall("SELECT collection_name, schema_json FROM schemas", ())
+        _col_owners = {}
+        for _sr in _srows:
+            _s = _sr["schema_json"]
+            _s = _s if isinstance(_s, dict) else _json2.loads(_s)
+            for _role in ("identifier", "primary_name", "aliases",
+                          "reference_identifier", "type", "tags"):
+                for _c in (_s.get(_role) or []):
+                    _cw = tuple(_re_words) if (_re_words := re.findall(
+                        r"[a-z0-9]+", str(_c).lower())) else ()
+                    if _cw and sum(len(x) for x in _cw) >= 4:
+                        _col_owners.setdefault(_cw, set()).add(_sr["collection_name"])
+        _variants = set(_q_words) | {w[:-1] for w in _q_words
+                                     if w.endswith("s") and len(w) > 3}
+        for _cw, _owners in _col_owners.items():
+            if len(_owners) != 1:
+                continue
+            # Single-word column: the word must match. Multi-word column: at
+            # least TWO of its words must appear in the question — 'prime
+            # brokers' earns 'Prime Broker'; 'moore' alone does NOT earn
+            # 'Moore file name' (it hijacked "what are the Moore notes").
+            # Single-word columns must be DISTINCTIVE words (>=5 chars):
+            # 'Mnemonic' anchors, bare 'Name'/'Type' columns do not.
+            if len(_cw) == 1 and len(_cw[0]) < 5:
+                continue
+            # Count matched column words; a question word equal to two
+            # ADJACENT column words joined covers both ('filenames' ->
+            # 'file'+'name' of 'Moore file name').
+            _hit_idx = {i for i, _w in enumerate(_cw) if _w in _variants}
+            for _i in range(len(_cw) - 1):
+                if (_cw[_i] + _cw[_i + 1]) in _variants:
+                    _hit_idx.update((_i, _i + 1))
+            _hits_n = len(_hit_idx)
+            _needed = 1 if len(_cw) == 1 else 2
+            if _hits_n >= _needed:
+                _owner = next(iter(_owners))
+                if _owner in available_collections and _owner not in _tier1_hits:
+                    _tier1_hits.append(_owner)
+    except Exception:
+        pass
+
     # Also add collections linked via confirmed cross-links (either direction —
     # links are edges, not arrows)
     for _id in _identifiers:
@@ -230,14 +287,25 @@ def select_collections(question: str, history: list, available_collections: list
                 _picked = [r["collection"] for r in _rows
                            if _lead - float(r["best_sim"]) <= _margin][:_max_cols]
                 # Merge Tier 1 identifier anchors (after ranking, per CODE-027);
-                # an anchor never gets dropped by the cap.
+                # an anchor never gets dropped by the cap. Each unplaced anchor
+                # takes a DIFFERENT slot from the end — replacing the same last
+                # slot let the final anchor evict the previous one (recon was
+                # evicted by a later xml anchor exactly this way).
+                _cap = max(_max_cols, 3)
+                _fill = len(_picked) - 1
                 for _col in _tier1_hits:
-                    if _col not in _picked:
-                        if len(_picked) >= max(_max_cols, 3):
-                            _picked[-1] = _col
-                        else:
-                            _picked.append(_col)
-                return _picked[:max(_max_cols, 3)]
+                    if _col in _picked:
+                        continue
+                    if len(_picked) < _cap:
+                        _picked.append(_col)
+                        continue
+                    # walk past slots already held by anchors — never evict one
+                    while _fill >= 0 and _picked[_fill] in _tier1_hits:
+                        _fill -= 1
+                    if _fill >= 0:
+                        _picked[_fill] = _col
+                        _fill -= 1
+                return _picked[:_cap]
         except Exception as _e:
             print(f"[ROUTING] centroid scoring failed ({type(_e).__name__}): {_e}")
 
@@ -433,14 +501,72 @@ def run_parallel_queries(collections: list, question: str, single_item: bool = F
             "0 records match", "0 matching",
         ))
 
+    # Arbitration ladder (deterministic, judged on answers already in hand):
+    # 1. exact-key methods (identifier/namespace/enum lookups) beat everything —
+    #    a record keyed by the question's own identifier outranks a semantic doc
+    # 2. collection-name token match ("...in the RECON file" -> recon_assist_file)
+    # 3. grounded metadata (filter VALUE matches a question token) beats ungrounded
+    # 4. routing order (the old sole criterion, demoted to tie-break)
+    import re as _re
+    _qtoks = {t for t in _re.findall(r"[a-z0-9]{3,}", question.lower())}
+
+    def _arb_score(col, idx):
+        r = results.get(col, {})
+        m = str(r.get("method") or "")
+        if any(k in m for k in ("identifier_lookup", "namespace", "enum", "relationship")):
+            mrank = 0
+        elif m == "metadata_sql":
+            mrank = 1
+        else:
+            mrank = 2
+        # Name-match only arbitrates DATA answers (exact-key/metadata). For
+        # doc answers it would let "recon file missing, what do I do" hand a
+        # procedural question to recon's file listing instead of the runbook.
+        _compact = _re.sub(r"[^a-z0-9]", "", col.lower())
+        name_hit = mrank < 2 and any(t in _compact for t in _qtoks)
+
+        # Doc-vs-doc rung (kb/obsidian twins): among DOCUMENT answers, the one
+        # whose TITLE matches more question words wins ('Charles River Log
+        # Folder for Errors' beats an archive note for a charles-river-logs
+        # question); routing order only breaks ties. Reuses the name slot,
+        # which is otherwise constant for docs.
+        if mrank == 2:
+            _title = str((r.get("answer_payload") or {}).get("primary_name") or "")
+            _tc = _re.sub(r"[^a-z0-9]", "", _title.lower())
+            _tvar = _qtoks | {t[:-1] for t in _qtoks if t.endswith("s") and len(t) > 3}
+            _thits = sum(1 for t in _tvar if t in _tc)
+            return (mrank, 3 - min(_thits, 3), 2, idx)
+        # Groundedness is graded: an EQUALS filter on a real field whose value
+        # matches a question token (identifier_namespace = tag) outranks a
+        # 'contains' on free text (nlp_text contains FIX tag) — equality is a
+        # claim, substring is a shrug. 0 = grounded equals, 1 = grounded
+        # contains, 2 = ungrounded.
+        grounded = 2
+        if m == "metadata_sql":
+            txt_l = _result_to_text(r.get("result", "")).lower()
+            # rstrip('.') — the capture class includes '.' for filenames, but
+            # count answers end '...= tag.' and the sentence period rode into
+            # the value, ungrounding a perfectly grounded answer (AG-03).
+            _eq_vals = [v.rstrip(".") for v in _re.findall(r"=\s+([\w.\-]+)", txt_l)]
+            _ct_vals = [v.rstrip(".") for v in _re.findall(r"contains\s+([\w.\-]+)", txt_l)]
+            if any(v.startswith(t) or t.startswith(v)
+                   for v in _eq_vals for t in _qtoks):
+                grounded = 0
+            elif any(v.startswith(t) or t.startswith(v)
+                     for v in _ct_vals for t in _qtoks):
+                grounded = 1
+        return (mrank, 0 if name_hit else 1, grounded, idx)
+
+    _candidates = [(col, i) for i, col in enumerate(collections)
+                   if not _is_empty_answer(results.get(col, {}).get("result", ""))]
     best_col = None
     best_result = None
-    for col in collections:  # respects priority order from select_collections
-        r = results.get(col, {})
-        if not _is_empty_answer(r.get("result", "")):
-            best_col = col
-            best_result = r
-            break
+    if _candidates:
+        best_col = min(_candidates, key=lambda c: _arb_score(c[0], c[1]))[0]
+        best_result = results.get(best_col, {})
+        if DEBUG:
+            print("DEBUG arbitration:",
+                  [(c, _arb_score(c, i)) for c, i in _candidates])
 
     if not best_result:
         best_col = collections[0]

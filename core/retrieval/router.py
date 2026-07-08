@@ -604,7 +604,11 @@ def _record_covers_question(question: str, fname: str, payload: Dict) -> bool:
     df = payload.get("description_fields") or {}
     if isinstance(df, dict):
         parts += list(df.keys()) + [str(v) for v in df.values()]
-    for k in ("primary_name", "type", "identifier", "description"):
+    for k in ("primary_name", "type", "identifier", "description",
+              # FIELD LABELS too — a question about the "PB filename" matches
+              # the record via its column names ('Moore file name',
+              # 'Tidal Job Name'), which never appear among the values.
+              "identifier_field", "primary_name_field", "type_field"):
         if payload.get(k):
             parts.append(str(payload[k]))
     al = payload.get("aliases") or []

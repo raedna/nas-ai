@@ -318,6 +318,40 @@ def run_metadata_query(collection: str, question: str, intent_mode: str = None) 
                 print(f"[METADATA] filter added from concept labels: {_f}")
                 spec["filters"] = [_f]
 
+        # A filter whose VALUE is actually a FIELD NAME is the LLM confusing
+        # schema with data (type = 'Prime Broker' where 'Prime Broker' is the
+        # column) — drop it outright.
+        import re as _re0
+        _field_compacts = {_re0.sub(r"[^a-z0-9]", "", str(f0).lower())
+                           for f0 in fields}
+        _kept_f = []
+        for f in spec["filters"]:
+            _vc = _re0.sub(r"[^a-z0-9]", "", str(f["value"]).lower())
+            if _vc in _field_compacts:
+                print(f"[METADATA] dropped field-name-valued filter: {f}")
+                continue
+            _kept_f.append(f)
+        spec["filters"] = _kept_f
+
+        # Value-anchor injection (deterministic): a question token that EXACTLY
+        # equals a listed value of a low-cardinality field is an explicit
+        # constraint — 'tags' -> identifier_namespace = tag, 'goldman' ->
+        # Prime Broker = Goldman. The embedding-based concept filter misses
+        # this on variance runs; exact token=value equality never does.
+        _qt = {t for t in _re0.findall(r"[a-z0-9]{3,}", question.lower())}
+        _qt |= {t[:-1] for t in list(_qt) if t.endswith("s") and len(t) > 3}
+        _filtered_fields = {f["field"] for f in spec["filters"]}
+        for _fld, _vals in sorted(field_values.items()):
+            if _fld in _filtered_fields:
+                continue
+            for _v in _vals:
+                if str(_v).lower() in _qt:
+                    spec["filters"].append(
+                        {"field": _fld, "op": "equals", "value": str(_v)})
+                    _filtered_fields.add(_fld)
+                    print(f"[METADATA] value-anchor filter injected: {_fld} = {_v}")
+                    break
+
         for f in spec["filters"]:
             if any(f["value"].lower() == v.lower() for v in field_values.get(f["field"], [])):
                 continue
@@ -400,12 +434,19 @@ def run_metadata_query(collection: str, question: str, intent_mode: str = None) 
             e = _field_expr(spec["target_field"], df_keys)
             return fetchall(f"SELECT COUNT(DISTINCT {e}) AS n FROM chunks WHERE {w} AND {e} IS NOT NULL", tuple(p))[0]["n"]
 
-        if spec["operation"] in ("count", "count_distinct") and spec["filters"]:
-            if _count_with(spec["filters"]) == 0:
-                _keep = [f for f in spec["filters"] if _count_with([f]) > 0]
-                if _keep and _count_with(_keep) > 0:
-                    print(f"[METADATA] dropped zero-result filters, kept: {_keep}")
-                    spec["filters"] = _keep
+        # Zero-result repair for ALL operations (was counts only — a junk
+        # filter on a LIST question sent the whole answer to the degenerate
+        # guard and lost the collection its seat in arbitration).
+        if spec["filters"] and _count_with(spec["filters"]) == 0:
+            _keep = [f for f in spec["filters"] if _count_with([f]) > 0]
+            if _keep and _count_with(_keep) > 0:
+                print(f"[METADATA] dropped zero-result filters, kept: {_keep}")
+                spec["filters"] = _keep
+            # NOTE: never drop ALL filters. When every filter matches nothing,
+            # that IS the answer ("FIX 5.0 SP2" doesn't exist in the data) —
+            # dropping them turned a no-answer trap into a 200-row dump
+            # (NA-04 regression). Junk filters are handled upstream by the
+            # field-name-valued drop; honest-but-unmatched filters must fail.
 
         where, params = _where(collection, spec["filters"], df_keys)
         op = spec["operation"]
@@ -465,9 +506,21 @@ def run_metadata_query(collection: str, question: str, intent_mode: str = None) 
                 answer = (f"{len(items)} record(s){_suffix}:\n\n"
                           + "\n".join(f"- {i}" for i in items))
                 return {"result": answer, "spec": spec}
-            rows = fetchall(
-                f"SELECT DISTINCT {expr} AS v FROM chunks WHERE {where} AND {expr} IS NOT NULL ORDER BY v LIMIT 200",
-                tuple(params))
+            # Array-valued payload fields (aliases, reference_identifiers):
+            # list DISTINCT ELEMENTS, not raw JSON strings.
+            _is_array = bool(fetchall(
+                f"SELECT 1 FROM chunks WHERE collection_name = %s "
+                f"AND jsonb_typeof(payload->'{tf.replace(chr(39), '')}') = 'array' LIMIT 1",
+                (collection,))) if tf not in _TABLE_COLUMNS and tf not in df_keys else False
+            if _is_array:
+                rows = fetchall(
+                    f"SELECT DISTINCT jsonb_array_elements_text(payload->'{tf.replace(chr(39), '')}') AS v "
+                    f"FROM chunks WHERE {where} ORDER BY v LIMIT 200",
+                    tuple(params))
+            else:
+                rows = fetchall(
+                    f"SELECT DISTINCT {expr} AS v FROM chunks WHERE {where} AND {expr} IS NOT NULL ORDER BY v LIMIT 200",
+                    tuple(params))
             vals = [r["v"] for r in rows if r["v"]]
 
             # Degenerate-result guard: a list that is empty or merely echoes the

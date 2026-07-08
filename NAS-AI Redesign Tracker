@@ -475,9 +475,42 @@ Centroid routing ranks kb/obsidian above recon/xml for aggregate questions (doc-
 - Latency: Chat avg 46 -> 52s (composition + wider fan-out); PP-01 at 272s is SPEED-01's poster case. Ask stable at ~15s.
 - PP-01 unchanged ❌ — remains the block's acceptance bar.
 
+---
+
+## Session 2026-07-08 — Chapter 3: arbitration ladder, anchor family, third eval baseline
+
+### Arbitration ladder (run_parallel_queries best-pick — was "first non-empty wins by routing order")
+Deterministic score tuple per candidate answer:
+1. **Method rank**: exact-key (identifier/namespace/enum/relationship) > metadata_sql > doc/semantic.
+2. **Collection-name hit** (data answers only — muted for docs so "recon file missing, what do I do" keeps its runbook).
+3. **Graded groundedness** for metadata: EQUALS-filter value matching a question token (0) > contains (1) > ungrounded (2). "Equality is a claim, substring is a shrug."
+4. **Doc-vs-doc rung** (twins): among document answers, TITLE word-hit count decides ('Charles River Log Folder for Errors' 4 hits beats 'CRD Logs Archive' 2) — fixes PR-08 while DL-08/PP-04/PP-08 hold.
+5. Routing order = final tie-break only.
+Fixed en route: sentence period riding into the captured filter value ('= tag.') ungrounded AG-03's perfect answer — rstrip('.').
+
+### Anchor family (select_collections — things the user LITERALLY wrote, checked against the system's own data)
+- Tier 1: filenames + ALL-CAPS code tokens (identifier + primary_name columns).
+- Tier 1.25: word prefix-matches record identifiers ('jpm' -> jpm_cfd_position). Identifier column ONLY (primary_name matching routed xml via 'check'->CheckSum).
+- Tier 1.2: question token ⊂ collection name ("in the recon file" -> recon_assist_file).
+- Tier 1.2b: schema COLUMN names, unique-to-one-collection only, name-class roles only, proportionality rule (multi-word column needs ≥2 of its words — 'prime brokers' earns 'Prime Broker'; 'moore' alone does NOT earn 'Moore file name'; single-word columns need ≥5 chars — 'Mnemonic' yes, 'Name' no), adjacent-word joining ('filenames' covers 'file'+'name').
+- Tier 1.5 merge bug fixed: successive anchors were overwriting the same last slot (recon evicted by a later anchor); anchors now fill distinct slots and never evict each other.
+
+### metadata_query hardening
+- **Field-name-valued filter drop**: type = 'Prime Broker' (column name as value) = LLM confusing schema with data — dropped at spec time.
+- **Value-anchor injection**: question token EXACTLY equal to a listed field value -> equals filter injected deterministically ('tags' -> identifier_namespace = tag; 'goldman' -> Prime Broker = Goldman). Kills the AG-03 variance class — the embedding-based concept filter misses on bad runs, token=value equality never does.
+- **Zero-repair extended to lists, then PARTIALLY REVERTED**: dropping ALL zero-result filters turned NA-04's no-answer trap into a 200-row dump. **Lesson: repair heuristics must distinguish junk filters (schema confusion — handled by the field-name drop) from honest-but-unmatched filters (the ANSWER is 'nothing matches').** Partial keep-repair stays; drop-all removed.
+- **Array-element expansion**: list_distinct on jsonb-array fields (aliases, reference_identifiers) lists elements, not raw JSON strings.
+
+### Third eval baseline (results/eval_run_20260708_202253) — best on record
+DL 10/10-grade (DL-05 finally identifier_lookup with the alias — _record_covers_question haystack now includes FIELD LABELS: 'filename' lives in 'Moore file name', not in any value). MI-02 chat ✅ (both records verbatim — ladder rank 0). AG-01/02/03*/04/07/08 chat ✅ (*after the period fix + value-anchor). PR-02 held by design. NA-04 restored post-revert. Remaining fails all named: PP-01 (bar), PP-03 (VOCAB-01), PR-08 (fixed post-run, doc rung), MI-04 (partial — full fix needs heterogeneous splitter), AG-10 (Phase 1b fix_version), astro set (DESIGN-01, deprioritized), XC-03-class dual-intent questions (splitter extension, design item).
+
 ## Next Session Priorities
 
-0. **Chapter 3** — metadata-answer arbitration (AG-chat regression, MI-02); DL-05 filename-branch trace; concept-vector quality pass (bbg 169 hierarchical-path clusters; recon cluster pollution via CODE-024/25 ffill); VOCAB-01 (spell-correct → fixes PP-03 for real + helps centroid routing on typos); PR-08 twin ranking. PP-01 remains the acceptance bar.
+0. **VOCAB-01** — per-collection vocabulary (ts_stat at ingest) + trigram spell-correction of query tokens; fixes PP-03 for real, feeds corrected text to BM25 AND centroid routing.
+1. **PP-01 assault** (the bar): scoped value-anchor for type-role values (broker/entity names) at routing + doc-vs-listing arbitration; attempt after VOCAB-01.
+2. **AG-10 / Phase 1b**: fix_version payload field at merge-serialization -> version-scoped metadata filters.
+3. **Heterogeneous multi-item splitter** (MI-04 full, XC-03-class dual-intent questions).
+4. MODEL-01 (schema_model config), CODE-025 ffill, astro/DESIGN-01, then SPEED-01, then Confluence/Halo ingestion + memory phases.
 1. **MODEL-01** — fix `schema_model` config; re-ingest Datatypes_FIX44 (DATA-01) as the 32B's first live test before CTM.
 2. **Eval retest** (NAS_AI_Retrieval_Eval_v1.md) — full pass: MI bucket should flip to ✅; DL-02/05, AG/RECON buckets re-scored; XC remains the largest unaddressed group.
 3. **Chat routing hardening** — DL-08/PP-03 no-collection fallback; kb_docs/obsidian wrong-twin ranking.
