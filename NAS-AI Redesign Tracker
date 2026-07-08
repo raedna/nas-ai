@@ -457,9 +457,27 @@ Loose string matchers MULTIPLY: a prefix-match on names ('check'->CheckSum) rout
 ### Cosmetics parked
 `- : ` empty rows in record listings = CODE-024 NULL-identifier rows; stray low-ranked concept links (correctly demoted to list bottom by confirmed-first ranking); KG review grouping dup rows (UI-05).
 
+---
+
+## Eval re-baseline 2026-07-08 (results/eval_run_20260708_122759) — vs overnight 07-07 run
+
+**Flipped to ✅ (Chat):** PP-02 (both surfaces — camelCase split + typo-proof BM25 stack), PP-04, PP-07 (right runbook), PR-01, PR-03 (was 💀), DL-07 (routed [bbg_fields] alone — Tier 1.5 + code anchor), XC-05, XC-06, NA-01, NA-04. DL-02/XC-01 carry the new "— Tidal Job Name:" labeled lead sentence. Ask surface stable-or-better throughout; NA-03/PP-03 wear the low-coverage banner as designed.
+
+**Regression cluster — AG-chat (07/08/09 ❌, were ✅; noise blocks on 01/03): ONE mechanism.**
+Centroid routing ranks kb/obsidian above recon/xml for aggregate questions (doc-cluster gravity on words like "recon files", "brokers"), and the fan-out's best-pick cannot tell a WRONG metadata answer from a right one — a confidently non-empty junk count from the wrong collection beats the right group-by. The old LLM router won these by luck. MI-02 chat shares the disease (sub-questions answered from kb instead of recon).
+**-> Chapter 3 lead item: metadata-answer arbitration** — when multiple collections return metadata_sql answers, judge them (grounded-filter-references-question-token beats unfiltered; listing beats bare count; else routing order). Acceptance: AG-07/08/09 chat, MI-02.
+
+**Hotfixed immediately:** counts never compose into secondary blocks (only record listings do) — AG-01's "From obsidian: 8 matching..." had gated itself in via lead word 'There' prefix-matching question word 'there'. The gate now requires listing lines.
+
+**Also carried to chapter 3:**
+- DL-05 Ask still `semantic` despite the _record_covers_question compact fix — needs a direct trace of the filename branch (warm-up task).
+- PR-08 chat wrong-twin (kb over obsidian) — twin ranking within fan-out.
+- Latency: Chat avg 46 -> 52s (composition + wider fan-out); PP-01 at 272s is SPEED-01's poster case. Ask stable at ~15s.
+- PP-01 unchanged ❌ — remains the block's acceptance bar.
+
 ## Next Session Priorities
 
-0. **Chapter 3** — concept-vector quality pass (bbg 169 hierarchical-path clusters; recon cluster pollution via CODE-024/25 ffill), VOCAB-01 (spell-correct → fixes PP-03 for real + helps centroid routing on typos), PP-01 remains the acceptance bar.
+0. **Chapter 3** — metadata-answer arbitration (AG-chat regression, MI-02); DL-05 filename-branch trace; concept-vector quality pass (bbg 169 hierarchical-path clusters; recon cluster pollution via CODE-024/25 ffill); VOCAB-01 (spell-correct → fixes PP-03 for real + helps centroid routing on typos); PR-08 twin ranking. PP-01 remains the acceptance bar.
 1. **MODEL-01** — fix `schema_model` config; re-ingest Datatypes_FIX44 (DATA-01) as the 32B's first live test before CTM.
 2. **Eval retest** (NAS_AI_Retrieval_Eval_v1.md) — full pass: MI bucket should flip to ✅; DL-02/05, AG/RECON buckets re-scored; XC remains the largest unaddressed group.
 3. **Chat routing hardening** — DL-08/PP-03 no-collection fallback; kb_docs/obsidian wrong-twin ranking.

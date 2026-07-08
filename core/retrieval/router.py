@@ -611,7 +611,13 @@ def _record_covers_question(question: str, fname: str, payload: Dict) -> bool:
     if isinstance(al, list):
         parts += [str(a) for a in al]
     hay = " ".join(parts).lower()
-    return any(t in hay for t in focus)
+    if any(t in hay for t in focus):
+        return True
+    # Compact comparison: multiword field labels must match single-token
+    # question words — 'filename' vs "Prime Broker file name", 'sftp' vs
+    # 's ftp'. Non-alphanumerics stripped from the haystack.
+    hay_compact = re.sub(r"[^a-z0-9]", "", hay)
+    return any(t in hay_compact for t in focus)
 
 
 def run_query_with_method(

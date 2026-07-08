@@ -405,14 +405,19 @@ def run_parallel_queries(collections: list, question: str, single_item: bool = F
                         "No answer found", "No record found",
                         "Found 0", "0 record(s)", "0 value(s)")):
                     continue
-                # Relevance gate — IDENTIFIERS ONLY, PREFIX match. A question
-                # word must be the prefix of a listed record key ('citi' ->
-                # citi_dcm_fees.csv). Names/descriptions are excluded: 'check'
-                # inside 'CheckSum' or 'date' inside a field description is
-                # coincidence, not evidence.
-                _ids = _re.findall(r"(?:^|\n)- ([\w.\-]+):", txt_)
-                _ids += _re.findall(r"^([\w.\-]+)", txt_)  # record answers' lead token
-                _ids = [i.lower() for i in _ids]
+                # Counts never compose: a bare number from another collection is
+                # collection-scoped and meaningless beside the primary answer
+                # (and its lead word 'There' once gated itself in by matching
+                # the question word 'there'). Only record LISTINGS may compose.
+                _listing_ids = _re.findall(r"(?:^|\n)- ([\w.\-]+)", txt_)
+                if not _listing_ids:
+                    continue
+                # Relevance gate — LISTED IDENTIFIERS ONLY, PREFIX match. A
+                # question word must be the prefix of a listed record key
+                # ('citi' -> citi_dcm_fees.csv). Names/descriptions excluded:
+                # 'check' inside 'CheckSum' is coincidence, not evidence.
+                _ids = [i.lower() for i in _listing_ids]
+                _ids += [i.lower() for i in _re.findall(r"^([\w.\-]+)", txt_)]
                 if _qw and not any(i.startswith(w) for i in _ids for w in _qw):
                     continue
                 out.append({"collection": col_, "answer": txt_})
