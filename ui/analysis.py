@@ -257,6 +257,8 @@ def render_analysis_panel():
 
     saved_area = ui.column().classes("w-full mt-4")
 
+    saved_compare_selection = []
+
     async def handle_analysis_upload(e, target_box=None):
         print("=== ANALYSIS UPLOAD CALLED ===", flush=True)
 
@@ -1087,6 +1089,7 @@ def render_analysis_panel():
                     for msg in messages:
                         rows.append({
                             "id": msg.get("id"),
+                            "session_id": msg.get("session_id"),
                             "message_index": msg.get("message_index"),
                             "msg_seq_num": msg.get("msg_seq_num"),
                             "msg_type": msg.get("msg_type"),
@@ -1102,6 +1105,121 @@ def render_analysis_panel():
                         })
 
                     tag_result_area = ui.column().classes("w-full q-mt-md")
+
+                    compare_saved_area = ui.column().classes("w-full q-mt-md")
+
+                    def add_selected_saved_message_to_compare():
+                        selected_rows = list(message_table.selected or [])
+
+                        if len(selected_rows) != 1:
+                            ui.notify("Select one saved message to add to compare.", color="warning")
+                            return
+
+                        selected = selected_rows[0]
+
+                        message_id = selected.get("id")
+                        session_id = selected.get("session_id")
+                        message_index = selected.get("message_index")
+
+                        if not message_id:
+                            ui.notify("Could not read selected message id.", color="negative")
+                            return
+
+                        # Avoid duplicates
+                        for item in saved_compare_selection:
+                            if item.get("message_id") == message_id:
+                                ui.notify("This message is already in the compare basket.", color="info")
+                                return
+
+                        if len(saved_compare_selection) >= 2:
+                            saved_compare_selection.clear()
+
+                        saved_compare_selection.append({
+                            "message_id": message_id,
+                            "session_id": session_id,
+                            "message_index": message_index,
+                        })
+
+                        ui.notify(
+                            f"Added session {session_id} message {message_index} to compare basket "
+                            f"({len(saved_compare_selection)}/2).",
+                            color="positive",
+                        )
+
+
+                    def compare_saved_message_basket():
+                        if len(saved_compare_selection) != 2:
+                            ui.notify("Add exactly two saved messages to the compare basket first.", color="warning")
+                            return
+
+                        first = saved_compare_selection[0]
+                        second = saved_compare_selection[1]
+
+                        first_message = get_fix_analysis_message(first["message_id"])
+                        second_message = get_fix_analysis_message(second["message_id"])
+
+                        if not first_message or not second_message:
+                            ui.notify("Could not load one of the saved messages.", color="negative")
+                            return
+
+                        first_raw_text = first_message.get("raw_text") or ""
+                        second_raw_text = second_message.get("raw_text") or ""
+
+                        if not first_raw_text or not second_raw_text:
+                            ui.notify("One of the selected saved messages is missing raw text.", color="negative")
+                            return
+
+                        comparison = compare_fix_messages(first_raw_text, second_raw_text)
+
+                        compare_saved_area.clear()
+
+                        with compare_saved_area:
+                            ui.label(
+                                f"Comparison: Session {first.get('session_id')} Message {first.get('message_index')} "
+                                f"vs Session {second.get('session_id')} Message {second.get('message_index')}"
+                            ).classes("text-lg font-semibold q-mt-md")
+
+                            render_compare_result(comparison)
+
+                    def compare_selected_saved_messages():
+                        selected_rows = list(message_table.selected or [])
+
+                        if len(selected_rows) != 2:
+                            ui.notify("Select exactly two saved messages to compare.", color="warning")
+                            return
+
+                        first_message_id = selected_rows[0].get("id")
+                        second_message_id = selected_rows[1].get("id")
+
+                        if not first_message_id or not second_message_id:
+                            ui.notify("Could not read selected message ids.", color="negative")
+                            return
+
+                        first_message = get_fix_analysis_message(first_message_id)
+                        second_message = get_fix_analysis_message(second_message_id)
+
+                        if not first_message or not second_message:
+                            ui.notify("Could not load selected saved messages.", color="negative")
+                            return
+
+                        first_raw_text = first_message.get("raw_text") or ""
+                        second_raw_text = second_message.get("raw_text") or ""
+
+                        if not first_raw_text or not second_raw_text:
+                            ui.notify("One of the selected saved messages is missing raw text.", color="negative")
+                            return
+
+                        comparison = compare_fix_messages(first_raw_text, second_raw_text)
+
+                        compare_saved_area.clear()
+
+                        with compare_saved_area:
+                            ui.label(
+                                f"Comparison: Saved Message {first_message.get('message_index')} "
+                                f"vs Saved Message {second_message.get('message_index')}"
+                            ).classes("text-lg font-semibold q-mt-md")
+
+                            render_compare_result(comparison)
 
                     def view_selected_message_tags():
                         selected_rows = list(message_table.selected or [])
@@ -1215,10 +1333,26 @@ def render_analysis_panel():
                         "Select one saved message row, then click View Selected Message Tags."
                     ).classes("text-sm text-blue-7 font-bold q-mt-md")
 
-                    ui.button(
-                        "View Selected Message Tags",
-                        on_click=view_selected_message_tags,
-                    ).props("color=primary outline")
+                    with ui.row().classes("q-gutter-sm"):
+                        ui.button(
+                            "View Selected Message Tags",
+                            on_click=view_selected_message_tags,
+                        ).props("color=primary outline")
+
+                        ui.button(
+                            "Compare Selected Saved Messages",
+                            on_click=compare_selected_saved_messages,
+                        ).props("color=primary outline")
+
+                        ui.button(
+                            "Add Selected to Cross-Session Compare",
+                            on_click=add_selected_saved_message_to_compare,
+                        ).props("outline color=secondary")
+
+                        ui.button(
+                            "Compare Cross-Session Basket",
+                            on_click=compare_saved_message_basket,
+                        ).props("outline color=secondary")
 
                     message_table = ui.table(
                         columns=[
@@ -1237,7 +1371,7 @@ def render_analysis_panel():
                         ],
                         rows=rows,
                         row_key="id",
-                        selection="single",
+                        selection="multiple",
                         pagination={"rowsPerPage": 0},
                     ).classes("w-full")
 

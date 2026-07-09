@@ -1,5 +1,5 @@
 from typing import Any, Dict, List
-
+from datetime import datetime
 from core.analysis.input.fix_message_splitter import split_fix_messages
 from core.analysis.analyzers.fix.analyzer import analyze_fix_message
 
@@ -103,15 +103,44 @@ def _build_sequence_warnings(messages: List[Dict[str, Any]]) -> List[str]:
     return warnings
 
 def _sequence_sort_key(msg: Dict[str, Any]):
-    time_value = str(msg.get("transact_time") or msg.get("sending_time") or "").strip()
+    time_value = (
+        msg.get("transact_time")
+        or msg.get("sending_time")
+        or ""
+    )
+
+    parsed_time = _parse_fix_timestamp(time_value)
     seq_num = _to_float(msg.get("msg_seq_num"))
 
     return (
-        0 if time_value else 1,
-        time_value,
+        0 if parsed_time else 1,
+        parsed_time or datetime.max,
         seq_num if seq_num is not None else 999999999,
         msg.get("message_index") or 999999999,
     )
+
+def _parse_fix_timestamp(value: Any):
+    raw = str(value or "").strip()
+
+    if not raw:
+        return None
+
+    # Fix OCR spacing issues like:
+    # 20260622-01: 44:19.992
+    raw = raw.replace(": ", ":").replace(" :", ":")
+
+    formats = [
+        "%Y%m%d-%H:%M:%S.%f",
+        "%Y%m%d-%H:%M:%S",
+    ]
+
+    for fmt in formats:
+        try:
+            return datetime.strptime(raw, fmt)
+        except ValueError:
+            pass
+
+    return None
 
 def _get_tag_value(decoded_rows: List[Dict[str, Any]], tag: str) -> str:
     tag = str(tag)
