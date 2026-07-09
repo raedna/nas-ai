@@ -587,3 +587,18 @@ come from Barclays" (collection-scoped honest zero).
 
 Pending gate for this block: AG-03 + new NA-04 (fresh process) after primacy change;
 then commit VOCAB-01 + guards.
+
+## MODEL-01 + DATA-01 CLOSED (2026-07-10)
+
+Root cause chain: Datatypes_FIX44 never had a model problem. parse_xml_rows
+auto-detect ranked row tags by RAW FREQUENCY — 51 <Description> leaves beat 26
+<Datatype> rows, every leaf "row" was empty, the LLM was never called, junk
+schema correctly refused. Datatypes_FIX42 only worked by a tie broken in
+document order. Fix: rank by YIELD (instances producing >=1 field: attribute
+or text-bearing child) — the objective itself; ties keep document order;
+all-zero-yield falls back to frequency. Confirmed: FIX44 -> Datatype (26/26),
+32B schema {identifier: Name, type: BaseType, description: Description}.
+MODEL-01: schema_model key was simply absent from nlp_config local_llm — set
+to qwen3-vl-32b-instruct; "[SCHEMA LLM] using schema model" prints. UI config
+Save rewrote local_llm wholesale (would delete undisplayed keys like
+schema_model) — now merges. Gate: smoke_fix after re-ingest.

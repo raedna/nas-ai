@@ -51,20 +51,36 @@ def parse_xml_rows(file_path, template_config=None, row_tag=None):
         # AUTO-DETECT row_tag
         # ----------------------------
         if row_tag is None:
-            candidates = {}
+            # Rank candidate tags by YIELD — the number of instances that
+            # would actually produce fields (attributes, or text-bearing
+            # children) — not raw frequency. Raw frequency picks leaf tags:
+            # Datatypes_FIX44 has 51 <Description> leaves vs 26 <Datatype>
+            # rows, and every Description "row" is empty (DATA-01). Yield IS
+            # the objective: the tag that produces the most non-empty rows.
+            # Ties break by document order (dict insertion follows root.iter),
+            # matching the old max() behavior on the files that worked.
+            candidates = {}  # tag -> [count, yield]
 
             for el in root.iter():
-                tag = el.tag
-                candidates[tag] = candidates.get(tag, 0) + 1
-
-            candidates.pop(root.tag, None)
+                if el.tag == root.tag:
+                    continue
+                n_fields = len(el.attrib) + sum(
+                    1 for c in el if c.text and c.text.strip())
+                stat = candidates.setdefault(el.tag, [0, 0])
+                stat[0] += 1
+                if n_fields:
+                    stat[1] += 1
 
             if not candidates:
                 raise ValueError("No candidate row tags found")
 
-            row_tag = max(candidates, key=candidates.get)
+            row_tag = max(candidates, key=lambda t: candidates[t][1])
+            if candidates[row_tag][1] == 0:
+                # nothing yields fields anywhere — keep old frequency pick
+                row_tag = max(candidates, key=lambda t: candidates[t][0])
 
-            print(f"🔍 Auto-detected row_tag: {row_tag}")
+            print(f"🔍 Auto-detected row_tag: {row_tag} "
+                  f"(yield {candidates[row_tag][1]}/{candidates[row_tag][0]})")
 
         # ----------------------------
         # EXTRACT ROWS

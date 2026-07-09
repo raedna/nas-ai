@@ -133,11 +133,17 @@ def _system_settings_section():
         _save_json(SYSTEM_CONFIG_PATH, cfg)
 
         nlp = _load_json(NLP_CONFIG_PATH, {})
-        nlp["local_llm"] = {
+        # MERGE into local_llm — replacing the dict deletes keys this tab
+        # doesn't display (schema_model, fast_model, ...). Same failure mode
+        # as the schema-save dropping the 'other' role: save must never
+        # discard what it doesn't show.
+        _llm = dict(nlp.get("local_llm") or {})
+        _llm.update({
             "base_url": llm_base_url.value,
             "model": llm_model.value,
             "timeout": int(llm_timeout.value),
-        }
+        })
+        nlp["local_llm"] = _llm
         _save_json(NLP_CONFIG_PATH, nlp)
 
         ui.notify("System settings saved.", type="positive")
