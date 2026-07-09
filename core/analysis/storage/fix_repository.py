@@ -2,7 +2,7 @@ import hashlib
 import json
 from typing import Any, Dict, Tuple
 from core.db import get_conn
-from core.db import fetchall, fetchone
+from core.db import fetchall, fetchone, execute
 
 def _analysis_source_hash(messages: list) -> str:
     raw_parts = []
@@ -184,6 +184,7 @@ def save_fix_analysis_result(
     analysis_mode: str,
     source_type: str = "manual",
     source_name: str = "",
+    save_note: str = "",
 ) -> Tuple[int, bool]:
     """
     Save a FIX analysis result into:
@@ -227,7 +228,19 @@ def save_fix_analysis_result(
             existing = cur.fetchone()
 
             if existing:
-                return existing[0], False
+                existing_session_id = existing[0]
+
+                if save_note:
+                    cur.execute(
+                        """
+                        UPDATE analysis_sessions
+                        SET save_note = %s
+                        WHERE id = %s
+                        """,
+                        (save_note, existing_session_id),
+                    )
+
+                return existing_session_id, False
 
             cur.execute(
                 """
@@ -237,12 +250,13 @@ def save_fix_analysis_result(
                     source_type,
                     source_name,
                     source_hash,
+                    save_note,
                     summary,
                     warning_count,
                     message_count,
                     group_count
                 )
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 RETURNING id
                 """,
                 (
@@ -251,6 +265,7 @@ def save_fix_analysis_result(
                     source_type,
                     source_name,
                     source_hash,
+                    save_note,
                     result.get("summary") or "",
                     len(warnings),
                     len(messages),
@@ -421,6 +436,7 @@ def list_fix_analysis_sessions(limit: int = 20):
             analysis_mode,
             source_type,
             source_name,
+            save_note,
             summary,
             warning_count,
             message_count,
@@ -439,6 +455,7 @@ def get_fix_analysis_session(session_id: int):
         """
         SELECT
             id,
+            save_note,
             analysis_mode,
             source_type,
             source_name,
@@ -453,6 +470,15 @@ def get_fix_analysis_session(session_id: int):
         (session_id,),
     )
 
+def update_fix_analysis_session_note(session_id: int, save_note: str) -> None:
+    execute(
+        """
+        UPDATE analysis_sessions
+        SET save_note = %s
+        WHERE id = %s
+        """,
+        (save_note, session_id),
+    )
 
 def list_fix_analysis_messages(session_id: int):
     return fetchall(
@@ -753,4 +779,52 @@ def find_related_saved_fix_messages(
 
     return results[:limit]
 
-    
+def build_related_match_messages_from_result(result: Dict[str, Any]):
+    """
+    Convert an analysis result into message dictionaries that can be checked
+    against previously saved FIX messages.
+    """
+    if not result:
+        return []
+
+    if result.get("input_type") == "fix_sequence":
+        return result.get("messages") or []
+
+    if result.get("input_type") == "fix_compare":
+        return []
+
+    return [_enrich_single_message({
+        "message_index": 1,
+        "raw_text": result.get("raw_text") or "",
+        "summary": result.get("summary") or "",
+        "warnings": result.get("warnings") or [],
+        "business_object": result.get("business_object") or {},
+        "decoded_rows": result.get("decoded_rows") or [],
+    })]
+
+def get_fix_analysis_message(message_id: int):
+    return fetchone(
+        """
+        SELECT
+            id,
+            session_id,
+            message_index,
+            raw_text,
+            summary,
+            msg_type,
+            msg_seq_num,
+            sender,
+            target,
+            cl_ord_id,
+            order_id,
+            exec_id,
+            symbol,
+            security_id,
+            security_exchange,
+            security_type,
+            ex_destination
+        FROM analysis_messages
+        WHERE id = %s
+        """,
+        (message_id,),
+    )

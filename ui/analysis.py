@@ -19,7 +19,19 @@ from core.analysis.storage.fix_repository import (
     list_fix_analysis_sessions,
     list_fix_analysis_messages,
     list_fix_message_tags,
+    find_related_saved_fix_messages,
+    build_related_match_messages_from_result,
+    get_fix_analysis_message,
+    update_fix_analysis_session_note,
 )
+
+
+DEBUG_FIX_ANALYSIS_UI = True
+
+
+def debug_print(*args, **kwargs):
+    if DEBUG_FIX_ANALYSIS_UI:
+        print(*args, **kwargs, flush=True)
 
 @app.post("/analysis/clipboard-image-ocr")
 async def clipboard_image_ocr(request: Request):
@@ -179,6 +191,29 @@ def _extract_text_from_uploaded_file(tmp_path: str, suffix: str) -> str:
     )
 
 def render_analysis_panel():
+
+    ui.add_head_html("""
+    <style>
+    .decoded-row-known {
+        background-color: #ecfdf3;
+    }
+
+    .decoded-row-custom {
+        background-color: #f4ecff;
+    }
+
+    .decoded-row-warning {
+        background-color: #fff4e5;
+    }
+
+    .decoded-row-known:hover,
+    .decoded-row-custom:hover,
+    .decoded-row-warning:hover {
+        filter: brightness(0.97);
+    }
+    </style>
+    """)
+
     ui.label("Analysis Engine").classes("text-xl font-bold mb-2")
     ui.label(
         "Paste FIX text below, upload an image/PDF, or paste a screenshot into the screenshot box. "
@@ -214,6 +249,12 @@ def render_analysis_panel():
     compare_input_box.visible = False
 
     result_area = ui.column().classes("w-full mt-4")
+
+    save_note_input = ui.textarea(
+        label="Save note / reason",
+        placeholder="Example: related to the CFD issue with Citi",
+    ).props("outlined autogrow").classes("w-full mt-4")
+
     saved_area = ui.column().classes("w-full mt-4")
 
     async def handle_analysis_upload(e, target_box=None):
@@ -492,6 +533,133 @@ def render_analysis_panel():
     </script>
     """)
 
+    def render_related_saved_matches(result):
+        messages = build_related_match_messages_from_result(result)
+
+        if not messages:
+            return
+
+        related_rows = []
+
+        for message in messages:
+            message_index = message.get("message_index")
+
+            matches = find_related_saved_fix_messages(
+                message,
+                exclude_session_id=None,
+                limit=20,
+            )
+
+            for match in matches:
+                related_rows.append({
+                    "source_message": message_index,
+                    "message_id": match.get("message_id"),
+                    "current_raw_text": message.get("raw_text") or result.get("raw_text") or "",
+                    "match_strength": match.get("match_strength"),
+                    "match_reason": match.get("match_reason"),
+                    "session_id": match.get("session_id"),
+                    "message_index": match.get("message_index"),
+                    "msg_type": match.get("msg_type"),
+                    "route": f"{match.get('sender') or ''} → {match.get('target') or ''}",
+                    "cl_ord_id": match.get("cl_ord_id"),
+                    "order_id": match.get("order_id"),
+                    "exec_id": match.get("exec_id"),
+                    "symbol": match.get("symbol"),
+                    "security_id": match.get("security_id"),
+                    "security_exchange": match.get("security_exchange"),
+                    "security_type": match.get("security_type"),
+                    "ex_destination": match.get("ex_destination"),
+                    "created_at": str(match.get("created_at") or ""),
+                })
+
+        ui.separator().classes("q-mt-md")
+
+        ui.label("Related Saved FIX Messages").classes("text-lg font-bold q-mt-md")
+
+        if not related_rows:
+            ui.label("No related saved FIX messages found.").classes("text-sm text-grey-7")
+            return
+
+        compare_related_area = ui.column().classes("w-full q-mt-md")
+
+        def compare_selected_related_message():
+            selected_rows = list(related_table.selected or [])
+
+            if len(selected_rows) != 1:
+                ui.notify("Select one related saved message first.", color="warning")
+                return
+
+            selected = selected_rows[0]
+
+            saved_message_id = selected.get("message_id")
+            current_raw_text = selected.get("current_raw_text") or ""
+
+            if not saved_message_id:
+                ui.notify("Could not read selected saved message id.", color="negative")
+                return
+
+            saved_message = get_fix_analysis_message(saved_message_id)
+
+            if not saved_message:
+                ui.notify("Could not load selected saved message.", color="negative")
+                return
+
+            saved_raw_text = saved_message.get("raw_text") or ""
+
+            if not current_raw_text or not saved_raw_text:
+                ui.notify("Current or saved message raw text is missing.", color="negative")
+                return
+
+            comparison = compare_fix_messages(
+                current_raw_text,
+                saved_raw_text,
+            )
+
+            compare_related_area.clear()
+
+            with compare_related_area:
+                ui.label(
+                    f"Comparison: Current Message {selected.get('source_message')} "
+                    f"vs Saved Session {selected.get('session_id')} "
+                    f"Message {selected.get('message_index')}"
+                ).classes("text-lg font-semibold q-mt-md")
+
+                render_compare_result(comparison)
+
+        ui.label(
+            "Select one related saved message, then click Compare Selected Related Message."
+        ).classes("text-sm text-blue-7 font-bold q-mt-md")
+
+        ui.button(
+            "Compare Selected Related Message",
+            on_click=compare_selected_related_message,
+        ).props("color=primary outline")
+
+        related_table = ui.table(
+            columns=[
+                {"name": "source_message", "label": "Current Msg", "field": "source_message", "align": "left", "sortable": True},
+                {"name": "match_strength", "label": "Strength", "field": "match_strength", "align": "left", "sortable": True},
+                {"name": "match_reason", "label": "Reason", "field": "match_reason", "align": "left", "sortable": True},
+                {"name": "session_id", "label": "Saved Session", "field": "session_id", "align": "left", "sortable": True},
+                {"name": "message_index", "label": "Saved Msg", "field": "message_index", "align": "left", "sortable": True},
+                {"name": "msg_type", "label": "MsgType", "field": "msg_type", "align": "left", "sortable": True},
+                {"name": "route", "label": "Route", "field": "route", "align": "left", "sortable": True},
+                {"name": "cl_ord_id", "label": "ClOrdID", "field": "cl_ord_id", "align": "left", "sortable": True},
+                {"name": "order_id", "label": "OrderID", "field": "order_id", "align": "left", "sortable": True},
+                {"name": "exec_id", "label": "ExecID", "field": "exec_id", "align": "left", "sortable": True},
+                {"name": "symbol", "label": "Symbol", "field": "symbol", "align": "left", "sortable": True},
+                {"name": "security_id", "label": "SecurityID", "field": "security_id", "align": "left", "sortable": True},
+                {"name": "security_exchange", "label": "Exchange", "field": "security_exchange", "align": "left", "sortable": True},
+                {"name": "security_type", "label": "SecType", "field": "security_type", "align": "left", "sortable": True},
+                {"name": "ex_destination", "label": "ExDestination", "field": "ex_destination", "align": "left", "sortable": True},
+                {"name": "created_at", "label": "Saved At", "field": "created_at", "align": "left", "sortable": True},
+            ],
+            rows=related_rows,
+            row_key="message_id",
+            selection="single",
+            pagination=10,
+        ).classes("w-full")
+
     def run_analysis():
         result_area.clear()
 
@@ -502,6 +670,16 @@ def render_analysis_panel():
         raw_a = raw_input.value or ""
         raw_b = compare_input_box.value or ""
         mode = analysis_mode.value
+
+        if mode == "Multi-Message Sequence":
+            raw_preview = raw_a.strip()
+
+            if len(raw_preview) < 30 or ("8=FIX" not in raw_preview and "BeginString" not in raw_preview):
+                ui.notify(
+                    "Input does not look like extracted FIX text. OCR may have failed. Try raw FIX text or a clearer/smaller image.",
+                    color="warning",
+                )
+                return
 
         if mode == "Compare Messages":
             if not raw_a.strip() or not raw_b.strip():
@@ -544,19 +722,46 @@ def render_analysis_panel():
 
                 if result.get("input_type") == "fix_sequence":
                     render_sequence_result(result)
+                    render_related_saved_matches(result)
 
                     def save_current_sequence_result():
+                        debug_print("=== SAVE CLICKED ===")
+                        debug_print("analysis mode:", "Multi-Message Sequence")
+                        debug_print("result input_type:", result.get("input_type"))
+                        debug_print("summary first 200:", str(result.get("summary") or "")[:200])
+                        debug_print("save note:", save_note_input.value or "")
+                        debug_print("message count:", len(result.get("messages") or []))
+
+                        for msg in (result.get("messages") or [])[:3]:
+                            debug_print(
+                                "seq msg:",
+                                msg.get("message_index"),
+                                str(msg.get("raw_text") or "")[:120],
+                            )
+
                         session_id, created = save_fix_analysis_result(
                             result,
                             analysis_mode="Multi-Message Sequence",
                             source_type="ui",
                             source_name="Analysis tab",
+                            save_note=save_note_input.value or "",
                         )
 
                         if created:
                             ui.notify(f"Saved new FIX analysis session {session_id}.", color="positive")
                         else:
-                            ui.notify(f"Analysis already exists as session {session_id}. Save skipped.", color="info")
+                            if save_note_input.value:
+                                ui.notify(
+                                    f"Analysis already exists as session {session_id}. Save skipped, note updated.",
+                                    color="info",
+                                )
+                            else:
+                                ui.notify(
+                                    f"Analysis already exists as session {session_id}. Save skipped.",
+                                    color="info",
+                                )
+
+                        refresh_saved_analyses()
 
                     ui.button(
                         "Save Analysis",
@@ -613,10 +818,32 @@ def render_analysis_panel():
 
                 rows = result.get("decoded_rows") or []
 
+                def decoded_row_class(row):
+                    tag_warning = str(row.get("tag_warning") or "").strip()
+                    enum_warning = str(row.get("enum_warning") or "").strip()
+                    tag_status = str(row.get("tag_status") or "").strip().lower()
+                    tag_name = str(row.get("tag_name") or "").strip()
+
+                    if tag_warning or enum_warning:
+                        return "decoded-row-warning"
+
+                    if tag_status in ("custom", "unknown", "missing", "not_found", "not found"):
+                        return "decoded-row-custom"
+
+                    if tag_name:
+                        return "decoded-row-known"
+
+                    return "decoded-row-custom"
+
+
                 rows = [
                     {
                         **row,
+                        "tag": int(str(row.get("tag", "")).split("#")[0])
+                        if str(row.get("tag", "")).split("#")[0].isdigit()
+                        else row.get("tag", ""),
                         "_seq": index,
+                        "_row_class": decoded_row_class(row),
                         "_tag_sort": int(str(row.get("tag", "999999")).split("#")[0])
                         if str(row.get("tag", "")).split("#")[0].isdigit()
                         else 999999,
@@ -775,12 +1002,15 @@ def render_analysis_panel():
                         analysis_mode="Single Message",
                         source_type="ui",
                         source_name="Analysis tab",
+                        save_note=save_note_input.value or "",
                     )
 
                     if created:
                         ui.notify(f"Saved new FIX analysis session {session_id}.", color="positive")
                     else:
                         ui.notify(f"Analysis already exists as session {session_id}. Save skipped.", color="info")
+
+                render_related_saved_matches(result)
 
                 ui.button(
                     "Save Analysis",
@@ -816,6 +1046,7 @@ def render_analysis_panel():
                 rows.append({
                     "id": session.get("id"),
                     "analysis_mode": session.get("analysis_mode"),
+                    "save_note": session.get("save_note") or "",
                     "message_count": session.get("message_count"),
                     "group_count": session.get("group_count"),
                     "warning_count": session.get("warning_count"),
@@ -901,19 +1132,42 @@ def render_analysis_panel():
 
                             tag_rows = []
 
+                            def saved_tag_row_class(tag):
+                                tag_warning = str(tag.get("tag_warning") or "").strip()
+                                enum_warning = str(tag.get("enum_warning") or "").strip()
+                                tag_status = str(tag.get("tag_status") or "").strip().lower()
+                                tag_name = str(tag.get("tag_name") or "").strip()
+
+                                if tag_warning or enum_warning:
+                                    return "decoded-row-warning"
+
+                                if tag_status in ("custom", "unknown", "missing", "not_found", "not found"):
+                                    return "decoded-row-custom"
+
+                                if tag_name:
+                                    return "decoded-row-known"
+
+                                return "decoded-row-custom"
+
+
+                            tag_rows = []
+
                             for tag in tags:
+                                tag_value = str(tag.get("tag") or "").strip()
+
                                 tag_rows.append({
                                     "position_index": tag.get("position_index"),
-                                    "tag": tag.get("tag"),
+                                    "tag": int(tag_value) if tag_value.isdigit() else tag_value,
                                     "tag_name": tag.get("tag_name"),
                                     "value": tag.get("value"),
                                     "value_name": tag.get("value_name"),
                                     "description": tag.get("description"),
                                     "tag_warning": tag.get("tag_warning"),
                                     "enum_warning": tag.get("enum_warning"),
+                                    "_row_class": saved_tag_row_class(tag),
                                 })
 
-                            ui.table(
+                            decoded_table = ui.table(
                                 columns=[
                                     {"name": "position_index", "label": "#", "field": "position_index", "align": "left", "sortable": True},
                                     {"name": "tag", "label": "Tag", "field": "tag", "align": "left", "sortable": True},
@@ -926,8 +1180,36 @@ def render_analysis_panel():
                                 ],
                                 rows=tag_rows,
                                 row_key="position_index",
-                                pagination={"rowsPerPage": 0},
+                                pagination={
+                                    "rowsPerPage": 0,
+                                    "sortBy": "position_index",
+                                    "descending": False,
+                                },
                             ).classes("w-full")
+
+                            def reset_saved_tag_sorting():
+                                decoded_table.pagination = {
+                                    "rowsPerPage": 0,
+                                    "sortBy": "position_index",
+                                    "descending": False,
+                                }
+                                decoded_table.update()
+
+                            ui.button(
+                                "Reset Sorting",
+                                on_click=reset_saved_tag_sorting,
+                            ).props("outline size=sm").classes("q-mt-sm")
+
+                            decoded_table.add_slot(
+                                "body",
+                                """
+                                <q-tr :props="props" :class="props.row._row_class">
+                                    <q-td v-for="col in props.cols" :key="col.name" :props="props">
+                                        {{ col.value }}
+                                    </q-td>
+                                </q-tr>
+                                """
+                            )
 
                     ui.label(
                         "Select one saved message row, then click View Selected Message Tags."
@@ -959,12 +1241,43 @@ def render_analysis_panel():
                         pagination={"rowsPerPage": 0},
                     ).classes("w-full")
 
-            ui.button("Open Selected Saved Analysis", on_click=open_selected_session).props("outline")
+            def update_selected_session_note():
+                selected_rows = list(table.selected or [])
+
+                if len(selected_rows) != 1:
+                    ui.notify("Select one saved analysis first.", color="warning")
+                    return
+
+                session_id = selected_rows[0].get("id")
+
+                if not session_id:
+                    ui.notify("Could not read selected session id.", color="negative")
+                    return
+
+                update_fix_analysis_session_note(
+                    session_id,
+                    save_note_input.value or "",
+                )
+
+                ui.notify(f"Updated save note for session {session_id}.", color="positive")
+                refresh_saved_analyses()
+
+            with ui.row().classes("q-gutter-sm"):
+                ui.button(
+                    "Open Selected Saved Analysis",
+                    on_click=open_selected_session,
+                ).props("outline")
+
+                ui.button(
+                    "Update Selected Save Note",
+                    on_click=update_selected_session_note,
+                ).props("outline color=primary")
 
             table = ui.table(
                 columns=[
                     {"name": "id", "label": "Session", "field": "id", "align": "left", "sortable": True},
                     {"name": "analysis_mode", "label": "Mode", "field": "analysis_mode", "align": "left", "sortable": True},
+                    {"name": "save_note", "label": "Save Note", "field": "save_note", "align": "left", "sortable": True},
                     {"name": "message_count", "label": "Messages", "field": "message_count", "align": "left", "sortable": True},
                     {"name": "group_count", "label": "Groups", "field": "group_count", "align": "left", "sortable": True},
                     {"name": "warning_count", "label": "Warnings", "field": "warning_count", "align": "left", "sortable": True},

@@ -414,6 +414,17 @@ def compare_fix_messages(raw_a: str, raw_b: str) -> Dict[str, Any]:
 
     relationship = _assess_relationship(analysis_a, analysis_b)
 
+    if comparison_rows and len(difference_rows) == 0:
+        relationship = {
+            **relationship,
+            "relationship": "Exact duplicate",
+            "strength": "exact",
+            "interpretation": (
+                "These FIX messages are identical across all compared tag occurrences."
+            ),
+            "warning": "",
+        }
+
     summary = (
         f"{relationship.get('relationship')}. "
         f"Compared {len(comparison_rows)} tag occurrences. "

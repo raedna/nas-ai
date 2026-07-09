@@ -95,6 +95,9 @@ CREATE TABLE IF NOT EXISTS analysis_message_tags (
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+ALTER TABLE analysis_sessions
+    ADD COLUMN IF NOT EXISTS save_note TEXT;
+
 ALTER TABLE analysis_messages
     ADD COLUMN IF NOT EXISTS exec_broker TEXT,
     ADD COLUMN IF NOT EXISTS ex_destination TEXT,
@@ -174,5 +177,5 @@ CREATE INDEX IF NOT EXISTS idx_analysis_messages_route_broker_symbol
 CREATE INDEX IF NOT EXISTS idx_analysis_messages_route_destination_symbol
     ON analysis_messages(sender, target, ex_destination, symbol);
 
-    
+
 
