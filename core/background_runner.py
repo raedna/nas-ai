@@ -65,6 +65,14 @@ def _run_cross_link_task(collection_name, task_id):
         except Exception as e:
             print(f"[BACKGROUND] NER cross-linking failed: {e}")
 
+        # VOCAB-01: refresh this collection's vocabulary (spell-correction
+        # lexicon) from the freshly ingested tsvectors.
+        try:
+            from core.vocab import build_collection_vocab
+            build_collection_vocab(collection_name)
+        except Exception as e:
+            print(f"[BACKGROUND] vocab build failed: {e}")
+
         # Mark done — only if not cancelled in the meantime
         execute(
             "UPDATE background_tasks SET status='done', finished_at=NOW() WHERE id=%s AND status='running'",

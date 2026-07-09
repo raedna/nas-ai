@@ -504,12 +504,27 @@ Fixed en route: sentence period riding into the captured filter value ('= tag.')
 ### Third eval baseline (results/eval_run_20260708_202253) — best on record
 DL 10/10-grade (DL-05 finally identifier_lookup with the alias — _record_covers_question haystack now includes FIELD LABELS: 'filename' lives in 'Moore file name', not in any value). MI-02 chat ✅ (both records verbatim — ladder rank 0). AG-01/02/03*/04/07/08 chat ✅ (*after the period fix + value-anchor). PR-02 held by design. NA-04 restored post-revert. Remaining fails all named: PP-01 (bar), PP-03 (VOCAB-01), PR-08 (fixed post-run, doc rung), MI-04 (partial — full fix needs heterogeneous splitter), AG-10 (Phase 1b fix_version), astro set (DESIGN-01, deprioritized), XC-03-class dual-intent questions (splitter extension, design item).
 
+---
+
+## Eval baseline #4 (results/eval_run_20260709_023135) — PP-01 SOLVED
+
+**PP-01 Chat ✅ — the acceptance bar fell without its planned assault**: the doc-title
+arbitration rung picked obsidian's "4.1 Checking the Tidal Recon Job" (title hits) over
+kb's TRAIANA doc that had won by routing order for three runs; answer quotes both
+Goldman tidal jobs verbatim from the 4.1 table. Also newly ✅: DL-10 Chat (actual NGC
+2064 image record via exact-key arbitration), XC-04 Chat (M51 image confirmed with
+record), NA-02 Chat (honest not-found, bbg junk gone), PR full sweep 8/8 (PR-08 held by
+the title rung). Tally ≈44/50 acceptable (baseline #1: ~25). Chat avg 48.6s — PP-01 at
+293s is SPEED-01's exhibit A. Cosmetic fixed post-run: duplicate filters in metadata
+answers (value-anchor + regrounding mirroring) — deduped. New watch-item: XC-06 Chat
+wobbled to a lesser broadcaster note (one debug run when convenient).
+
 ## Next Session Priorities
 
-0. **VOCAB-01** — per-collection vocabulary (ts_stat at ingest) + trigram spell-correction of query tokens; fixes PP-03 for real, feeds corrected text to BM25 AND centroid routing.
-1. **PP-01 assault** (the bar): scoped value-anchor for type-role values (broker/entity names) at routing + doc-vs-listing arbitration; attempt after VOCAB-01.
+0. **VOCAB-01** — per-collection vocabulary (ts_stat at ingest) + trigram spell-correction of query tokens; fixes PP-03 (the last PP fail), feeds corrected text to BM25 AND centroid routing.
+1. ~~PP-01 assault~~ — **resolved by the doc-title rung** (baseline #4). Residual: its 293s latency belongs to SPEED-01.
 2. **AG-10 / Phase 1b**: fix_version payload field at merge-serialization -> version-scoped metadata filters.
-3. **Heterogeneous multi-item splitter** (MI-04 full, XC-03-class dual-intent questions).
+3. **Heterogeneous multi-item splitter** (MI-04 full, XC-03-class dual-intent questions). Design note from MI-04 testing: extend the multi-item GATE to accept type-role VALUES as items — 'goldman'/'jpm' are listed Prime Broker values, so "X for goldman and jpm" splits into two value-anchored sub-questions, each answerable by the metadata path with its injected equals filter.
 4. MODEL-01 (schema_model config), CODE-025 ffill, astro/DESIGN-01, then SPEED-01, then Confluence/Halo ingestion + memory phases.
 1. **MODEL-01** — fix `schema_model` config; re-ingest Datatypes_FIX44 (DATA-01) as the 32B's first live test before CTM.
 2. **Eval retest** (NAS_AI_Retrieval_Eval_v1.md) — full pass: MI bucket should flip to ✅; DL-02/05, AG/RECON buckets re-scored; XC remains the largest unaddressed group.
@@ -519,3 +534,56 @@ DL 10/10-grade (DL-05 finally identifier_lookup with the alias — _record_cover
 6. **CTM-01** — sample-file parse + schema dry-run when the file is ready.
 7. Honest count fallback ("couldn't determine" instead of retrieval-capped number); BG-01/UI-03/INGEST-01 cleanups.
 8. Phase 3.5 NER cross-linking (CL-03/CL-05); full BBG ingest (69k); CV-03b revisit with the 32B; astro synthesis (DL-06/DL-10); DESIGN-01 workflow profiles.
+---
+
+## Session 2026-07-09 (cont.) — VOCAB-01 delivered, honesty guards, portability watch
+
+**PP-03 SOLVED — PP bucket 8/8.** Full VOCAB-01 chain live: 'brodcaster acting up agian'
+-> surgical correction ({'brodcaster': 'broadcast'}, stopword+lexeme guards), kb_docs
+routed by centroid (0.657), "Message Broadcaster Down" retrieved via the solo-variant
+BM25 fix (AND-variant 'broadcast & acting' had excluded it from the whole candidate
+pool). Coverage banner now judged on CORRECTED words (a corrected answer must not wear
+the typo's banner). smoke_recon 10/10 post-changes.
+
+**Concept-link noise fixed (the "whacky related" item).** diag_concept_dist measured the
+truth: centroid-vs-centroid ambient median ~0.60, genuine links >=0.81 with margins
+>=0.17, noise living in the 0.75-0.80 band (the Jennison-0.78 card on a broadcaster
+answer). find_concept_links now requires sim >= min_sim AND sim >= target collection's
+own median + margin (config concept_links {min_sim 0.80, margin 0.15}); median computed
+live -> self-calibrating. Related section only; zero answer-path surface.
+
+**Value-groundedness guard (metadata_query).** The LLM force-mapped 'Barclays' -> BOA
+(nearest listed bank) despite the prompt forbidding invention. Deterministic guard: an
+equals-filter value must overlap the question (raw substring | token overlap | token-in-
+compact). Ungrounded -> dropped; if nothing remains, metadata path aborts to retrieval
+(honest banner) rather than dumping everything. Goldman/tag filters untouched (grounded
+by construction).
+
+**Named-collection primacy (arbitration).** "which RECON files come from Barclays" had
+kb_docs' contains-mention headline over recon's honest empty. Now: exactly one collection
+named in the question + named collection EMPTY + winner only metadata-CONTAINS/ungrounded
+(mrank 1, grounded>=1) -> honest zero headlines, displaced winner composes below
+(unconditionally — it earned its arbitration score). Exact-key and grounded-EQUALS
+winners keep the headline; doc winners untouched (the 'moore' hijack lesson). Keys off
+the live collection list -> inert if data is reorganized.
+
+**NA-04 replaced**: old corpus-wide Barclays question expired (data now contains
+Barclays mentions — honest matches, not a regression). New trap: "which recon files
+come from Barclays" (collection-scoped honest zero).
+
+### Portability watch (are we designing around this dataset?)
+1. **Similarity floors are corpus+model-measured**: centroid routing 0.6/0.08,
+   concept_links 0.80/0.15, vocab 0.75. Margins self-calibrate; absolute floors need
+   remeasuring if the embedding model changes. All in config.
+2. **Arbitration method rank assumes metadata > doc.** If an authoritative table ever
+   lives INSIDE a doc collection, a weak metadata match elsewhere can outrank the true
+   doc answer. Groundedness/title rungs soften; watch on new ingests.
+3. **Tier 1.2b proportionality constants** (2-word multi-word columns, 5-char single)
+   tuned to this schema's column-name lengths. Structural, but revisit on new schemas.
+4. **Generic collection names** ('notes', 'files') would make name-token anchors and
+   primacy fire on innocent words — naming discipline, or revisit Tier 1.2.
+
+**Ultimate test agreed**: ingest a brand-new file and judge answers cold — no tuning pass.
+
+Pending gate for this block: AG-03 + new NA-04 (fresh process) after primacy change;
+then commit VOCAB-01 + guards.

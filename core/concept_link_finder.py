@@ -1,13 +1,35 @@
 import json
 import numpy as np
+from statistics import median
 from core.db import fetchall
 
 
-def find_concept_links(collection, chunk_id, target_collections=None, similarity_threshold=0.75):
+def _cfg():
+    """Config: concept_links {min_sim, margin}. Defaults measured from the
+    corpus distribution (diag_concept_dist): ambient centroid-vs-centroid
+    median ~0.60, genuine links >=0.81 with margins >=0.17 over that median;
+    noise lives in the 0.75-0.80 band."""
+    try:
+        from core.system_config import load_system_config
+        c = load_system_config().get("concept_links", {})
+        return float(c.get("min_sim", 0.80)), float(c.get("margin", 0.15))
+    except Exception:
+        return 0.80, 0.15
+
+
+def find_concept_links(collection, chunk_id, target_collections=None, similarity_threshold=None):
     """
     Given a chunk from a collection, find related concept clusters in other collections
     by comparing its concept cluster centroid against target collection centroids.
-    
+
+    A cluster qualifies only if it stands out from its OWN collection's ambient
+    similarity level: sim >= min_sim AND sim >= median(all that collection's
+    cluster sims to this source) + margin. Centroid-vs-centroid similarities are
+    double-averaged and sit near the dense middle of the embedding space, so an
+    absolute threshold alone admits ambient noise ("either too many or none").
+    The median is computed from the live distribution — self-calibrating for
+    new collections and embedding models.
+
     Returns list of {target_collection, cluster_id, similarity, anchor_chunk_ids, anchor_texts}
     """
     # Step 1: Find which concept cluster this chunk belongs to
@@ -56,20 +78,30 @@ def find_concept_links(collection, chunk_id, target_collections=None, similarity
         )
         target_collections = [r['collection'] for r in rows]
 
-    # Step 3: Compare source centroid against all target cluster centroids
+    # Step 3: Compare source centroid against ALL target cluster centroids,
+    # then keep only standouts above that collection's own ambient level.
+    min_sim, margin = _cfg()
+    if similarity_threshold is not None:  # explicit caller override
+        min_sim = float(similarity_threshold)
     results = []
 
     for target in target_collections:
         src_centroid_str = src_centroid
-        target_clusters = fetchall("""
+        all_clusters = fetchall("""
             SELECT cluster_id, group_value, centroid, anchor_chunk_ids, anchor_texts,
                    1 - (centroid::vector <=> %s::vector) AS similarity
             FROM concept_vectors
             WHERE collection = %s
-            AND 1 - (centroid::vector <=> %s::vector) >= %s
             ORDER BY similarity DESC
-            LIMIT 3
-        """, (src_centroid_str, target, src_centroid_str, similarity_threshold))
+        """, (src_centroid_str, target))
+        if not all_clusters:
+            continue
+        _amb = median(float(r["similarity"]) for r in all_clusters)
+        target_clusters = [
+            r for r in all_clusters
+            if float(r["similarity"]) >= min_sim
+            and float(r["similarity"]) >= _amb + margin
+        ][:3]
 
         for tc in target_clusters:
             results.append({

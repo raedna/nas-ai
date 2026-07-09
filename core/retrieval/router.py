@@ -413,13 +413,29 @@ def _get_bm25_queries(question: str, collection: str = None) -> List[str]:
     if not content_words:
         return [q_norm]
 
+    _corrected_solo = []
     if collection:
+        # VOCAB-01: spell-correct unknown tokens against the collection's own
+        # vocabulary ('brodcaster' -> 'broadcast') BEFORE corpus filtering —
+        # a corrected token rejoins the search instead of being dropped.
+        try:
+            from core.vocab import correct_words
+            content_words, _changes = correct_words(content_words, collection)
+            # A corrected word is the question's core signal by construction —
+            # give it a SOLO variant too: the AND variant 'broadcast & acting'
+            # excludes 'Message Broadcaster Down' (no lexeme 'act' there), the
+            # solo 'broadcast' variant puts it back in the candidate pool.
+            _corrected_solo = list(_changes.values())
+        except Exception:
+            pass
         kept = _filter_corpus_words(collection, content_words)
         if kept:
             content_words = kept
 
     queries: set = set()
     queries.add(" ".join(content_words))
+    for _cw_solo in _corrected_solo:
+        queries.add(_cw_solo)
 
     for i, word in enumerate(content_words):
         synonyms = expand_terms_with_synonyms([word])
@@ -567,8 +583,15 @@ def route_query(
         # ALL content words count in the denominator — including typos and
         # corpus-absent tokens. They are part of the question's information;
         # excluding them inflated a 1-of-3-words match to 100% coverage.
+        # Spell-corrected forms are used for MATCHING ('brodcaster' judges as
+        # 'broadcast') — a corrected answer must not wear the typo's banner.
         _words = [w for w in normalize_simple_text(question).split()
                   if w and w not in _noise and len(w) > 2]
+        try:
+            from core.vocab import correct_words as _cw_fn
+            _words, _ = _cw_fn(_words, collection)
+        except Exception:
+            pass
         if _words:
             _hay = " ".join(str(payload.get(k) or "") for k in
                             ("nlp_text", "text", "primary_name", "description")).lower()

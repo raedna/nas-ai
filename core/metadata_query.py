@@ -362,6 +362,41 @@ def run_metadata_query(collection: str, question: str, intent_mode: str = None) 
                         f["field"], f["op"] = fld, "equals"
                     break
 
+        # Value-groundedness guard (deterministic): an equals filter is a CLAIM
+        # that the question mentions that value. Shown the listed values, the
+        # LLM force-maps unknown terms to the nearest one ('Barclays' -> BOA)
+        # despite the prompt forbidding it. Grounded means: the raw value is a
+        # substring of the question (covers short/multi-word values like 'GS',
+        # 'Goldman Sachs'), OR value tokens overlap question tokens, OR a
+        # question token appears inside the value's compact form ('goldman' in
+        # 'goldmansachs'). Zero overlap = invented — drop. If the drop leaves
+        # no filters, the metadata path cannot honestly answer a constrained
+        # question: abort to retrieval (low-coverage banner) rather than list
+        # everything (the NA-04 dump lesson, from the other direction).
+        _g_kept, _g_dropped = [], False
+        _q_low = question.lower()
+        for f in spec["filters"]:
+            if f.get("op") != "equals":
+                _g_kept.append(f)
+                continue
+            _v_raw = str(f.get("value", "")).lower()
+            _vtoks = {t for t in _re0.findall(r"[a-z0-9]{3,}", _v_raw)}
+            _vcompact = _re0.sub(r"[^a-z0-9]", "", _v_raw)
+            _grounded = (
+                (_v_raw and _v_raw in _q_low)
+                or bool(_vtoks & _qt)
+                or any(t in _vcompact for t in _qt)
+            )
+            if _grounded:
+                _g_kept.append(f)
+            else:
+                _g_dropped = True
+                print(f"[METADATA] dropped ungrounded filter (value not in question): {f}")
+        if _g_dropped and not _g_kept:
+            print("[METADATA] all filters ungrounded — aborting metadata path")
+            return None
+        spec["filters"] = _g_kept
+
         # Role-name matcher (deterministic, schema-driven): if a question token
         # compact-matches a schema role's SOURCE COLUMN NAME ('files' matches
         # 'Moore file name'), and the LLM's target matches NO question token,
@@ -447,6 +482,18 @@ def run_metadata_query(collection: str, question: str, intent_mode: str = None) 
             # dropping them turned a no-answer trap into a 200-row dump
             # (NA-04 regression). Junk filters are handled upstream by the
             # field-name-valued drop; honest-but-unmatched filters must fail.
+
+        # Dedupe filters — value-anchor injection + regrounding can mirror the
+        # LLM's own filter ("Prime Broker = Goldman" twice + "type = Goldman").
+        # Same VALUE on multiple fields is also redundant: keep the first.
+        _seen_fv, _dedup = set(), []
+        for f in spec["filters"]:
+            _k = str(f["value"]).lower()
+            if (f["field"], f["op"], _k) in _seen_fv or _k in {v for _, _, v in _seen_fv}:
+                continue
+            _seen_fv.add((f["field"], f["op"], _k))
+            _dedup.append(f)
+        spec["filters"] = _dedup
 
         where, params = _where(collection, spec["filters"], df_keys)
         op = spec["operation"]

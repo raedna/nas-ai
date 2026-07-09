@@ -174,6 +174,21 @@ def select_collections(question: str, history: list, available_collections: list
         _noise_words = set()
     _q_words = [w for w in re.findall(r"[a-z0-9]{3,}", question.lower())
                 if w not in _noise_words]
+    # VOCAB-01: spell-correct unknown tokens against the GLOBAL vocabulary so
+    # typo'd questions anchor and embed like their intended words
+    # ('brodcaster acting up' routes like 'broadcast acting up').
+    _routing_question = question
+    try:
+        from core.vocab import correct_words
+        _corrected, _changes = correct_words(_q_words, collection=None)
+        if _changes:
+            _q_words = _corrected
+            _rq = question.lower()
+            for _orig, _new in _changes.items():
+                _rq = _rq.replace(_orig, _new)
+            _routing_question = _rq
+    except Exception:
+        pass
     for _w in _q_words:
         for _col in available_collections:
             if _col in _tier1_hits:
@@ -186,6 +201,26 @@ def select_collections(question: str, history: list, available_collections: list
                 (_col, _w + "%"))
             if _hit:
                 _tier1_hits.append(_col)
+
+    # --- Tier 1.3 (VOCAB-01): rare-word vocabulary ownership. A (corrected)
+    # content word that exists in only 1-2 collections' own lexicons anchors
+    # those collections ('broadcast' lives in kb_docs + obsidian only;
+    # 'haloitsm' in kb_docs only). Pure data ownership, no similarity vote.
+    try:
+        for _w in dict.fromkeys(_q_words):  # preserve order, dedupe
+            if len(_w) < 4:
+                continue
+            _owners = _fetchall(
+                "SELECT DISTINCT collection FROM collection_vocab "
+                "WHERE word = %s LIMIT 4", (_w,))
+            _ownset = [r["collection"] for r in _owners
+                       if r["collection"] in available_collections]
+            if 0 < len(_ownset) <= 2:
+                for _c in _ownset:
+                    if _c not in _tier1_hits:
+                        _tier1_hits.append(_c)
+    except Exception:
+        pass
 
     # --- Tier 1.2: the question NAMES a collection ("...in the recon file",
     # "which bbg fields...") — a token matching the collection's own name is
@@ -273,7 +308,7 @@ def select_collections(question: str, history: list, available_collections: list
         _max_cols = int(_rt_cfg.get("max_collections", 3))
         try:
             from core.embedder import embed_text
-            _qv = str(embed_text(question))
+            _qv = str(embed_text(_routing_question))
             _rows = _fetchall(
                 """SELECT collection, MAX(1 - (centroid <=> %s::vector)) AS best_sim
                    FROM concept_vectors GROUP BY collection ORDER BY best_sim DESC""",
@@ -493,8 +528,11 @@ def run_parallel_queries(collections: list, question: str, single_item: bool = F
 
     # Pick best result: prefer collections whose answer is not one of the
     # system's own empty/zero-result phrasings, then first collection wins.
-    def _is_empty_answer(text: str) -> bool:
-        t = str(text or "")
+    def _is_empty_answer(text) -> bool:
+        # Coerce dicts first: a 0-result discovery is {total_matches: 0,
+        # results: []}, whose raw str() contains none of the empty phrasings —
+        # it rendered as "non-empty" and entered arbitration as a candidate.
+        t = _result_to_text(text) if not isinstance(text, str) else str(text or "")
         return (not t.strip()) or any(m in t for m in (
             "No answer found", "No record found", "No exact match found",
             "Found 0 item", "Found 0 match", "0 record(s)", "0 value(s)",
@@ -572,6 +610,33 @@ def run_parallel_queries(collections: list, question: str, single_item: bool = F
         best_col = collections[0]
         best_result = results.get(best_col, {"result": "No answer found.", "related_sections": []})
 
+    # Named-collection primacy (listing intents only): a question that names
+    # exactly ONE collection ("which RECON files...") scopes its headline to
+    # that collection. If the named collection came up EMPTY and the arbitration
+    # winner is only a metadata CONTAINS/ungrounded answer (a mention-match,
+    # not an equals claim), the honest zero headlines and the displaced winner
+    # composes below, correctly labeled. Fenced narrowly: exact-key and
+    # grounded-EQUALS winners are real claims and keep the headline; doc
+    # winners (mrank 2) mean a procedural question — untouched (the 'moore'
+    # lesson: name tokens must not hijack doc questions). Keys off the live
+    # collection list, so it is inert if the data is ever reorganized.
+    _primacy_displaced = None
+    if best_col is not None and len(collections) > 1:
+        _named = [c for c in collections
+                  if any(t in _re.sub(r"[^a-z0-9]", "", c.lower()) for t in _qtoks)]
+        if (len(_named) == 1 and best_col != _named[0]
+                and _is_empty_answer(results.get(_named[0], {}).get("result", ""))):
+            _sc = _arb_score(best_col, collections.index(best_col))
+            if _sc[0] == 1 and _sc[2] >= 1:
+                _primacy_displaced = best_col
+                best_col = _named[0]
+                best_result = dict(results.get(best_col) or {})
+                best_result["result"] = (
+                    f"No matching records found in {best_col} for this question.")
+                if DEBUG:
+                    print(f"DEBUG primacy: named '{best_col}' headlines honest "
+                          f"zero; '{_primacy_displaced}' composes")
+
     # Merge related_sections from all collections
     merged_related = list(best_result.get("related_sections") or [])
     seen = {(s["collection"], s["title"]) for s in merged_related}
@@ -587,7 +652,16 @@ def run_parallel_queries(collections: list, question: str, single_item: bool = F
     best_result["collection"] = best_col
     best_result["collections_queried"] = collections
     best_result["related_sections"] = merged_related
-    best_result["secondary_answers"] = _collect_secondary_answers(results, best_col)
+    _secondary = _collect_secondary_answers(results, best_col)
+    # A primacy-displaced winner composes unconditionally — it already earned
+    # a grounded arbitration score; the prefix gate (built for unsolicited
+    # runner-ups) must not silence it.
+    if _primacy_displaced and not any(
+            s.get("collection") == _primacy_displaced for s in _secondary):
+        _d_txt = _result_to_text(results.get(_primacy_displaced, {}).get("result", ""))
+        if _d_txt and not _is_empty_answer(_d_txt):
+            _secondary.insert(0, {"collection": _primacy_displaced, "answer": _d_txt})
+    best_result["secondary_answers"] = _secondary[:2]
     return best_result
 
 _CONTEXTUALIZE_FORMAT = {
