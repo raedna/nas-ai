@@ -664,12 +664,58 @@ def render_analysis_panel():
         ).classes("w-full")
 
 def render_analysis_panel():
+    MAX_COMPARE_MESSAGES = 10
 
-    result_area = ui.column().classes("w-full mt-4")
-    saved_area = ui.column().classes("w-full mt-4")
+    # --- FIX UI REDESIGN WORKSPACE SKELETON ---
+    with ui.row().classes("w-full no-wrap items-start"):
+
+        # 1. CONTROL SECTION
+        with ui.column().classes("q-pa-md bg-grey-2").style(
+            "width: 260px; min-width: 260px; position: sticky; top: 0; height: 100vh; overflow-y: auto;"
+        ):
+            ui.label("FIX Workspace").classes("text-xl font-bold")
+            ui.label(f"Compare basket: up to {MAX_COMPARE_MESSAGES} messages").classes(
+                "text-xs text-grey-7"
+            )
+            ui.separator().classes("q-my-md")
+
+            ui.label("Control").classes("text-md font-semibold")
+            control_area = ui.column().classes("w-full q-gutter-sm")
+
+        # Main workspace
+        with ui.column().classes("w-full q-pa-md"):
+
+            # 2. CONTEXT / SELECTION SECTION
+            with ui.card().classes("w-full q-pa-md q-mb-md"):
+                ui.label("Context / Selection").classes("text-lg font-semibold")
+                ui.label(
+                    "Saved sessions, message selector, Message A/B, and comparison basket will move here."
+                ).classes("text-sm text-grey-7")
+                context_area = ui.column().classes("w-full q-mt-md")
+
+            # 3. WORKING WINDOWS SECTION
+            with ui.card().classes("w-full q-pa-md q-mb-md"):
+                ui.label("Working Windows").classes("text-lg font-semibold")
+                ui.label(
+                    "Raw input, decoded tags, selected tag details, and message windows will move here."
+                ).classes("text-sm text-grey-7")
+                working_area = ui.column().classes("w-full q-mt-md")
+
+            # 4. INFO / REPORTING SECTION
+            with ui.card().classes("w-full q-pa-md q-mb-md"):
+                ui.label("Info / Reporting").classes("text-lg font-semibold")
+                ui.label(
+                    "Analysis output, warnings, insights, related messages, and future Ask integration will move here."
+                ).classes("text-sm text-grey-7")
+                reporting_area = ui.column().classes("w-full q-mt-md")
+
+    # Temporary compatibility aliases.
+    # Existing code can keep using these while we migrate gradually.
+    result_area = working_area
+    saved_area = context_area
 
     saved_compare_selection = []
-
+    
     def render_sequence_insights(insights):
         if not insights:
             return
