@@ -2,7 +2,7 @@ from pathlib import Path
 from tempfile import NamedTemporaryFile
 import json
 from nicegui import ui
-
+from core.analysis.analyzers.fix.fix_insights import build_sequence_insights
 from core.analysis.analyzers.fix.analyzer import analyze_fix_message
 from core.analysis.analyzers.fix.comparator import compare_fix_messages
 from IMAGES.image_parser import parse_image
@@ -23,6 +23,7 @@ from core.analysis.storage.fix_repository import (
     build_related_match_messages_from_result,
     get_fix_analysis_message,
     update_fix_analysis_session_note,
+    delete_fix_analysis_session,
 )
 
 
@@ -662,6 +663,40 @@ def render_analysis_panel():
             pagination=10,
         ).classes("w-full")
 
+def render_analysis_panel():
+
+    result_area = ui.column().classes("w-full mt-4")
+    saved_area = ui.column().classes("w-full mt-4")
+
+    saved_compare_selection = []
+
+    def render_sequence_insights(insights):
+        if not insights:
+            return
+
+        ui.separator().classes("q-my-md")
+        ui.label("Sequence Insights").classes("text-lg font-semibold")
+
+        ui.label(insights.get("summary") or "").classes("text-sm text-grey-8")
+
+        warnings = insights.get("warnings") or []
+        changes = insights.get("changes") or []
+
+        info_changes = [
+            change for change in changes
+            if change.get("severity") == "info"
+        ]
+
+        if warnings:
+            ui.label("Potential Issues").classes("text-md font-semibold text-red-7 q-mt-md")
+            for change in warnings:
+                ui.label(f"- {change.get('summary')}").classes("text-red-7")
+
+        if info_changes:
+            with ui.expansion("Informational Changes", value=False).classes("w-full q-mt-md"):
+                for change in info_changes:
+                    ui.label(f"- {change.get('summary')}").classes("text-grey-8")
+
     def run_analysis():
         result_area.clear()
 
@@ -724,6 +759,8 @@ def render_analysis_panel():
 
                 if result.get("input_type") == "fix_sequence":
                     render_sequence_result(result)
+                    insights = build_sequence_insights(result.get("messages") or [])
+                    render_sequence_insights(insights)
                     render_related_saved_matches(result)
 
                     def save_current_sequence_result():
@@ -1100,6 +1137,7 @@ def render_analysis_panel():
                             "exec_id": msg.get("exec_id"),
                             "symbol": msg.get("symbol"),
                             "order_qty": msg.get("order_qty"),
+                            "last_qty": msg.get("last_qty"),
                             "cum_qty": msg.get("cum_qty"),
                             "leaves_qty": msg.get("leaves_qty"),
                         })
@@ -1366,6 +1404,7 @@ def render_analysis_panel():
                             {"name": "exec_id", "label": "ExecID", "field": "exec_id", "align": "left", "sortable": True},
                             {"name": "symbol", "label": "Symbol", "field": "symbol", "align": "left", "sortable": True},
                             {"name": "order_qty", "label": "OrderQty", "field": "order_qty", "align": "left", "sortable": True},
+                            {"name": "last_qty", "label": "LastQty", "field": "last_qty", "align": "left", "sortable": True},
                             {"name": "cum_qty", "label": "CumQty", "field": "cum_qty", "align": "left", "sortable": True},
                             {"name": "leaves_qty", "label": "LeavesQty", "field": "leaves_qty", "align": "left", "sortable": True},
                         ],
@@ -1396,16 +1435,50 @@ def render_analysis_panel():
                 ui.notify(f"Updated save note for session {session_id}.", color="positive")
                 refresh_saved_analyses()
 
+            def confirm_delete_selected_session():
+                selected_rows = list(table.selected or [])
+
+                if len(selected_rows) != 1:
+                    ui.notify("Select one saved analysis to delete.", color="warning")
+                    return
+
+                session_id = selected_rows[0].get("id")
+
+                if not session_id:
+                    ui.notify("Could not read selected session id.", color="negative")
+                    return
+
+                with ui.dialog() as dialog, ui.card():
+                    ui.label(f"Delete saved analysis session {session_id}?").classes("text-lg font-semibold")
+                    ui.label(
+                        "This will delete the saved session, its messages, and message tags. This cannot be undone."
+                    ).classes("text-red-7")
+
+                    with ui.row().classes("q-gutter-sm q-mt-md"):
+                        ui.button("Cancel", on_click=dialog.close).props("outline")
+
+                        def do_delete():
+                            delete_fix_analysis_session(session_id)
+                            dialog.close()
+                            ui.notify(f"Deleted saved analysis session {session_id}.", color="positive")
+                            refresh_saved_analyses()
+
+                        ui.button("Delete", on_click=do_delete).props("color=negative")
+
+                dialog.open()
+
             with ui.row().classes("q-gutter-sm"):
-                ui.button(
-                    "Open Selected Saved Analysis",
-                    on_click=open_selected_session,
-                ).props("outline")
+                ui.button("Open Selected Saved Analysis", on_click=open_selected_session).props("outline")
 
                 ui.button(
                     "Update Selected Save Note",
                     on_click=update_selected_session_note,
                 ).props("outline color=primary")
+
+                ui.button(
+                    "Delete Selected Saved Analysis",
+                    on_click=confirm_delete_selected_session,
+                ).props("outline color=negative")
 
             table = ui.table(
                 columns=[

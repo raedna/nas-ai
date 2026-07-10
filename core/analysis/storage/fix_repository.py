@@ -1,8 +1,7 @@
 import hashlib
 import json
 from typing import Any, Dict, Tuple
-from core.db import get_conn
-from core.db import fetchall, fetchone, execute
+from core.db import get_conn, fetchall, fetchone, execute
 
 def _analysis_source_hash(messages: list) -> str:
     raw_parts = []
@@ -478,6 +477,15 @@ def update_fix_analysis_session_note(session_id: int, save_note: str) -> None:
         WHERE id = %s
         """,
         (save_note, session_id),
+    )
+
+def delete_fix_analysis_session(session_id: int) -> None:
+    execute(
+        """
+        DELETE FROM analysis_sessions
+        WHERE id = %s
+        """,
+        (session_id,),
     )
 
 def list_fix_analysis_messages(session_id: int):

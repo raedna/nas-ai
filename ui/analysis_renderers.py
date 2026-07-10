@@ -242,6 +242,7 @@ def render_sequence_result(result: dict):
                 "ord_status": msg.get("ord_status"),
                 "symbol": msg.get("symbol"),
                 "order_qty": msg.get("order_qty"),
+                "last_qty": msg.get("last_qty"),
                 "cum_qty": msg.get("cum_qty"),
                 "leaves_qty": msg.get("leaves_qty"),
             })
@@ -261,6 +262,7 @@ def render_sequence_result(result: dict):
             {"name": "ord_status", "label": "OrdStatus", "field": "ord_status", "align": "left", "sortable": True},
             {"name": "symbol", "label": "Symbol", "field": "symbol", "align": "left", "sortable": True},
             {"name": "order_qty", "label": "OrderQty", "field": "order_qty", "align": "left", "sortable": True},
+            {"name": "last_qty", "label": "LastQty", "field": "last_qty", "align": "left", "sortable": True},
             {"name": "cum_qty", "label": "CumQty", "field": "cum_qty", "align": "left", "sortable": True},
             {"name": "leaves_qty", "label": "LeavesQty", "field": "leaves_qty", "align": "left", "sortable": True},
         ]
