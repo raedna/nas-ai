@@ -123,9 +123,64 @@ def correct_word(word: str, collection: str = None):
 
 
 def correct_words(words, collection: str = None):
-    """Correct a list of tokens; returns (corrected_list, corrections_dict)."""
+    """Correct a list of tokens; returns (corrected_list, corrections_dict).
+
+    Batched (SPEED-01): the per-word path costs up to 3 DB round-trips per
+    word — brutal on a remote link. Here: ONE tsvector call for all words,
+    ONE membership query, and the trigram path only for the (rare) unknowns.
+    Semantics identical to correct_word; the per-word path remains as the
+    fallback if batching fails.
+    """
+    enabled, _min_sim = _cfg()
+    ws = [str(w or "").lower() for w in words]
+    if not enabled or not ws:
+        return list(ws), {}
+    try:
+        # One round-trip: lexeme (or absence = stopword) for every word.
+        # to_tsvector on the single word mirrors the per-word semantics
+        # exactly — a phrase-level call would merge duplicate lexemes.
+        _rows = fetchall(
+            """SELECT w, to_tsvector('english', w)::text AS v
+               FROM unnest(%s::text[]) AS w""", (ws,))
+        _lex = {}      # word -> lexeme (words with no signal are absent)
+        for _r in _rows:
+            _tsv = str(_r["v"] or "")
+            if _tsv.strip():
+                _m = re.match(r"'([^']+)'", _tsv)
+                _lex[_r["w"]] = _m.group(1) if _m else _r["w"]
+
+        # One round-trip: membership for every surface form + lexeme.
+        _cand = sorted({t for w in _lex for t in (w, _lex[w])})
+        if _cand:
+            scope = "AND collection = %s" if collection else ""
+            args = (_cand, collection) if collection else (_cand,)
+            _known_rows = fetchall(
+                f"SELECT DISTINCT word FROM collection_vocab "
+                f"WHERE word = ANY(%s::text[]) {scope}", args)
+            _known = {r["word"] for r in _known_rows}
+        else:
+            _known = set()
+
+        out, changed = [], {}
+        for w in ws:
+            if (len(w) < 3 or not re.search(r"[a-z]", w)
+                    or w not in _lex               # stopword / no signal
+                    or w in _known or _lex[w] in _known):
+                out.append(w)
+                continue
+            # unknown word — rare; per-word trigram path is acceptable here
+            c, was = correct_word(w, collection)
+            out.append(c)
+            if was:
+                changed[w] = c
+        if changed:
+            print(f"[VOCAB] corrected: {changed}")
+        return out, changed
+    except Exception:
+        pass
+
     out, changed = [], {}
-    for w in words:
+    for w in ws:
         c, was = correct_word(w, collection)
         out.append(c)
         if was:

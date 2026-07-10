@@ -1142,8 +1142,19 @@ def chat_turn(question: str, history: list, available_collections: list) -> dict
         related_sections: cross-link enrichment (if any)
     }
     """
+    import time as _time
+    _t0 = _time.perf_counter()
+    _marks = []
+
+    def _mark(stage):
+        _marks.append((stage, _time.perf_counter() - _t0))
+        if DEBUG:
+            print(f"TIMER {stage}: {_marks[-1][1]:.1f}s total"
+                  + (f" (+{_marks[-1][1] - _marks[-2][1]:.1f}s)" if len(_marks) > 1 else ""))
+
     # Step 1: detect intent
     intent = detect_chat_intent(question, history)
+    _mark("intent")
     print("DEBUG available_collections:", available_collections)
     if intent["intent"] == "chat":
         response = generate_conversational_response(question, history)
@@ -1159,6 +1170,7 @@ def chat_turn(question: str, history: list, available_collections: list) -> dict
     # leave new/standalone questions untouched. Only follow-ups get to see prior
     # history downstream (prevents the previous topic polluting a new question).
     ctx = contextualize_query(question, history)
+    _mark("contextualize")
     standalone_question = ctx["standalone_query"]
     effective_history = history if ctx["is_followup"] else []
     if DEBUG:
@@ -1168,9 +1180,11 @@ def chat_turn(question: str, history: list, available_collections: list) -> dict
     # per-item fan-out, merged per-item answer. Single-item questions skip this
     # entirely (gate fails before any LLM call).
     sub_questions = split_multi_item_question(standalone_question)
+    _mark("multi_item_gate")
 
     # Step 2: select collections (1–3, ranked by relevance)
     collections = select_collections(standalone_question, effective_history, available_collections)
+    _mark("routing")
 
     if sub_questions and collections:
         if DEBUG:
@@ -1187,6 +1201,7 @@ def chat_turn(question: str, history: list, available_collections: list) -> dict
 
     # Step 3: retrieve answer (parallel across selected collections)
     query_run = run_parallel_queries(collections, standalone_question)
+    _mark("retrieval")
     if DEBUG:
         print("DEBUG standalone_question:", standalone_question)
         print("DEBUG query_run related:", [(s.get('collection'), s.get('confidence'), bool(s.get('anchor_chunk_ids'))) for s in query_run.get('related_sections', [])])
@@ -1288,6 +1303,7 @@ def chat_turn(question: str, history: list, available_collections: list) -> dict
         response = generate_conversational_response(
             question, effective_history, retrieved_answer=retrieved,
             primary_answer=primary_answer, answer_kind=answer_kind)
+    _mark("synthesis")
 
     # Post-synthesis composition: runner-up STRUCTURED answers appended
     # verbatim (the LLM never sees them — no contamination, no blending).
