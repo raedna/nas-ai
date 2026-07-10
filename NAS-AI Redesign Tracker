@@ -602,3 +602,27 @@ MODEL-01: schema_model key was simply absent from nlp_config local_llm — set
 to qwen3-vl-32b-instruct; "[SCHEMA LLM] using schema model" prints. UI config
 Save rewrote local_llm wholesale (would delete undisplayed keys like
 schema_model) — now merges. Gate: smoke_fix after re-ingest.
+
+## SPEED-01 steps 1-3 DONE (2026-07-11) — remote-first network cuts
+
+Context: user away from the NAS for ~a month; slow link is the NORMAL case.
+Baseline #5 (eval_run_20260710_235752): quality best yet (~48/50 pending
+verdicts — AG-07/09/10 all exact, MI-03 fixed, NA honest), but chat avg 137s
+with 644s/1013s outliers — link RTT multiplication + possible 32B residency.
+
+1. Stage timers in chat_turn (TIMER lines, DEBUG-gated): intent /
+   contextualize / multi_item_gate / routing / retrieval / synthesis.
+2. correct_words batched: ONE unnest tsvector call + ONE word=ANY membership
+   (was up to 3 RTT per word); trigram only for unknowns; per-word path kept
+   as fallback. Parity: 180 combos, 0 mismatches (diag_vocab_parity.py).
+   Visible now: per-collection corrections are sloppy for short words
+   ('prime'->'price', 'rerun'->'run') — PRE-EXISTING, parity-proven. Candidate
+   follow-up: length-aware min_sim (<=5 chars needs ~0.85). User to decide.
+3. Tier 1.25 batched (one query per word across collections, seating order
+   preserved — diag_tier13 byte-identical) + in-process schema cache (60s TTL,
+   invalidated on save/delete) consumed by Tier 1.2b and metadata_query.
+   Smokes recon+fix green.
+
+Step 4 (NOT started, config-gated, requires full eval): single shared intent
+call, contextualize+intent merge, fast_model (llama-3.2-3b) for
+rewrite/routing, streaming. PP-01-class cascades need their own look.
