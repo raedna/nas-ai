@@ -71,9 +71,25 @@ def _field_values(collection: str, fields: set, df_keys=frozenset()) -> Dict[str
     values = {}
     for f in sorted(fields):
         expr = _field_expr(f, df_keys)
-        rows = fetchall(
-            f"SELECT DISTINCT {expr} AS v FROM chunks WHERE collection_name = %s AND {expr} IS NOT NULL LIMIT 25",
-            (collection,))
+        # jsonb-array fields (e.g. versions: ["4.2","4.4"]): list the ELEMENTS
+        # as the field's values, not the raw JSON text — the LLM must ground
+        # filters in '4.4', never in '["4.2", "4.4"]'.
+        _key = f.replace("'", "")
+        _arr = fetchall(
+            f"""SELECT 1 FROM chunks WHERE collection_name = %s
+                AND jsonb_typeof(payload->'{_key}') = 'array' LIMIT 1""",
+            (collection,)) if expr.startswith("payload->>") else []
+        if _arr:
+            rows = fetchall(
+                f"""SELECT DISTINCT _v AS v FROM chunks,
+                    jsonb_array_elements_text(payload->'{_key}') _v
+                    WHERE collection_name = %s
+                    AND jsonb_typeof(payload->'{_key}') = 'array' LIMIT 25""",
+                (collection,))
+        else:
+            rows = fetchall(
+                f"SELECT DISTINCT {expr} AS v FROM chunks WHERE collection_name = %s AND {expr} IS NOT NULL LIMIT 25",
+                (collection,))
         vals = [str(r["v"]) for r in rows if r["v"]]
         if len(vals) == 1:
             fields.discard(f)
@@ -206,8 +222,21 @@ def _where(collection: str, filters: List[Dict], df_keys=frozenset()):
     for f in filters:
         expr = _field_expr(f["field"], df_keys)
         if f["op"] == "equals":
-            clauses.append(f"LOWER({expr}) = LOWER(%s)")
-            params.append(f["value"])
+            # Array-aware equality: a jsonb-array payload field (e.g.
+            # versions: ["4.2","4.4"]) matches when it CONTAINS the value;
+            # scalar fields compare as before. Decided per-row by type, so
+            # mixed collections stay correct.
+            if expr.startswith("payload->>"):
+                _key = f["field"].replace("'", "")
+                clauses.append(
+                    "(CASE WHEN jsonb_typeof(payload->'{k}') = 'array' "
+                    "THEN EXISTS (SELECT 1 FROM jsonb_array_elements_text("
+                    "payload->'{k}') _v WHERE LOWER(_v) = LOWER(%s)) "
+                    "ELSE LOWER({e}) = LOWER(%s) END)".format(k=_key, e=expr))
+                params.extend([f["value"], f["value"]])
+            else:
+                clauses.append(f"LOWER({expr}) = LOWER(%s)")
+                params.append(f["value"])
         else:
             clauses.append(f"{expr} ILIKE %s")
             params.append(f"%{f['value']}%")

@@ -102,6 +102,12 @@ def merge_rows_by_version(all_rows, file_kind):
             for v, r, f in version_rows
         ]
         merged_row["_latest_version"] = latest_version
+        # Phase 1b: queryable version membership — every version this record
+        # appears in, dotted form ('44' -> '4.4'). Unlike _version_history
+        # (a system key, invisible to the metadata path), this is an ordinary
+        # payload field: "how many fields are in FIX 4.4" can filter on it.
+        merged_row["versions"] = sorted(
+            {f"{v // 10}.{v % 10}" for v, _, _ in version_rows})
         merged[key] = merged_row
 
     return merged
@@ -330,6 +336,10 @@ def xml_finalize(file_path, collection_name, file_tags):
         if doc.get("description"):
             text_parts.append(doc["description"])
 
+        if doc.get("versions"):
+            # searchable version membership ('FIX 4.4' questions hit lexically)
+            text_parts.append("Versions: " + ", ".join(doc["versions"]))
+
         if doc.get("enum_values"):
             enum_texts = []
             for e in doc["enum_values"]:
@@ -366,6 +376,7 @@ def xml_finalize(file_path, collection_name, file_tags):
             "enum_values": doc.get("enum_values"),
             "type": doc.get("type"),
             "type_field": doc.get("type_field"),
+            "versions": doc.get("versions"),
             "doc_type": doc.get("doc_type"),
             "source_file": primary_source_file,
             "source_files": source_files,

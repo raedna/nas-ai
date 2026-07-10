@@ -20,6 +20,7 @@ def normalize_link_index(link_index, schema=None):
             "aliases": entry.get("aliases", []),
             "enum_values": entry.get("enum_values", []),
             "type": entry.get("type"),
+            "versions": entry.get("versions"),
             "doc_type": "structured",
             "raw": entry,
             "link_keys": entry.get("link_keys", []),

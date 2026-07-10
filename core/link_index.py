@@ -178,6 +178,10 @@ def build_link_index(all_rows, schema_map):
                 if not best_name and names:
                     best_name = names[0][1]
 
+                # Phase 1b: version membership rides along from merged rows
+                if row.get("versions") and not entry.get("versions"):
+                    entry["versions"] = row["versions"]
+
                 if best_name:
                     entry["primary_name"] = best_name
 
