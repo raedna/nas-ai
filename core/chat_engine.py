@@ -170,8 +170,10 @@ def select_collections(question: str, history: list, available_collections: list
         for _k in ("discovery_noise_words", "question_words",
                    "structured_namespace_terms", "stopwords"):
             _noise_words.update(_h.get(_k, []))
+        _hints = _h
     except Exception:
         _noise_words = set()
+        _hints = {}
     _q_words = [w for w in re.findall(r"[a-z0-9]{3,}", question.lower())
                 if w not in _noise_words]
     # VOCAB-01: spell-correct unknown tokens against the GLOBAL vocabulary so
@@ -189,38 +191,50 @@ def select_collections(question: str, history: list, available_collections: list
             _routing_question = _rq
     except Exception:
         pass
+    # Numeric tokens are AMBIGUOUS anchors: '152' in "tag 152" is an
+    # identifier; '100' in "gain 100" is a VALUE. A number only anchors when
+    # the preceding content word is a namespace term (config
+    # structured_namespace_terms: tag/field/component) — the question's own
+    # grammar says "this number names a record" (AG-09).
+    _ns_terms = {str(t).lower() for t in _hints.get(
+        "structured_namespace_terms", [])}
+    _all_toks = re.findall(r"[a-z0-9]+", question.lower())
+
+    def _numeric_anchor_ok(w):
+        if re.search(r"[a-z]", w):
+            return True  # words always eligible
+        for _i, _t in enumerate(_all_toks):
+            if _t == w and _i > 0:
+                _prev = _all_toks[_i - 1]
+                if _prev in _ns_terms or _prev.rstrip("s") in _ns_terms:
+                    return True
+        return False
+
+    _t125_why = []
     for _w in _q_words:
+        if not _numeric_anchor_ok(_w):
+            continue
         for _col in available_collections:
             if _col in _tier1_hits:
                 continue
             # identifier COLUMN only — matching primary_name here routed xml
             # via 'check' -> CheckSum. Record keys are the anchor, not names.
+            # The prefix must end at a WORD BOUNDARY in the identifier:
+            # 'jpm' -> jpm_cfd_position anchors (boundary '_'), '152' ->
+            # identifier 152 anchors (end), but 'all' -> AllocAccount does
+            # NOT (the match continues into a letter) — quantifiers were
+            # junk-seating xml and evicting true anchors (AG-07/AG-09).
             _hit = _fetchall(
                 """SELECT 1 FROM chunks WHERE collection_name = %s
-                   AND identifier ILIKE %s LIMIT 1""",
-                (_col, _w + "%"))
+                   AND identifier ~* %s LIMIT 1""",
+                (_col, "^" + re.escape(_w) + "([^a-z0-9]|$)"))
             if _hit:
                 _tier1_hits.append(_col)
+                _t125_why.append(f"{_w}->{_col}")
 
-    # --- Tier 1.3 (VOCAB-01): rare-word vocabulary ownership. A (corrected)
-    # content word that exists in only 1-2 collections' own lexicons anchors
-    # those collections ('broadcast' lives in kb_docs + obsidian only;
-    # 'haloitsm' in kb_docs only). Pure data ownership, no similarity vote.
-    try:
-        for _w in dict.fromkeys(_q_words):  # preserve order, dedupe
-            if len(_w) < 4:
-                continue
-            _owners = _fetchall(
-                "SELECT DISTINCT collection FROM collection_vocab "
-                "WHERE word = %s LIMIT 4", (_w,))
-            _ownset = [r["collection"] for r in _owners
-                       if r["collection"] in available_collections]
-            if 0 < len(_ownset) <= 2:
-                for _c in _ownset:
-                    if _c not in _tier1_hits:
-                        _tier1_hits.append(_c)
-    except Exception:
-        pass
+    if DEBUG:
+        print(f"DEBUG tier hits after 1/1.25: {_tier1_hits} "
+              f"({_t125_why}) | q_words: {_q_words}")
 
     # --- Tier 1.2: the question NAMES a collection ("...in the recon file",
     # "which bbg fields...") — a token matching the collection's own name is
@@ -278,6 +292,32 @@ def select_collections(question: str, history: list, available_collections: list
                     _tier1_hits.append(_owner)
     except Exception:
         pass
+
+    # --- Tier 1.3 (VOCAB-01): rare-word vocabulary ownership. A (corrected)
+    # content word that exists in only 1-2 collections' own lexicons anchors
+    # those collections ('broadcast' lives in kb_docs + obsidian only;
+    # 'haloitsm' in kb_docs only). Pure data ownership, no similarity vote.
+    # Runs AFTER 1.2/1.2b: explicit anchors (the question NAMES a collection
+    # or a column) seat before soft vocabulary ownership — 'prime' seating
+    # kb+obsidian ahead of the named recon collection lost AG-07.
+    try:
+        for _w in dict.fromkeys(_q_words):  # preserve order, dedupe
+            if len(_w) < 4:
+                continue
+            _owners = _fetchall(
+                "SELECT DISTINCT collection FROM collection_vocab "
+                "WHERE word = %s LIMIT 4", (_w,))
+            _ownset = [r["collection"] for r in _owners
+                       if r["collection"] in available_collections]
+            if 0 < len(_ownset) <= 2:
+                for _c in _ownset:
+                    if _c not in _tier1_hits:
+                        _tier1_hits.append(_c)
+    except Exception:
+        pass
+
+    if DEBUG:
+        print(f"DEBUG tier hits after 1.2/1.2b/1.3: {_tier1_hits}")
 
     # Also add collections linked via confirmed cross-links (either direction —
     # links are edges, not arrows)
@@ -622,8 +662,13 @@ def run_parallel_queries(collections: list, question: str, single_item: bool = F
     # collection list, so it is inert if the data is ever reorganized.
     _primacy_displaced = None
     if best_col is not None and len(collections) > 1:
+        # PREFIX of the compact collection name, not substring: 'recon' names
+        # recon_assist_file; 'fields' does NOT name bbg_fields (AG-10 misfire
+        # — a generic trailing segment let an empty collection steal the
+        # headline from the real answer).
         _named = [c for c in collections
-                  if any(t in _re.sub(r"[^a-z0-9]", "", c.lower()) for t in _qtoks)]
+                  if any(_re.sub(r"[^a-z0-9]", "", c.lower()).startswith(t)
+                         for t in _qtoks)]
         if (len(_named) == 1 and best_col != _named[0]
                 and _is_empty_answer(results.get(_named[0], {}).get("result", ""))):
             _sc = _arb_score(best_col, collections.index(best_col))

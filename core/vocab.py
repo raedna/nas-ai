@@ -76,6 +76,10 @@ def correct_word(word: str, collection: str = None):
     w = str(word or "").lower()
     if not enabled or len(w) < 3:
         return w, False
+    # Letterless tokens (tag numbers, quantities: '152', '100') are never
+    # typos of words — "correcting" 152 -> 0.152 corrupted routing (MI-03).
+    if not re.search(r"[a-z]", w):
+        return w, False
     try:
         # Stopwords are absent from the vocabulary BY DESIGN (tsvector drops
         # them) — never "correct" them ('again' -> 'gain'). An empty tsvector
