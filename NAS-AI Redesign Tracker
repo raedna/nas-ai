@@ -603,6 +603,7 @@ to qwen3-vl-32b-instruct; "[SCHEMA LLM] using schema model" prints. UI config
 Save rewrote local_llm wholesale (would delete undisplayed keys like
 schema_model) — now merges. Gate: smoke_fix after re-ingest.
 
+<<<<<<< Updated upstream
 ## SPEED-01 steps 1-3 DONE (2026-07-11) — remote-first network cuts
 
 Context: user away from the NAS for ~a month; slow link is the NORMAL case.
@@ -626,3 +627,36 @@ with 644s/1013s outliers — link RTT multiplication + possible 32B residency.
 Step 4 (NOT started, config-gated, requires full eval): single shared intent
 call, contextualize+intent merge, fast_model (llama-3.2-3b) for
 rewrite/routing, streaming. PP-01-class cascades need their own look.
+=======
+## SPEED-01 step 4 DONE (2026-07-11) — chat avg 137s -> 26.6s
+
+Eval eval_run_20260711_032930: **Chat avg 26.6s / p95 47.8s / max 50.1s**
+(was 137s / 644s / 1013s); Ask 14.5s. Quality held — 18 of 20 answer diffs
+were synthesis phrasing, DL-05 Chat IMPROVED (leads with the record now).
+
+1. llm_detect_intent memoized per question (lock + capped cache; fallback
+   results never cached) — the 3 byte-identical per-collection calls -> 1.
+2. front_of_pipe(): ONE fast-model call replaces detect_chat_intent +
+   contextualize_query; deterministic short-circuits preserved; full fallback
+   to the two-call path on any failure. Config: local_llm.fast_model
+   (llama-3.2-3b-instruct); clearing the key reverts to default model.
+3. Config tab now edits schema_model + fast_model (empty = remove key).
+
+Incidents during rollout (both fixed):
+- The 3B echoed 'recon' as 'recent' in its "unchanged" standalone_query —
+  routing corrupted. Guard: is_followup=false forces standalone_query =
+  original question IN CODE. Lesson: never ask a model to copy what code can.
+- Setting fast_model ACTIVATED a dormant _fast_model() hook in
+  split_multi_item_question — the 3B silently answered is_multi=false and
+  MI-02/MI-03 lost their splits (fail-safe = silent no-split). Splitter
+  pinned to the default model with comment. Lesson: adding a config key can
+  change behavior wherever that key was already consumed — grep before set.
+- LM Studio "Only Keep Last JIT Loaded Model" was ON -> 14B/3B ping-pong
+  (35s front calls). Toggle OFF; 32GB holds 14B+3B+bge comfortably. 32B must
+  stay unloaded during chat.
+
+Multi-item questions pay ~+15s for the 14B split call (gate-passers only;
+everything else +0.0s). Remaining latency lives in per-collection spec
+extraction (~7s x 3, serialized) — future candidate, judgment-quality risk.
+SPEED-01 CLOSED for now: 5.2x avg, 20x max improvement, quality held.
+>>>>>>> Stashed changes

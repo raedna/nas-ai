@@ -69,12 +69,33 @@ def _matches_any_phrase(q: str, phrases: List[str]) -> bool:
             return True
     return False
 
+# SPEED-01: llm_detect_intent is question-only, but run_parallel_queries
+# calls it once PER ROUTED COLLECTION — three byte-identical LLM calls
+# serialized through LM Studio's single queue (~10-15s of pure duplication
+# per chat turn). Memoize per question; lock so concurrent threads wait for
+# the first computation instead of racing three copies.
+import threading as _threading
+_INTENT_CACHE: dict = {}
+_INTENT_LOCK = _threading.Lock()
+_INTENT_CACHE_MAX = 64
+
+
 def llm_detect_intent(question: str) -> Dict[str, str]:
     """
     Use LLaMA 8B to classify query intent and extract role/target.
     Replaces field_maps.json keyword matching for role detection.
     Falls back to detect_ask_intent if LLM unavailable.
+    Memoized per question (SPEED-01) — duplicate per-collection calls hit
+    the cache; the cache is process-local and capped.
     """
+    _key = str(question or "").strip().lower()
+    with _INTENT_LOCK:
+        if _key in _INTENT_CACHE:
+            return dict(_INTENT_CACHE[_key])
+        return _llm_detect_intent_uncached(question, _key)
+
+
+def _llm_detect_intent_uncached(question: str, _key: str) -> Dict[str, str]:
     try:
         from core.local_llm_client import call_local_llm_json
 
@@ -130,18 +151,23 @@ def llm_detect_intent(question: str) -> Dict[str, str]:
         if isinstance(result, dict) and "mode" in result:
             mode = result["mode"]
             if mode in {"answer", "discovery_list", "discovery_count", "comparison"}:
-                return {
+                _out = {
                     "mode": mode,
                     "reason": result.get("reason", "llm classification"),
                     "role": result.get("role") or None,
                     "target": result.get("target") or None,
                 }
+                if len(_INTENT_CACHE) >= _INTENT_CACHE_MAX:
+                    _INTENT_CACHE.clear()
+                _INTENT_CACHE[_key] = dict(_out)
+                return _out
 
     except Exception as e:
         import logging
         logging.getLogger(__name__).warning(f"LLM intent detection failed: {e}")
 
-    # Fallback to rule-based
+    # Fallback to rule-based — NOT cached (transient LLM failure must not
+    # pin a degraded classification for the cache lifetime).
     return detect_ask_intent(question)
 
 # ---------------------------------------------------------------------------

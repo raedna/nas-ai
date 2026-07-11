@@ -97,6 +97,17 @@ def _system_settings_section():
     llm_timeout = ui.number(
         "LLM timeout (seconds)", value=int(llm_cfg.get("timeout", 60)), min=10, max=300, step=10,
     ).props("outlined dense").classes("w-48")
+    llm_schema_model = ui.input(
+        "Schema model (ingestion)", value=llm_cfg.get("schema_model", ""),
+    ).props("outlined dense").classes("w-full max-w-xl")
+    ui.label("Bigger model for schema inference at ingest (e.g. qwen3-vl-32b-instruct). "
+             "Empty = use the default LLM model.").classes("text-xs text-gray-500 -mt-2 mb-1")
+    llm_fast_model = ui.input(
+        "Fast model (front-of-pipe)", value=llm_cfg.get("fast_model", ""),
+    ).props("outlined dense").classes("w-full max-w-xl")
+    ui.label("Small model for intent classification and follow-up rewriting "
+             "(e.g. llama-3.2-3b-instruct). Empty = use the default LLM model.").classes(
+        "text-xs text-gray-500 -mt-2 mb-1")
 
     ui.separator().classes("my-3")
     ui.label("Cross-Encoder Reranker").classes("text-lg font-bold")
@@ -143,6 +154,15 @@ def _system_settings_section():
             "model": llm_model.value,
             "timeout": int(llm_timeout.value),
         })
+        # Optional model overrides: empty input = remove the key (revert to
+        # the default model) — never save empty strings.
+        for _k, _v in (("schema_model", llm_schema_model.value),
+                       ("fast_model", llm_fast_model.value)):
+            _v = (_v or "").strip()
+            if _v:
+                _llm[_k] = _v
+            else:
+                _llm.pop(_k, None)
         nlp["local_llm"] = _llm
         _save_json(NLP_CONFIG_PATH, nlp)
 

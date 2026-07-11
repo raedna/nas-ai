@@ -3,7 +3,8 @@
     "base_url": "http://localhost:1234",
     "model": "qwen2.5-14b-instruct-1m",
     "timeout": 300,
-    "schema_model": "qwen3-vl-32b-instruct"
+    "schema_model": "qwen3-vl-32b-instruct",
+    "fast_model": "llama-3.2-3b-instruct"
   },
   "structured_planner": {
     "enabled": false,

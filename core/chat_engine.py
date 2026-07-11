@@ -847,7 +847,12 @@ def split_multi_item_question(question: str) -> list:
             system_prompt=system,
             user_prompt=f"Question: {question}",
             temperature=0.0,
-            model=_fast_model(),
+            # DEFAULT model, deliberately NOT _fast_model(): the 3B answers
+            # is_multi=false for real multi-item questions and the fail-safe
+            # makes that a SILENT no-split (MI-02/MI-03 regressed the moment
+            # the fast_model config key appeared). Split judgment is
+            # quality-critical; only clerical calls ride the fast model.
+            model=None,
             response_format=_MULTI_ITEM_FORMAT,
         )
     except Exception:
@@ -894,6 +899,106 @@ def run_multi_item_queries(sub_questions: list, collections: list) -> list:
             except Exception as e:
                 results[i] = {"result": f"Error: {e}", "related_sections": [], "collection": None}
     return results
+
+
+_FRONT_FORMAT = {
+    "type": "json_schema",
+    "json_schema": {
+        "name": "front_of_pipe",
+        "strict": True,
+        "schema": {
+            "type": "object",
+            "properties": {
+                "intent": {"type": "string", "enum": ["retrieval", "chat"]},
+                "is_followup": {"type": "boolean"},
+                "standalone_query": {"type": "string"},
+                "reason": {"type": "string"},
+            },
+            "required": ["intent", "is_followup", "standalone_query", "reason"],
+            "additionalProperties": False,
+        },
+    },
+}
+
+
+def front_of_pipe(question: str, history: list) -> dict:
+    """SPEED-01 step 4: ONE fast-model call replacing detect_chat_intent +
+    contextualize_query (two serialized 14B calls, ~11s of every turn).
+    Clerical work — chat-vs-retrieval classification and follow-up rewrite —
+    is easy; the judgment calls (spec extraction, rerank, synthesis) stay on
+    the default model. Deterministic short-circuits preserved from
+    contextualize_query; ANY failure falls back to the original two calls.
+
+    Returns {intent, is_followup, standalone_query, reason}.
+    """
+    recent = [m for m in (history or []) if m.get("role") in ("user", "assistant")]
+    _ctx_fixed = None
+    if not recent:
+        _ctx_fixed = {"is_followup": False, "standalone_query": question,
+                      "reason": "no history"}
+    elif _has_explicit_identifier(question):
+        _ctx_fixed = {"is_followup": False, "standalone_query": question,
+                      "reason": "self-contained (explicit identifier)"}
+
+    try:
+        _model = _fast_model()
+        hist_lines = []
+        for m in recent[-4:]:
+            content = (m.get("content") or "").strip().replace("\n", " ")[:220]
+            hist_lines.append(f"{m['role'].upper()}: {content}")
+        hist_text = "\n".join(hist_lines) or "(none)"
+
+        system = (
+            "You are the front stage of a knowledge assistant. Two decisions "
+            "about the user's LATEST message:\n\n"
+            "1. intent: 'chat' ONLY for greetings/small talk/thanks; "
+            "'retrieval' for anything asking about data, files, procedures, "
+            "records, or work topics. Default to 'retrieval'.\n\n"
+            "2. follow-up rewrite: DEFAULT to is_followup=false. Only set "
+            "is_followup=true when the latest message CANNOT be understood on "
+            "its own — a pronoun ('it', 'that'), elliptical form ('what about "
+            "X', 'the second one'), or missing subject. If the message names "
+            "its own subject it is standalone EVEN IF related to prior turns.\n"
+            "When is_followup=false: standalone_query MUST equal the latest "
+            "message UNCHANGED — never add qualifiers from earlier turns.\n"
+            "When is_followup=true: rewrite by pulling ONLY the missing "
+            "subject from previous turns.\n\n"
+            "Return ONLY JSON: {intent, is_followup, standalone_query, reason}."
+        )
+        user = f"Previous turns:\n{hist_text}\n\nLatest message: {question}"
+        result = call_local_llm_json(
+            system, user, temperature=0.0, model=_model,
+            response_format=_FRONT_FORMAT)
+        if (isinstance(result, dict)
+                and result.get("intent") in ("retrieval", "chat")
+                and isinstance(result.get("standalone_query"), str)
+                and result.get("standalone_query").strip()):
+            out = {"intent": result["intent"],
+                   "is_followup": bool(result.get("is_followup")),
+                   "standalone_query": result["standalone_query"].strip(),
+                   "reason": result.get("reason", "front_of_pipe")}
+            if _ctx_fixed is not None:
+                # deterministic contextualize verdict overrides the model's
+                out.update(_ctx_fixed)
+            if not out["is_followup"]:
+                # ENFORCED, not requested: a standalone question passes
+                # through verbatim. The 3B echoed 'recon' as 'recent' once —
+                # models may not be trusted to copy; code copies.
+                out["standalone_query"] = question
+            if DEBUG:
+                print(f"DEBUG front_of_pipe ({_model or 'default'}):", out)
+            return out
+    except Exception as _e:
+        if DEBUG:
+            print(f"DEBUG front_of_pipe failed ({type(_e).__name__}) — "
+                  "falling back to two-call path")
+
+    intent = detect_chat_intent(question, history)
+    ctx = contextualize_query(question, history)
+    return {"intent": intent.get("intent", "retrieval"),
+            "is_followup": ctx["is_followup"],
+            "standalone_query": ctx["standalone_query"],
+            "reason": ctx.get("reason", "fallback")}
 
 
 def contextualize_query(question: str, history: list) -> dict:
@@ -1152,11 +1257,13 @@ def chat_turn(question: str, history: list, available_collections: list) -> dict
             print(f"TIMER {stage}: {_marks[-1][1]:.1f}s total"
                   + (f" (+{_marks[-1][1] - _marks[-2][1]:.1f}s)" if len(_marks) > 1 else ""))
 
-    # Step 1: detect intent
-    intent = detect_chat_intent(question, history)
-    _mark("intent")
+    # Step 1 + 1b merged (SPEED-01 step 4): ONE fast-model call decides
+    # chat-vs-retrieval AND the follow-up rewrite (was two serialized 14B
+    # calls). Falls back to the original two-call path on any failure.
+    ctx = front_of_pipe(question, history)
+    _mark("front_of_pipe")
     print("DEBUG available_collections:", available_collections)
-    if intent["intent"] == "chat":
+    if ctx["intent"] == "chat":
         response = generate_conversational_response(question, history)
         return {
             "role": "assistant",
@@ -1166,11 +1273,6 @@ def chat_turn(question: str, history: list, available_collections: list) -> dict
             "related_sections": []
         }
 
-    # Step 1b: contextualize. Rewrite genuine follow-ups into a standalone query;
-    # leave new/standalone questions untouched. Only follow-ups get to see prior
-    # history downstream (prevents the previous topic polluting a new question).
-    ctx = contextualize_query(question, history)
-    _mark("contextualize")
     standalone_question = ctx["standalone_query"]
     effective_history = history if ctx["is_followup"] else []
     if DEBUG:
