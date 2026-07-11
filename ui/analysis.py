@@ -1199,11 +1199,11 @@ def render_analysis_panel():
                     "summary": (session.get("summary") or "")[:160],
                 })
 
-            session_options = {}
+            session_dropdown_options = {}
 
             for row in rows:
                 note = row.get("save_note") or "No note"
-                note_preview = note[:50] + "..." if len(note) > 50 else note
+                note_preview = note[:60] + "..." if len(note) > 60 else note
 
                 label = (
                     f"Session {row.get('id')} | "
@@ -1212,10 +1212,10 @@ def render_analysis_panel():
                     f"{row.get('warning_count') or 0} warnings"
                 )
 
-                session_options[label] = row.get("id")
+                session_dropdown_options[row.get("id")] = label
 
             selected_session_dropdown = ui.select(
-                options=session_options,
+                options=session_dropdown_options,
                 label="Saved Session",
                 with_input=True,
             ).props("outlined dense").classes("w-full q-mt-md")
@@ -1223,11 +1223,15 @@ def render_analysis_panel():
             def open_selected_session():
                 selected_rows = list(table.selected or [])
 
-                if len(selected_rows) != 1:
-                    ui.notify("Select one saved analysis first.", color="warning")
-                    return
+                session_id = None
 
-                session_id = selected_rows[0].get("id")
+                if len(selected_rows) == 1:
+                    session_id = selected_rows[0].get("id")
+                elif selected_session_dropdown.value:
+                    session_id = selected_session_dropdown.value
+                else:
+                    ui.notify("Select one saved analysis from the table or dropdown first.", color="warning")
+                    return
 
                 if not session_id:
                     ui.notify("Could not read selected session id.", color="negative")
