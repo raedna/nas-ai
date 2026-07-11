@@ -252,7 +252,8 @@ def select_collections(question: str, history: list, available_collections: list
     # Type) are not distinctive and never anchor. Name-class roles only.
     try:
         import json as _json2
-        _srows = _fetchall("SELECT collection_name, schema_json FROM schemas", ())
+        from core.schema_inference import get_all_schemas_cached
+        _srows = get_all_schemas_cached()  # SPEED-01: cached, invalidated on save
         _col_owners = {}
         for _sr in _srows:
             _s = _sr["schema_json"]

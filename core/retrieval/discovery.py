@@ -104,7 +104,7 @@ def _llm_detect_intent_uncached(question: str, _key: str) -> Dict[str, str]:
             "Classify the user query and extract structured search intent.\n\n"
             "Return only JSON with these fields:\n"
             "- mode: one of 'answer', 'discovery_list', 'discovery_count', 'comparison'\n"
-            "- reason: brief reason for the mode\n"
+            "- reason: brief reason for the mode, MAX 8 words\n"
             "- role: the payload field to search — one of 'primary_name', 'description', "
             "'identifier', 'type', 'enum_value', 'aliases', or null if not applicable\n"
             "- target: the specific value or substring to search for within that role field, "

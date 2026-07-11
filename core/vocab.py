@@ -56,12 +56,20 @@ def build_collection_vocab(collection: str) -> int:
 
 
 def _cfg():
+    """(enabled, min_similarity, min_similarity_short, short_len).
+    Short words need a HIGHER bar: at 4-5 chars a 0.75 sequence ratio admits
+    junk ('prime'->'price' 0.80, 'come'->'comm' 0.75, 'rerun'->'run' 0.75)
+    while real typo fixes in long words score well above it
+    ('brodcaster'->'broadcast' 0.84). Both bars in config."""
     try:
         from core.system_config import load_system_config
         c = load_system_config().get("vocab_correction", {})
-        return bool(c.get("enabled", True)), float(c.get("min_similarity", 0.75))
+        return (bool(c.get("enabled", True)),
+                float(c.get("min_similarity", 0.75)),
+                float(c.get("min_similarity_short", 0.85)),
+                int(c.get("short_word_len", 5)))
     except Exception:
-        return True, 0.75
+        return True, 0.75, 0.85, 5
 
 
 def correct_word(word: str, collection: str = None):
@@ -72,8 +80,10 @@ def correct_word(word: str, collection: str = None):
     scrambled letter destroys three trigrams; sequence ratio gives 0.84).
     Best candidate wins at ratio >= config min_similarity (default 0.75);
     ties broken by document frequency, then alphabetically."""
-    enabled, min_sim = _cfg()
+    enabled, min_sim, min_sim_short, short_len = _cfg()
     w = str(word or "").lower()
+    if len(w) <= short_len:
+        min_sim = min_sim_short
     if not enabled or len(w) < 3:
         return w, False
     # Letterless tokens (tag numbers, quantities: '152', '100') are never
@@ -131,7 +141,7 @@ def correct_words(words, collection: str = None):
     Semantics identical to correct_word; the per-word path remains as the
     fallback if batching fails.
     """
-    enabled, _min_sim = _cfg()
+    enabled = _cfg()[0]
     ws = [str(w or "").lower() for w in words]
     if not enabled or not ws:
         return list(ws), {}

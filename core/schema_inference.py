@@ -68,6 +68,33 @@ def ensure_schemas_table():
         print(f"[SCHEMA DB] Could not create schemas table: {e}")
 
 
+# --- SPEED-01: in-process schema cache -------------------------------------
+# The schemas table is read on EVERY routing call (Tier 1.2b) and every
+# metadata query — round-trip waste for data that only changes at ingest or
+# a manual save. Short TTL + explicit invalidation on save/delete.
+_SCHEMA_CACHE = {"rows": None, "ts": 0.0}
+_SCHEMA_CACHE_TTL = 60.0
+
+
+def get_all_schemas_cached():
+    """All schema rows [{collection_name, source_file_stem, schema_json}] — cached."""
+    import time as _t
+    if (_SCHEMA_CACHE["rows"] is not None
+            and _t.time() - _SCHEMA_CACHE["ts"] < _SCHEMA_CACHE_TTL):
+        return _SCHEMA_CACHE["rows"]
+    from core.db import fetchall as _fa
+    rows = _fa(
+        "SELECT collection_name, source_file_stem, schema_json FROM schemas", ())
+    _SCHEMA_CACHE["rows"] = rows
+    _SCHEMA_CACHE["ts"] = _t.time()
+    return rows
+
+
+def invalidate_schema_cache():
+    _SCHEMA_CACHE["rows"] = None
+    _SCHEMA_CACHE["ts"] = 0.0
+
+
 def save_schema_to_db(schema, collection_name, source_file_stem):
     """Save schema to PostgreSQL schemas table."""
     try:
@@ -79,6 +106,7 @@ def save_schema_to_db(schema, collection_name, source_file_stem):
             ON CONFLICT (collection_name, source_file_stem)
             DO UPDATE SET schema_json = EXCLUDED.schema_json, updated_at = NOW()
         """, (collection_name, source_file_stem, json.dumps(schema)))
+        invalidate_schema_cache()
         print(f"[SCHEMA DB] Saved schema for {collection_name}/{source_file_stem}")
         return True
     except Exception as e:
@@ -130,6 +158,7 @@ def delete_schema_from_db(collection_name, source_file_stem):
             DELETE FROM schemas
             WHERE collection_name = %s AND source_file_stem = %s
         """, (collection_name, source_file_stem))
+        invalidate_schema_cache()
         return True
     except Exception as e:
         print(f"[SCHEMA DB] Could not delete schema: {e}")

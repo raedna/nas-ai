@@ -660,3 +660,20 @@ everything else +0.0s). Remaining latency lives in per-collection spec
 extraction (~7s x 3, serialized) — future candidate, judgment-quality risk.
 SPEED-01 CLOSED for now: 5.2x avg, 20x max improvement, quality held.
 >>>>>>> Stashed changes
+
+## SPEED-01 FINAL + vocab bar (2026-07-11 pm)
+
+- Vocab length-aware bar (min_similarity_short 0.85, <=5 chars): junk
+  corrections gone ('prime'->'price', 'rerun'->'run'), real fixes intact;
+  parity PASS 180/0.
+- Reason fields capped at 8 words in spec/intent prompts (post-answer
+  decoration, pure decode cost). AG re-run: 10/10 EXACT both surfaces,
+  chat avg 21.5s / max 29.1s (SPEED-01 started at 137s avg / 1013s max).
+- [LLM TIMER] per-call instrumentation permanent.
+- Incident: branch switch (fix-ui-redesign) silently reverted uncommitted
+  working-tree edits; audit found ONE casualty (schema cache) — reapplied.
+  Rule going forward: commit main before touching branches; test on main.
+- Apple Silicon note: Max Concurrent Predictions time-slices one GPU —
+  concurrency is NOT free throughput; call-count and decode-length cuts are.
+
+NEXT: memory & learning (chat layer) — per user roadmap, CTM parked.

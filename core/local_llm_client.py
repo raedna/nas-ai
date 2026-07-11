@@ -56,6 +56,8 @@ def call_local_llm_json(system_prompt, user_prompt, temperature=0.0,
         payload["response_format"] = response_format
 
     try:
+        import time as _time
+        _t0 = _time.perf_counter()
         response = requests.post(
             url,
             json=payload,
@@ -64,6 +66,12 @@ def call_local_llm_json(system_prompt, user_prompt, temperature=0.0,
         response.raise_for_status()
         data = response.json()
         content = data["choices"][0]["message"]["content"]
+        # SPEED-01 instrumentation: every LLM call's model, duration, and
+        # prompt size — the call inventory that decides what to cut next.
+        _dur = _time.perf_counter() - _t0
+        _plen = len(system_prompt or "") + len(user_prompt or "")
+        print(f"[LLM TIMER] {payload['model']} {_dur:.1f}s "
+              f"(prompt {_plen} chars)")
         return _parse_json_response(content)
     except Exception as e:
         # Never fail silently — callers treat None as "LLM unavailable" and

@@ -105,8 +105,9 @@ def _collection_schema(collection: str) -> Dict:
     stem is the file name, and multi-file collections entirely."""
     merged: Dict[str, list] = {}
     try:
-        rows = fetchall(
-            "SELECT schema_json FROM schemas WHERE collection_name = %s", (collection,))
+        from core.schema_inference import get_all_schemas_cached
+        rows = [r for r in get_all_schemas_cached()
+                if r["collection_name"] == collection]
         import json as _json
         merged["_schema_count"] = len(rows)
         for r in rows:
@@ -157,7 +158,7 @@ def _extract_spec(question: str, collection: str, fields: set, field_values: Dic
         "or null for plain row counts\n"
         "- filters: list of {field, op, value} where op is 'equals' or 'contains'; "
         "field must be from the allowed list; empty list if no filter\n"
-        "- reason: brief\n\n"
+        "- reason: brief, MAX 8 words\n\n"
         "Rules:\n"
         "- 'how many X' counting records -> operation=count_distinct, target_field=identifier "
         "(the unique key). Only use another field when the question asks to count "
