@@ -303,8 +303,8 @@ def render_analysis_panel():
 
     with context_area:
         save_note_input = ui.textarea(
-            label="Save note / reason",
-            placeholder="Example: related to the CFD issue with Citi",
+            label="Save note / reason *",
+            placeholder="Required. Example: 76250 - CFD Issue Citi batch 13",
         ).props("outlined autogrow").classes("w-full")
 
     async def handle_analysis_upload(e, target_box=None):
@@ -857,6 +857,8 @@ def render_analysis_panel():
                     render_related_saved_matches(result)
 
                     def save_current_sequence_result():
+                        save_note = (save_note_input.value or "").strip()
+                        
                         debug_print("=== SAVE CLICKED ===")
                         debug_print("analysis mode:", "Multi-Message Sequence")
                         debug_print("result input_type:", result.get("input_type"))
@@ -871,12 +873,16 @@ def render_analysis_panel():
                                 str(msg.get("raw_text") or "")[:120],
                             )
 
+                        if not save_note:
+                            ui.notify("Save note is required before saving the analysis.", color="warning")
+                            return
+
                         session_id, created = save_fix_analysis_result(
                             result,
                             analysis_mode="Multi-Message Sequence",
                             source_type="ui",
                             source_name="Analysis tab",
-                            save_note=save_note_input.value or "",
+                            save_note=save_note,
                         )
 
                         if created:
@@ -1129,12 +1135,18 @@ def render_analysis_panel():
                 ).classes("w-full max-h-96 overflow-auto")
 
                 def save_current_single_result():
+                    save_note = (save_note_input.value or "").strip()
+
+                    if not save_note:
+                        ui.notify("Save note is required before saving the analysis.", color="warning")
+                        return
+
                     session_id, created = save_fix_analysis_result(
                         result,
                         analysis_mode="Single Message",
                         source_type="ui",
                         source_name="Analysis tab",
-                        save_note=save_note_input.value or "",
+                        save_note=save_note,
                     )
 
                     if created:
@@ -1187,6 +1199,26 @@ def render_analysis_panel():
                     "summary": (session.get("summary") or "")[:160],
                 })
 
+            session_options = {}
+
+            for row in rows:
+                note = row.get("save_note") or "No note"
+                note_preview = note[:50] + "..." if len(note) > 50 else note
+
+                label = (
+                    f"Session {row.get('id')} | "
+                    f"{note_preview} | "
+                    f"{row.get('message_count') or 0} msgs | "
+                    f"{row.get('warning_count') or 0} warnings"
+                )
+
+                session_options[label] = row.get("id")
+
+            selected_session_dropdown = ui.select(
+                options=session_options,
+                label="Saved Session",
+                with_input=True,
+            ).props("outlined dense").classes("w-full q-mt-md")
 
             def open_selected_session():
                 selected_rows = list(table.selected or [])
