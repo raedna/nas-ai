@@ -215,50 +215,97 @@ def render_analysis_panel():
     </style>
     """)
 
+    MAX_COMPARE_MESSAGES = 10
+
+    # --- FIX UI REDESIGN WORKSPACE SKELETON ---
+    with ui.row().classes("w-full no-wrap items-start"):
+
+        # 1. CONTROL SECTION
+        with ui.column().classes("q-pa-md bg-grey-2").style(
+            "width: 260px; min-width: 260px; position: sticky; top: 0; height: 100vh; overflow-y: auto;"
+        ):
+            ui.label("FIX Workspace").classes("text-xl font-bold")
+            ui.label(f"Compare basket: up to {MAX_COMPARE_MESSAGES} messages").classes(
+                "text-xs text-grey-7"
+            )
+            ui.separator().classes("q-my-md")
+
+            ui.label("Control").classes("text-md font-semibold")
+            control_area = ui.column().classes("w-full q-gutter-sm")
+
+        # Main workspace
+        with ui.column().classes("w-full q-pa-md"):
+
+            # 2. CONTEXT / SELECTION SECTION
+            with ui.card().classes("w-full q-pa-md q-mb-md"):
+                ui.label("Context / Selection").classes("text-lg font-semibold")
+                ui.label(
+                    "Saved sessions, message selector, Message A/B, and comparison basket will move here."
+                ).classes("text-sm text-grey-7")
+                context_area = ui.column().classes("w-full q-mt-md")
+
+            # 3. WORKING WINDOWS SECTION
+            with ui.card().classes("w-full q-pa-md q-mb-md"):
+                ui.label("Working Windows").classes("text-lg font-semibold")
+                ui.label(
+                    "Raw input, decoded tags, selected tag details, and message windows will move here."
+                ).classes("text-sm text-grey-7")
+                working_area = ui.column().classes("w-full q-mt-md")
+
+            # 4. INFO / REPORTING SECTION
+            with ui.card().classes("w-full q-pa-md q-mb-md"):
+                ui.label("Info / Reporting").classes("text-lg font-semibold")
+                ui.label(
+                    "Analysis output, warnings, insights, related messages, and future Ask integration will move here."
+                ).classes("text-sm text-grey-7")
+                reporting_area = ui.column().classes("w-full q-mt-md")
+
+    result_area = working_area
+    saved_area = context_area
+
     ui.label("Analysis Engine").classes("text-xl font-bold mb-2")
-    ui.label(
-        "Paste FIX text below, upload an image/PDF, or paste a screenshot into the screenshot box. "
-        "Extracted text will appear in the input box for review before analysis."
-    ).classes("text-sm text-gray-500 mb-4")
+    with control_area:
+        analyzer_select = ui.select(
+            options=["FIX Message"],
+            value="FIX Message",
+            label="Analyzer",
+        ).props("outlined dense").classes("w-full")
 
-    analyzer_select = ui.select(
-        options=["FIX Message"],
-        value="FIX Message",
-        label="Analyzer",
-    ).props("outlined").classes("w-64")
+        analysis_mode = ui.select(
+            ["Single Message", "Compare Messages", "Multi-Message Sequence"],
+            value="Single Message",
+            label="Analysis Mode",
+        ).props("outlined dense").classes("w-full")
 
-    analysis_mode = ui.select(
-        ["Single Message", "Compare Messages", "Multi-Message Sequence"],
-        value="Single Message",
-        label="Analysis Mode",
-    )
 
-    raw_input = ui.textarea(
-        label="FIX message(s) / extracted OCR text",
-        placeholder="Paste one FIX message, multiple FIX messages, OCR text, or upload image/PDF...",
-    ).props("outlined").classes("w-full mt-4 analysis-fix-input max-h-64 overflow-auto")
+    with working_area:
+        ui.label(
+            "Paste FIX text below, upload an image/PDF, or paste a screenshot into the screenshot box. "
+            "Extracted text will appear in the input box for review before analysis."
+        ).classes("text-sm text-gray-500 mb-4")
 
-    ui.label(
-        "For Multi-Message Sequence, paste or OCR multiple FIX messages into this same box."
-    ).classes("text-xs text-grey-7")
+        raw_input = ui.textarea(
+            label="FIX message(s) / extracted OCR text",
+            placeholder="Paste one FIX message, multiple FIX messages, OCR text, or upload image/PDF...",
+        ).props("outlined").classes("w-full mt-4 analysis-fix-input max-h-64 overflow-auto")
 
-    compare_input_box = ui.textarea(
-        label="Message B / Compare Against",
-        placeholder="Paste the second FIX message here for comparison...",
-    ).classes("w-full")
+        ui.label(
+            "For Multi-Message Sequence, paste or OCR multiple FIX messages into this same box."
+        ).classes("text-xs text-grey-7")
 
-    compare_input_box.visible = False
+        compare_input_box = ui.textarea(
+            label="Message B / Compare Against",
+            placeholder="Paste the second FIX message here for comparison...",
+        ).props("outlined").classes("w-full mt-4")
 
-    result_area = ui.column().classes("w-full mt-4")
+        compare_input_box.visible = False
 
-    save_note_input = ui.textarea(
-        label="Save note / reason",
-        placeholder="Example: related to the CFD issue with Citi",
-    ).props("outlined autogrow").classes("w-full mt-4")
 
-    saved_area = ui.column().classes("w-full mt-4")
-
-    saved_compare_selection = []
+    with context_area:
+        save_note_input = ui.textarea(
+            label="Save note / reason",
+            placeholder="Example: related to the CFD issue with Citi",
+        ).props("outlined autogrow").classes("w-full")
 
     async def handle_analysis_upload(e, target_box=None):
         print("=== ANALYSIS UPLOAD CALLED ===", flush=True)
@@ -1543,10 +1590,12 @@ def render_analysis_panel():
                 pagination=10,
             ).classes("w-full")
 
-    with ui.row().classes("mt-3 gap-2"):
-        ui.button("Analyze", on_click=run_analysis).props("color=primary")
-        ui.button("Refresh Saved Analyses", on_click=refresh_saved_analyses).props("outline")
-        ui.button("Clear", on_click=clear_analysis).props("outline color=secondary")
+        with control_area:
+            ui.separator().classes("q-my-md")
+
+            ui.button("Analyze", on_click=run_analysis).props("color=primary").classes("w-full")
+            ui.button("Refresh Saved Analyses", on_click=refresh_saved_analyses).props("outline").classes("w-full")
+            ui.button("Clear", on_click=clear_analysis).props("outline color=secondary").classes("w-full")
 
     refresh_saved_analyses()
 
