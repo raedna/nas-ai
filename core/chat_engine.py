@@ -1253,7 +1253,8 @@ def _answer_multi_item(sub_questions: list, collections: list) -> dict:
     }
 
 
-def chat_turn(question: str, history: list, available_collections: list) -> dict:
+def chat_turn(question: str, history: list, available_collections: list,
+              session_id=None) -> dict:
     """
     Process one chat turn. Returns:
     {
@@ -1273,6 +1274,28 @@ def chat_turn(question: str, history: list, available_collections: list) -> dict
         if DEBUG:
             print(f"TIMER {stage}: {_marks[-1][1]:.1f}s total"
                   + (f" (+{_marks[-1][1] - _marks[-2][1]:.1f}s)" if len(_marks) > 1 else ""))
+
+    # Step 0 (Memory M2): deterministic capture gate — config-listed
+    # triggers ("remember that ..."), no LLM decides what enters memory.
+    try:
+        from core.memory_store import match_memory_command, remember
+        _fact = match_memory_command(question)
+    except Exception:
+        _fact = None
+    if _fact:
+        _ctx_q = None
+        for _m in reversed(history or []):
+            if _m.get("role") == "user" and _m.get("content") != question:
+                _ctx_q = _m.get("content")
+                break
+        remember(_fact, session_id=session_id, context_question=_ctx_q)
+        return {
+            "role": "assistant",
+            "content": f"Noted — I'll remember that: {_fact}",
+            "method": "memory_capture",
+            "collection": "memory",
+            "related_sections": [],
+        }
 
     # Step 1 + 1b merged (SPEED-01 step 4): ONE fast-model call decides
     # chat-vs-retrieval AND the follow-up rewrite (was two serialized 14B
@@ -1355,6 +1378,16 @@ def chat_turn(question: str, history: list, available_collections: list) -> dict
         doc_types = {r['dt'] for r in rows if r['dt']}
         return doc_types == {'structured'} or doc_types == {'structured', None}
 
+    # Memory M2: notes linked to this answer NEVER enter the merge/related
+    # machinery — they compose verbatim below the answer ("From memory:"),
+    # provenance intact, regardless of confidence. Without this carve-out the
+    # >=0.80 "merge" bucket swallowed them silently (text merge was removed
+    # in the retrieval rework; only image payloads still merge).
+    _memory_sections = [s for s in all_related
+                        if s.get("collection") == "memory"]
+    all_related = [s for s in all_related
+                   if s.get("collection") != "memory"]
+
     high_confidence = [
         s for s in all_related
         if s.get("confidence", 0) >= RELATED_MERGE_THRESHOLD
@@ -1434,6 +1467,14 @@ def chat_turn(question: str, history: list, available_collections: list) -> dict
             if _sec["collection"] != collection:
                 response = (str(response) + f"\n\n---\n**From {_sec['collection']}:**\n\n"
                             + _sec["answer"][:1500])
+    # Memory notes compose verbatim — the user's own words with their date
+    # line, never paraphrased, visible whether they agree with the data or
+    # contradict it (the conflict shows itself; the data stays the record).
+    for _ms in _memory_sections[:2]:
+        _note = str(_ms.get("preview") or _ms.get("title") or "").strip()
+        if _note and _note[:80] not in str(response):
+            response = (str(response) + "\n\n---\n**From memory:**\n\n"
+                        + _note[:600])
     # Step 1 (retrieval-quality rework): related previews are NO LONGER appended into
     # the answer body — that was concatenating whole, often unrelated, articles.
 

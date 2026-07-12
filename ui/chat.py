@@ -37,7 +37,8 @@ def render_chat_panel():
 
     log = ui.column().classes("w-full gap-2 mt-2")
 
-    with ui.row().classes("w-full items-center gap-2"):
+    with ui.row().classes(
+            "w-full items-center gap-2 sticky bottom-0 bg-white z-10 py-2"):
         msg = ui.input(placeholder="Ask anything…").props("outlined dense clearable").classes("flex-grow")
         send = ui.button("Send").props("unelevated")
 
@@ -111,13 +112,17 @@ def render_chat_panel():
         add_message(state["session_id"], "user", text)
         set_title_from_first_question(state["session_id"], text)
 
-        avail = [c for c in (coll.value or [])] or names
+        # Refresh per send: a collection created MID-SESSION (the first
+        # memory) must be routable on the very next question.
+        _names_now = [r["name"] for r in collection_stats() if r["chunks"]]
+        avail = [c for c in (coll.value or [])] or _names_now
         with log:
             card = ui.card().classes("w-full")
             with card:
                 ui.spinner()
 
-        fn = partial(chat_turn, text, list(history), avail)
+        fn = partial(chat_turn, text, list(history), avail,
+                     session_id=state["session_id"])
         try:
             resp = await run.io_bound(fn)
         except Exception as exc:
@@ -151,6 +156,15 @@ def render_chat_panel():
             if isinstance(resp, dict) and resp.get("collection"):
                 ui.label(f"Source: {resp['collection']} · {resp.get('method', '')}").classes(
                     "text-xs text-gray-500 mt-1")
+            if isinstance(resp, dict) and resp.get("method") != "memory_capture":
+                def _remember_answer(q=text, a=content):
+                    from core.memory_store import remember
+                    remember(f"Q: {q}\nA: {a[:500]}",
+                             session_id=state["session_id"],
+                             context_question=q, origin="button")
+                    ui.notify("Saved to memory", type="positive")
+                ui.button("Remember this", on_click=_remember_answer).props(
+                    "flat dense size=sm icon=bookmark_add").classes("mt-1")
             for s in (resp.get("related_sections") if isinstance(resp, dict) else []) or []:
                 label = (f"[{s.get('collection')}] {s.get('title')} · "
                          f"{s.get('match_type')} {float(s.get('confidence') or 0):.2f}")

@@ -724,3 +724,39 @@ to persisted message rows.
 NEXT: M2 design — the `memory` collection (remembered facts as chunks in the
 standard pipeline: routing/vocab/arbitration for free, answers visibly
 sourced "From memory (you told me on <date>)").
+
+## Memory M2 core loop DONE (2026-07-13) — capture, collection, compose
+
+Full loop verified: "ok, remember that the gsact.txt file arrives at 6 AM ET"
+-> instant capture (deterministic config triggers + filler stripping, no LLM
+gate) -> memory chunk with provenance in text -> NER edge to the gsact record
+(auto-confirmed at filename confidence) -> "From memory:" block composed
+verbatim under every gsact answer. Eval 20260713_002011 caught it live under
+DL-02. Remember-this button on answer cards (origin=button).
+
+Five stacked bugs excavated on the way, two of them system-wide:
+1. Chat tab computed collections once per page render — mid-session
+   collections unroutable (now refreshed per send).
+2. Memory payload lacked identifier/source_file keys the NER scanner reads.
+3. **generic_terms held 139 corpus identifiers** (gsact.txt, citi files, tag
+   numbers, chunk ids) from some old link-noise fix — NER structurally blind
+   to the most important terms EVERYWHERE. Cleaned to 19 true generics
+   (removed list archived: config/generic_terms_removed_20260713.json).
+   Gazetteer also now reads COLUMN identifiers (payload as fallback).
+4. NER edges are 'candidate' until KG review; memory filename edges now
+   auto-confirm (user's own assertion + unambiguous match).
+5. **Related sections >=0.80 confidence vanish in chat**: the "merge into
+   answer" text path was removed in the retrieval rework, only image payloads
+   still merge — high-confidence sections went nowhere. Memory now bypasses
+   via its own verbatim compose. NOTE: non-memory high-confidence TEXT
+   sections still vanish — open item RELATED-01.
+
+Eval vs baseline: no regressions (18/21 diffs = phrasing), PP-01 Chat
+improved (names both Goldman jobs), NA-04 Ask honest 0-match instead of the
+200-row _merged_fields dump (raw dict rendering = cosmetic item). Chat avg
+23.4s / Ask 11.2s — best full-suite numbers yet.
+
+M2 remaining: Memories management page (list/forget UI over
+memory_store.list_memories/forget), explicit conflict nudge ("consider
+updating <source_file>") when memory contradicts a corpus value, RELATED-01.
+Then M3 preferences / M4 feedback learning.

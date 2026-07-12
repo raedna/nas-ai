@@ -41,9 +41,12 @@ def build_gazetteer(target_collections, generic):
     gaz = {}
     import json as _json
     for col in target_collections:
+        # COLUMNS first, payload as fallback — payload->>'identifier' is not
+        # reliably populated (recon rows carry it only in the column, which
+        # left gsact.txt out of the gazetteer entirely).
         rows = fetchall("""
-            SELECT DISTINCT payload->>'identifier' AS identifier,
-                   payload->>'primary_name' AS primary_name,
+            SELECT DISTINCT COALESCE(identifier, payload->>'identifier') AS identifier,
+                   COALESCE(primary_name, payload->>'primary_name') AS primary_name,
                    payload->>'aliases' AS aliases
             FROM chunks WHERE collection_name = %s
         """, (col,))
