@@ -677,3 +677,50 @@ SPEED-01 CLOSED for now: 5.2x avg, 20x max improvement, quality held.
   concurrency is NOT free throughput; call-count and decode-length cuts are.
 
 NEXT: memory & learning (chat layer) — per user roadmap, CTM parked.
+
+## Remote migration (2026-07-12) — local Postgres on the Mac
+
+User away from NAS ~1 month; Tailscale RTT measured 335ms avg (vs ~ms at
+home) — round-trip multiplication made even the batched pipeline crawl
+(routing 44s) and UI startup painful. Fix: full pg_dump from NAS ->
+Homebrew postgresql@17 + pgvector on the Mac, config repointed to
+localhost:5432. All 11 collections verified by chunk counts.
+
+Result: routing 0.1s, goldman question 11.9s total warm — fastest ever
+recorded (fewer round trips than home NAS ever gave).
+
+RULES FOR THE MONTH:
+- ALL writes (ingest, schema edits) go to the Mac copy; NAS copy is FROZEN.
+- On return: pg_dump Mac -> NAS (reverse direction), or promote the Mac
+  copy permanently and keep NAS as backup.
+- 32B unloaded except during ingest; LM Studio 'Only Keep Last JIT Loaded
+  Model' stays OFF (14B+3B resident).
+
+NEXT: memory & learning design (chat layer) — what to remember (corrections
+/ preferences / feedback-weighted retrieval), storage (same PostgreSQL),
+and how learning feeds answers without breaking groundedness guarantees.
+
+## Memory M1 DONE (2026-07-13) — persistent chat sessions
+
+chat_sessions/chat_messages in PostgreSQL (core/chat_store.py); Chat tab:
+session dropdown (title = first question), New chat/Delete, resume most
+recent on open, every turn persisted as it happens. Verified: browser
+refresh + UI restart + session switching + follow-up on resumed history.
+
+Bugs caught by testing:
+- create_session INSERTed via fetchall (read helper, no COMMIT) — row rolled
+  back, FK violations on first message. Explicit-commit connection.
+- 3B follow-up rewrite NO-OP: is_followup=true but 'it' left unresolved —
+  pipeline ran subject-less, generic runbook beat the gsact record. Guard:
+  rewrite that equals the original escalates that one call to the 14B
+  (contextualize_query's dormant _fast_model hook also disarmed — THIRD
+  place the fast_model config key silently activated). Verified: 'what tidal
+  job pulls it?' -> 14B rewrite with gsact.txt -> exact-key record answer.
+- ui/app.py: NASAI_PORT env override for parallel worktree UIs.
+
+M1 is the substrate for M2-M4: facts cite (session, date); feedback attaches
+to persisted message rows.
+
+NEXT: M2 design — the `memory` collection (remembered facts as chunks in the
+standard pipeline: routing/vocab/arbitration for free, answers visibly
+sourced "From memory (you told me on <date>)").

@@ -986,6 +986,19 @@ def front_of_pipe(question: str, history: list) -> dict:
                 # through verbatim. The 3B echoed 'recon' as 'recent' once —
                 # models may not be trusted to copy; code copies.
                 out["standalone_query"] = question
+            else:
+                # A claimed follow-up whose "rewrite" equals the original is
+                # a FAILED rewrite (the 3B kept 'it' unresolved and the whole
+                # pipeline ran subject-less). Escalate this one call to the
+                # default model — follow-ups are the only case where rewrite
+                # quality decides the answer.
+                import re as _re_fp
+                _n = lambda t: _re_fp.sub(r"[^a-z0-9]+", " ", str(t).lower()).strip()
+                if _n(out["standalone_query"]) == _n(question):
+                    ctx2 = contextualize_query(question, history)
+                    out["is_followup"] = ctx2["is_followup"]
+                    out["standalone_query"] = ctx2["standalone_query"]
+                    out["reason"] = "escalated: fast rewrite was a no-op"
             if DEBUG:
                 print(f"DEBUG front_of_pipe ({_model or 'default'}):", out)
             return out
@@ -1055,7 +1068,10 @@ def contextualize_query(question: str, history: list) -> dict:
     try:
         result = call_local_llm_json(
             system_prompt=system, user_prompt=user, temperature=0.0,
-            model=_fast_model(), response_format=_CONTEXTUALIZE_FORMAT,
+            # DEFAULT model, deliberately NOT _fast_model(): this is now the
+            # ESCALATION path for follow-up rewrites the 3B fumbled (returned
+            # 'it' unresolved) — same dormant-hook trap as the splitter.
+            model=None, response_format=_CONTEXTUALIZE_FORMAT,
         )
     except Exception:
         result = None

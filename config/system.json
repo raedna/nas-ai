@@ -1,8 +1,8 @@
 {
   "qdrant_url": "http://100.123.16.57:6333",
   "pgvector": {
-    "host": "100.123.16.57",
-    "port": 5433,
+    "host": "localhost",
+    "port": 5432,
     "dbname": "nasai",
     "user": "nasai",
     "password": "nasai2024"
