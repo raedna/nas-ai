@@ -84,5 +84,5 @@ def index():
 # storage_secret enables app.storage.user (signed cookie).
 # reconnect_timeout is generous so briefly switching away from the tab doesn't
 # trigger a full page reload when the websocket reconnects.
-ui.run(title="NAS AI", port=8080, reload=False, show=True,
+ui.run(title="NAS AI", port=8081, reload=False, show=True,
        storage_secret="nas-ai-local-ui", reconnect_timeout=600)
