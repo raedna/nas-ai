@@ -91,7 +91,7 @@ QUESTIONS = [
 ]
 
 
-def _trunc(text, n=500):
+def _trunc(text, n=1500):  # long enough that content audits are exact, not windowed
     t = " ".join(str(text or "").split())
     return t[:n] + ("…" if len(t) > n else "")
 

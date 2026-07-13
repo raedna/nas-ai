@@ -60,6 +60,11 @@ def render_ask_panel():
             return
 
         result = resp.get("result") if isinstance(resp, dict) else resp
+        # Discovery/analytics results are dicts ({total_matches, results}) —
+        # render the human listing, never the raw dict repr (NA-04 Ask).
+        if not isinstance(result, str):
+            from core.chat_engine import _result_to_text
+            result = _result_to_text(result)
         meta.text = f"method: {resp.get('method', '?')}" if isinstance(resp, dict) else ""
         payload = resp.get("answer_payload") if isinstance(resp, dict) else None
 

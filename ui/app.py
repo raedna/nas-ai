@@ -25,12 +25,13 @@ from ui.analysis import render_analysis_panel
 from ui.validation import render_validation_panel  # noqa: E402
 from ui.system_config import render_system_config_panel  # noqa: E402
 from ui.data_prep import render_data_prep_panel  # noqa: E402
+from ui.memories import render_memories_panel  # noqa: E402
 from ui import entry_page  # noqa: E402,F401  (registers the /entry/{chunk_id} full-article page)
 
 # Tab order — query tabs first, admin next, debug/remaining after.
 TABS = [
-    "Collections", "Ask", "Chat", "Analysis", "Ingestion", "Knowledge Graph", "Validation",
-    "SQL Inspector", "System Config", "Data Prep", "Debug",
+    "Collections", "Ask", "Chat", "Memories", "Analysis", "Ingestion", "Knowledge Graph",
+    "Validation", "SQL Inspector", "System Config", "Data Prep", "Debug",
 ]
 
 
@@ -61,6 +62,8 @@ def index():
                     render_ask_panel()
                 elif name == "Chat":
                     render_chat_panel()
+                elif name == "Memories":
+                    render_memories_panel()
                 elif name == "Analysis":
                     render_analysis_panel()
                 elif name == "Ingestion":

@@ -760,3 +760,30 @@ M2 remaining: Memories management page (list/forget UI over
 memory_store.list_memories/forget), explicit conflict nudge ("consider
 updating <source_file>") when memory contradicts a corpus value, RELATED-01.
 Then M3 preferences / M4 feedback learning.
+
+## M2 polish + statement capture DONE (2026-07-13)
+
+Verified end-to-end without manual SQL: "remember that THE FILE comes in at
+5 AM Eastern" (subject unresolved, mid-conversation) -> resolved to gsact.txt
+-> auto-confirmed edge -> composed under the very next answer, no refresh.
+
+- Memories tab (list with provenance, Forget per note; forget() now deletes
+  the note's cross-links too — dangling confirmed edges pointed at deleted
+  chunks).
+- Statement intent: declaratives without trigger words are captured
+  ("that file comes in at 4 AM..."); deterministic guards ('?' or
+  interrogative lead word never a statement), retrieval remains default.
+- resolve_fact(): dedicated 14B resolver for to-be-remembered facts with a
+  TOKEN-PRESERVATION guard — every content token of the original must
+  survive; violations store the original verbatim. Born from two incidents:
+  the 3B reduced a statement to 'that file'; the question-shaped
+  contextualizer rewrote a fact into the PREVIOUS QUESTION and we memorized
+  a question as truth. Rule now global: models classify, models suggest —
+  but nothing enters permanent memory without passing a deterministic gate.
+- Auto-confirm matched 'candidate'; edges are saved as 'pending_review' —
+  never fired (manual SQL had masked it). Now matches both.
+- Cosmetics: Ask renders discovery dicts as listings (NA-04); eval stores
+  1500 chars.
+
+M2 COMPLETE. Remaining in memory arc: conflict nudge ("consider updating
+<source_file>"), RELATED-01, then M3 preferences / M4 feedback learning.

@@ -139,7 +139,8 @@ def remember(fact: str, session_id=None, context_question: str = None,
         # requiring KG review here would hide the note from the very answers
         # it annotates. Low-confidence (code-term) edges still await review.
         execute("""UPDATE cross_links SET status = 'confirmed'
-                   WHERE source_collection = %s AND status = 'candidate'
+                   WHERE source_collection = %s
+                   AND status IN ('candidate', 'pending_review')
                    AND confidence >= 0.85""", (MEMORY_COLLECTION,))
     except Exception as e:
         print(f"[MEMORY] cross-link scan failed: {e}")
@@ -164,4 +165,10 @@ def forget(identifier: str) -> int:
         (MEMORY_COLLECTION, identifier))
     execute("DELETE FROM chunks WHERE collection_name = %s AND identifier = %s",
             (MEMORY_COLLECTION, identifier))
+    # A forgotten note's edges must go with it — dangling confirmed links
+    # point the related-section builder at a chunk that no longer exists.
+    execute("""DELETE FROM cross_links
+               WHERE (source_collection = %s AND source_identifier = %s)
+               OR (target_collection = %s AND target_identifier = %s)""",
+            (MEMORY_COLLECTION, identifier, MEMORY_COLLECTION, identifier))
     return rows[0]["n"] if rows else 0

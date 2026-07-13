@@ -910,7 +910,8 @@ _FRONT_FORMAT = {
         "schema": {
             "type": "object",
             "properties": {
-                "intent": {"type": "string", "enum": ["retrieval", "chat"]},
+                "intent": {"type": "string",
+                           "enum": ["retrieval", "chat", "statement"]},
                 "is_followup": {"type": "boolean"},
                 "standalone_query": {"type": "string"},
                 "reason": {"type": "string"},
@@ -953,8 +954,12 @@ def front_of_pipe(question: str, history: list) -> dict:
             "You are the front stage of a knowledge assistant. Two decisions "
             "about the user's LATEST message:\n\n"
             "1. intent: 'chat' ONLY for greetings/small talk/thanks; "
+            "'statement' when the user is TELLING a fact, not asking — a "
+            "declarative sentence stating how something is ('the X file "
+            "comes at 4 AM', 'the vendor changed the layout'). NEVER "
+            "'statement' for questions or commands. "
             "'retrieval' for anything asking about data, files, procedures, "
-            "records, or work topics. Default to 'retrieval'.\n\n"
+            "records, or work topics. When unsure: 'retrieval'.\n\n"
             "2. follow-up rewrite: DEFAULT to is_followup=false. Only set "
             "is_followup=true when the latest message CANNOT be understood on "
             "its own — a pronoun ('it', 'that'), elliptical form ('what about "
@@ -971,7 +976,7 @@ def front_of_pipe(question: str, history: list) -> dict:
             system, user, temperature=0.0, model=_model,
             response_format=_FRONT_FORMAT)
         if (isinstance(result, dict)
-                and result.get("intent") in ("retrieval", "chat")
+                and result.get("intent") in ("retrieval", "chat", "statement")
                 and isinstance(result.get("standalone_query"), str)
                 and result.get("standalone_query").strip()):
             out = {"intent": result["intent"],
@@ -1253,6 +1258,61 @@ def _answer_multi_item(sub_questions: list, collections: list) -> dict:
     }
 
 
+_FACT_FORMAT = {
+    "type": "json_schema",
+    "json_schema": {
+        "name": "resolved_fact",
+        "strict": True,
+        "schema": {
+            "type": "object",
+            "properties": {"resolved": {"type": "string"}},
+            "required": ["resolved"],
+            "additionalProperties": False,
+        },
+    },
+}
+
+
+def resolve_fact(fact: str, history: list) -> str:
+    """Resolve 'the file'/'it'/'that job' in a to-be-remembered FACT using
+    the conversation — with a deterministic guard: the result must keep
+    every content token of the original (only the subject may be ADDED) and
+    must not be a question. Any violation -> store the original verbatim.
+    (The generic contextualizer once rewrote a fact into the PREVIOUS
+    QUESTION and we memorized a question as truth — never again.)"""
+    import re as _re
+    recent = [m for m in (history or []) if m.get("role") in ("user", "assistant")]
+    if not recent:
+        return fact
+    hist_lines = []
+    for m in recent[-4:]:
+        content = (m.get("content") or "").strip().replace("\n", " ")[:200]
+        hist_lines.append(f"{m['role'].upper()}: {content}")
+    system = (
+        "A user asked an assistant to remember a NOTE. If the note refers to "
+        "its subject indirectly ('the file', 'it', 'that job'), rewrite it to "
+        "name the subject explicitly, taken from the conversation. Keep every "
+        "other word of the note EXACTLY as written. Never turn the note into "
+        "a question. If the note already names its subject, return it "
+        "unchanged. Return JSON: {resolved}.")
+    user = ("Conversation:\n" + "\n".join(hist_lines)
+            + f"\n\nNote: {fact}")
+    try:
+        r = call_local_llm_json(system, user, temperature=0.0,
+                                model=None, response_format=_FACT_FORMAT)
+        cand = str((r or {}).get("resolved") or "").strip()
+        if not cand or cand.endswith("?"):
+            return fact
+        _toks = lambda t: [w for w in _re.findall(r"[a-z0-9]+", t.lower())]
+        _orig, _new = _toks(fact), set(_toks(cand))
+        if all(w in _new for w in _orig if w not in
+               ("the", "it", "that", "this", "file", "job", "one"))                 and len(cand) <= max(2.5 * len(fact), len(fact) + 80):
+            return cand
+        return fact
+    except Exception:
+        return fact
+
+
 def chat_turn(question: str, history: list, available_collections: list,
               session_id=None) -> dict:
     """
@@ -1288,6 +1348,11 @@ def chat_turn(question: str, history: list, available_collections: list,
             if _m.get("role") == "user" and _m.get("content") != question:
                 _ctx_q = _m.get("content")
                 break
+        # EVERY door into memory resolves its subject first: "remember that
+        # THE FILE comes at 5 AM" after a gsact conversation must store
+        # gsact.txt, or the note carries no identifier, gets no cross-link,
+        # and annotates nothing. 14B contextualizer, same as statements.
+        _fact = resolve_fact(_fact, history)
         remember(_fact, session_id=session_id, context_question=_ctx_q)
         return {
             "role": "assistant",
@@ -1303,6 +1368,40 @@ def chat_turn(question: str, history: list, available_collections: list,
     ctx = front_of_pipe(question, history)
     _mark("front_of_pipe")
     print("DEBUG available_collections:", available_collections)
+
+    # Statement intent (Memory M2): the user is TELLING a fact without a
+    # trigger phrase. Deterministic guards outrank the model: a '?' or an
+    # interrogative/command lead word can never be a statement. The stored
+    # fact is the REWRITTEN standalone form — 'that file comes at 4 AM'
+    # resolves its subject from the conversation before entering memory.
+    if ctx["intent"] == "statement":
+        import re as _re_st
+        _lead = (_re_st.findall(r"[a-z']+", question.lower()) or [""])[0]
+        _interrog = {"what", "which", "when", "where", "who", "why", "how",
+                     "is", "are", "was", "were", "do", "does", "did", "can",
+                     "could", "will", "would", "should", "list", "show",
+                     "find", "give", "tell", "compare", "count"}
+        if "?" in question or _lead in _interrog:
+            ctx["intent"] = "retrieval"  # guard override, fall through
+        else:
+            try:
+                from core.memory_store import remember
+                # The fact text is PERMANENT: dedicated resolver with a
+                # token-preservation guard (see resolve_fact).
+                _fact = resolve_fact(question, history)
+                remember(_fact, session_id=session_id,
+                         context_question=None, origin="statement")
+                return {
+                    "role": "assistant",
+                    "content": f"Noted — I'll remember that: {_fact}",
+                    "method": "memory_capture",
+                    "collection": "memory",
+                    "related_sections": [],
+                }
+            except Exception as _e:
+                print(f"[MEMORY] statement capture failed: {_e}")
+                ctx["intent"] = "retrieval"
+
     if ctx["intent"] == "chat":
         response = generate_conversational_response(question, history)
         return {
