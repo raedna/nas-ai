@@ -191,30 +191,9 @@ def _extract_text_from_uploaded_file(tmp_path: str, suffix: str) -> str:
         )
     )
 
+
+
 def render_analysis_panel():
-
-    ui.add_head_html("""
-    <style>
-    .decoded-row-known {
-        background-color: #ecfdf3;
-    }
-
-    .decoded-row-custom {
-        background-color: #f4ecff;
-    }
-
-    .decoded-row-warning {
-        background-color: #fff4e5;
-    }
-
-    .decoded-row-known:hover,
-    .decoded-row-custom:hover,
-    .decoded-row-warning:hover {
-        filter: brightness(0.97);
-    }
-    </style>
-    """)
-
     MAX_COMPARE_MESSAGES = 10
 
     # --- FIX UI REDESIGN WORKSPACE SKELETON ---
@@ -222,7 +201,13 @@ def render_analysis_panel():
 
         # 1. CONTROL SECTION
         with ui.column().classes("q-pa-md bg-grey-2").style(
-            "width: 260px; min-width: 260px; position: sticky; top: 0; height: 100vh; overflow-y: auto;"
+            "width: 260px; "
+            "position: fixed; "
+            "left: 0; "
+            "top: 82px; "
+            "bottom: 0; "
+            "overflow-y: auto; "
+            "z-index: 100;"
         ):
             ui.label("FIX Workspace").classes("text-xl font-bold")
             ui.label(f"Compare basket: up to {MAX_COMPARE_MESSAGES} messages").classes(
@@ -234,503 +219,10 @@ def render_analysis_panel():
             control_area = ui.column().classes("w-full q-gutter-sm")
 
         # Main workspace
-        with ui.column().classes("w-full q-pa-md"):
-
-            # 2. CONTEXT / SELECTION SECTION
-            with ui.card().classes("w-full q-pa-md q-mb-md"):
-                ui.label("Context / Selection").classes("text-lg font-semibold")
-                ui.label(
-                    "Saved sessions, message selector, Message A/B, and comparison basket will move here."
-                ).classes("text-sm text-grey-7")
-                context_area = ui.column().classes("w-full q-mt-md")
-
-            # 3. WORKING WINDOWS SECTION
-            with ui.card().classes("w-full q-pa-md q-mb-md"):
-                ui.label("Working Windows").classes("text-lg font-semibold")
-                ui.label(
-                    "Raw input, decoded tags, selected tag details, and message windows will move here."
-                ).classes("text-sm text-grey-7")
-                working_area = ui.column().classes("w-full q-mt-md")
-
-            # 4. INFO / REPORTING SECTION
-            with ui.card().classes("w-full q-pa-md q-mb-md"):
-                ui.label("Info / Reporting").classes("text-lg font-semibold")
-                ui.label(
-                    "Analysis output, warnings, insights, related messages, and future Ask integration will move here."
-                ).classes("text-sm text-grey-7")
-                reporting_area = ui.column().classes("w-full q-mt-md")
-
-    result_area = working_area
-    saved_area = context_area
-
-    ui.label("Analysis Engine").classes("text-xl font-bold mb-2")
-    with control_area:
-        analyzer_select = ui.select(
-            options=["FIX Message"],
-            value="FIX Message",
-            label="Analyzer",
-        ).props("outlined dense").classes("w-full")
-
-        analysis_mode = ui.select(
-            ["Single Message", "Compare Messages", "Multi-Message Sequence"],
-            value="Single Message",
-            label="Analysis Mode",
-        ).props("outlined dense").classes("w-full")
-
-
-    with working_area:
-        ui.label(
-            "Paste FIX text below, upload an image/PDF, or paste a screenshot into the screenshot box. "
-            "Extracted text will appear in the input box for review before analysis."
-        ).classes("text-sm text-gray-500 mb-4")
-
-        raw_input = ui.textarea(
-            label="FIX message(s) / extracted OCR text",
-            placeholder="Paste one FIX message, multiple FIX messages, OCR text, or upload image/PDF...",
-        ).props("outlined").classes("w-full mt-4 analysis-fix-input max-h-64 overflow-auto")
-
-        ui.label(
-            "For Multi-Message Sequence, paste or OCR multiple FIX messages into this same box."
-        ).classes("text-xs text-grey-7")
-
-        compare_input_box = ui.textarea(
-            label="Message B / Compare Against",
-            placeholder="Paste the second FIX message here for comparison...",
-        ).props("outlined").classes("w-full mt-4")
-
-        compare_input_box.visible = False
-
-
-    with context_area:
-        save_note_input = ui.textarea(
-            label="Save note / reason *",
-            placeholder="Required. Example: 76250 - CFD Issue Citi batch 13",
-        ).props("outlined autogrow").classes("w-full")
-
-    async def handle_analysis_upload(e, target_box=None):
-        print("=== ANALYSIS UPLOAD CALLED ===", flush=True)
-
-        try:
-            filename = _get_upload_filename(e)
-            suffix = Path(filename).suffix.lower() or ".png"
-
-            print(f"Uploaded filename: {filename}", flush=True)
-            print(f"Detected suffix: {suffix}", flush=True)
-
-            file_bytes = await _get_upload_bytes(e)
-
-            with NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
-                tmp.write(file_bytes)
-                tmp_path = tmp.name
-
-            print(f"Temporary file: {tmp_path}", flush=True)
-
-            extracted_text = _extract_text_from_uploaded_file(tmp_path, suffix)
-
-            print("=== EXTRACTED TEXT START ===", flush=True)
-            print(extracted_text, flush=True)
-            print("=== EXTRACTED TEXT END ===", flush=True)
-
-            if not extracted_text:
-                ui.notify("No text was extracted from the uploaded file.", type="warning")
-                return
-
-            target = target_box or raw_input
-            target.value = extracted_text
-            target.update()
-            result_area.clear()
-            ui.notify("Text extracted. Review it, then click Analyze.", type="positive")
-
-        except Exception as ex:
-            ui.notify(f"OCR failed: {ex}", type="negative")
-            print(f"=== ANALYSIS UPLOAD FAILED: {ex} ===", flush=True)
-
-    ui.upload(
-        label="Upload FIX screenshot/image/PDF into main input",
-        on_upload=lambda e: handle_analysis_upload(e, target_box=raw_input),
-        auto_upload=True,
-        max_files=1,
-    ).props("accept=image/*,.pdf").classes("w-full mt-2")
-
-    upload_b = ui.upload(
-        label="Upload Message B screenshot/image or PDF",
-        on_upload=lambda e: handle_analysis_upload(e, target_box=compare_input_box),
-        auto_upload=True,
-        max_files=1,
-    ).props("accept=image/*,.pdf").classes("w-full mt-2")
-
-    upload_b.visible = False
-
-    def update_analysis_mode_visibility():
-        is_compare = analysis_mode.value == "Compare Messages"
-        compare_input_box.visible = is_compare
-        upload_b.visible = is_compare
-
-    analysis_mode.on_value_change(lambda _: update_analysis_mode_visibility())
-    update_analysis_mode_visibility()
-
-    ui.html("""
-    <div id="analysis-screenshot-paste-box-a"
-        tabindex="0"
-        style="
-            border: 2px dashed #aaa;
-            border-radius: 8px;
-            padding: 18px;
-            margin-top: 12px;
-            text-align: center;
-            color: #666;
-            cursor: pointer;
-            background: #fafafa;
-         ">
-        Click here, then paste Message A screenshot with Cmd+V / Ctrl+V
-    </div>
-
-    <div id="analysis-screenshot-paste-box-b"
-        tabindex="0"
-        style="
-            display: none;
-            border: 2px dashed #aaa;
-            border-radius: 8px;
-            padding: 18px;
-            margin-top: 12px;
-            text-align: center;
-            color: #666;
-            cursor: pointer;
-            background: #fafafa;
-         ">
-        Click here, then paste Message B screenshot with Cmd+V / Ctrl+V
-    </div>
-    """).classes("w-full")
-
-    ui.add_body_html("""
-    <script>
-    setTimeout(() => {
-        const boxA = document.getElementById('analysis-screenshot-paste-box-a');
-        const boxB = document.getElementById('analysis-screenshot-paste-box-b');
-
-        if (!boxA && !boxB) return;
-
-        let activeBox = null;
-
-        function idleText(box) {
-            if (box.id === 'analysis-screenshot-paste-box-b') {
-                return 'Click here, then paste Message B screenshot with Cmd+V / Ctrl+V';
-            }
-            return 'Click here, then paste Message A screenshot with Cmd+V / Ctrl+V';
-        }
-
-        function setPasteBoxIdle(box) {
-            if (!box) return;
-            box.style.borderColor = '#aaa';
-            box.style.background = '#fafafa';
-            box.innerText = idleText(box);
-        }
-
-        function isCompareMode() {
-            const text = document.body.innerText || '';
-            return text.includes('Compare Messages') && text.includes('Message B / Compare Against');
-        }
-
-        function updateBoxVisibility() {
-            if (!boxB) return;
-
-            const messageBTextareaVisible = Array.from(document.querySelectorAll('textarea')).some(t => {
-                const label = t.closest('.q-field')?.innerText || '';
-                return label.includes('Message B') && t.offsetParent !== null;
-            });
-
-            boxB.style.display = messageBTextareaVisible ? 'block' : 'none';
-        }
-
-        function setAllIdle() {
-            activeBox = null;
-            updateBoxVisibility();
-            setPasteBoxIdle(boxA);
-            setPasteBoxIdle(boxB);
-        }
-
-        setInterval(updateBoxVisibility, 500);
-
-        function setPasteBoxActive(box) {
-            activeBox = box;
-            box.focus();
-            box.style.borderColor = '#1976d2';
-            box.style.background = '#eef6ff';
-            box.innerText = 'Paste now with Cmd+V / Ctrl+V';
-        }
-
-        async function setTextareaValue(text, target) {
-            let textarea = null;
-
-            if (target === 'b') {
-                const textareas = Array.from(document.querySelectorAll('textarea'));
-                textarea = textareas.find(t => {
-                    const label = t.closest('.q-field')?.innerText || '';
-                    return label.includes('Message B');
-                });
-            } else {
-                textarea = document.querySelector('textarea.analysis-fix-input');
-            }
-
-            if (!textarea) {
-                const textareas = Array.from(document.querySelectorAll('textarea'));
-                textarea = textareas.find(t => t.offsetParent !== null);
-            }
-
-            if (!textarea) {
-                alert('Could not find target analysis input box.');
-                return;
-            }
-
-            textarea.value = text;
-            textarea.dispatchEvent(new Event('input', { bubbles: true }));
-            textarea.dispatchEvent(new Event('change', { bubbles: true }));
-        }
-
-        function wireBox(box) {
-            if (!box) return;
-
-            box.addEventListener('click', (event) => {
-                event.stopPropagation();
-                setInterval(updateBoxVisibility, 500);
-                setAllIdle();
-                setPasteBoxActive(box);
-            });
-        }
-
-        wireBox(boxA);
-        wireBox(boxB);
-
-        document.addEventListener('click', (event) => {
-            if (
-                (!boxA || !boxA.contains(event.target)) &&
-                (!boxB || !boxB.contains(event.target))
-            ) {
-                setAllIdle();
-            }
-        });
-
-        document.addEventListener('paste', async (event) => {
-            if (!activeBox) return;
-
-            const items = event.clipboardData && event.clipboardData.items;
-            if (!items) {
-                alert('No clipboard items found.');
-                return;
-            }
-
-            for (const item of items) {
-                if (item.type && item.type.startsWith('image/')) {
-                    event.preventDefault();
-
-                    activeBox.innerText = 'Running OCR on pasted screenshot...';
-                    activeBox.style.borderColor = '#f59e0b';
-                    activeBox.style.background = '#fff7ed';
-
-                    const file = item.getAsFile();
-                    const reader = new FileReader();
-
-                    reader.onload = async () => {
-                        try {
-                            const response = await fetch('/analysis/clipboard-image-ocr', {
-                                method: 'POST',
-                                headers: {
-                                    'Content-Type': 'application/json',
-                                },
-                                body: JSON.stringify({
-                                    image_data_url: reader.result,
-                                }),
-                            });
-
-                            const result = await response.json();
-
-                            if (!result.ok) {
-                                alert('OCR failed: ' + (result.error || 'Unknown error'));
-                                setPasteBoxActive(activeBox);
-                                return;
-                            }
-
-                            if (!result.text) {
-                                alert('No OCR text was extracted from the pasted screenshot.');
-                                setPasteBoxActive(activeBox);
-                                return;
-                            }
-
-                            const target = activeBox.id === 'analysis-screenshot-paste-box-b' ? 'b' : 'a';
-
-                            await setTextareaValue(result.text, target);
-
-                            activeBox.innerText = 'OCR text inserted. Review it, then click Analyze.';
-                            activeBox.style.borderColor = '#16a34a';
-                            activeBox.style.background = '#f0fdf4';
-
-                        } catch (err) {
-                            alert('OCR request failed: ' + err);
-                            setPasteBoxActive(activeBox);
-                        }
-                    };
-
-                    reader.readAsDataURL(file);
-                    return;
-                }
-            }
-
-            alert('No image found in clipboard.');
-        });
-
-        setAllIdle();
-    }, 500);
-    </script>
-    """)
-
-    def render_related_saved_matches(result):
-        messages = build_related_match_messages_from_result(result)
-
-        if not messages:
-            return
-
-        related_rows = []
-
-        for message in messages:
-            message_index = message.get("message_index")
-
-            matches = find_related_saved_fix_messages(
-                message,
-                exclude_session_id=None,
-                limit=20,
-            )
-
-            for match in matches:
-                related_rows.append({
-                    "source_message": message_index,
-                    "message_id": match.get("message_id"),
-                    "current_raw_text": message.get("raw_text") or result.get("raw_text") or "",
-                    "match_strength": match.get("match_strength"),
-                    "match_reason": match.get("match_reason"),
-                    "session_id": match.get("session_id"),
-                    "message_index": match.get("message_index"),
-                    "msg_type": match.get("msg_type"),
-                    "route": f"{match.get('sender') or ''} → {match.get('target') or ''}",
-                    "cl_ord_id": match.get("cl_ord_id"),
-                    "order_id": match.get("order_id"),
-                    "exec_id": match.get("exec_id"),
-                    "symbol": match.get("symbol"),
-                    "security_id": match.get("security_id"),
-                    "security_exchange": match.get("security_exchange"),
-                    "security_type": match.get("security_type"),
-                    "ex_destination": match.get("ex_destination"),
-                    "created_at": str(match.get("created_at") or ""),
-                })
-
-        ui.separator().classes("q-mt-md")
-
-        ui.label("Related Saved FIX Messages").classes("text-lg font-bold q-mt-md")
-
-        if not related_rows:
-            ui.label("No related saved FIX messages found.").classes("text-sm text-grey-7")
-            return
-
-        compare_related_area = ui.column().classes("w-full q-mt-md")
-
-        def compare_selected_related_message():
-            selected_rows = list(related_table.selected or [])
-
-            if len(selected_rows) != 1:
-                ui.notify("Select one related saved message first.", color="warning")
-                return
-
-            selected = selected_rows[0]
-
-            saved_message_id = selected.get("message_id")
-            current_raw_text = selected.get("current_raw_text") or ""
-
-            if not saved_message_id:
-                ui.notify("Could not read selected saved message id.", color="negative")
-                return
-
-            saved_message = get_fix_analysis_message(saved_message_id)
-
-            if not saved_message:
-                ui.notify("Could not load selected saved message.", color="negative")
-                return
-
-            saved_raw_text = saved_message.get("raw_text") or ""
-
-            if not current_raw_text or not saved_raw_text:
-                ui.notify("Current or saved message raw text is missing.", color="negative")
-                return
-
-            comparison = compare_fix_messages(
-                current_raw_text,
-                saved_raw_text,
-            )
-
-            compare_related_area.clear()
-
-            with compare_related_area:
-                ui.label(
-                    f"Comparison: Current Message {selected.get('source_message')} "
-                    f"vs Saved Session {selected.get('session_id')} "
-                    f"Message {selected.get('message_index')}"
-                ).classes("text-lg font-semibold q-mt-md")
-
-                render_compare_result(comparison)
-
-        ui.label(
-            "Select one related saved message, then click Compare Selected Related Message."
-        ).classes("text-sm text-blue-7 font-bold q-mt-md")
-
-        ui.button(
-            "Compare Selected Related Message",
-            on_click=compare_selected_related_message,
-        ).props("color=primary outline")
-
-        related_table = ui.table(
-            columns=[
-                {"name": "source_message", "label": "Current Msg", "field": "source_message", "align": "left", "sortable": True},
-                {"name": "match_strength", "label": "Strength", "field": "match_strength", "align": "left", "sortable": True},
-                {"name": "match_reason", "label": "Reason", "field": "match_reason", "align": "left", "sortable": True},
-                {"name": "session_id", "label": "Saved Session", "field": "session_id", "align": "left", "sortable": True},
-                {"name": "message_index", "label": "Saved Msg", "field": "message_index", "align": "left", "sortable": True},
-                {"name": "msg_type", "label": "MsgType", "field": "msg_type", "align": "left", "sortable": True},
-                {"name": "route", "label": "Route", "field": "route", "align": "left", "sortable": True},
-                {"name": "cl_ord_id", "label": "ClOrdID", "field": "cl_ord_id", "align": "left", "sortable": True},
-                {"name": "order_id", "label": "OrderID", "field": "order_id", "align": "left", "sortable": True},
-                {"name": "exec_id", "label": "ExecID", "field": "exec_id", "align": "left", "sortable": True},
-                {"name": "symbol", "label": "Symbol", "field": "symbol", "align": "left", "sortable": True},
-                {"name": "security_id", "label": "SecurityID", "field": "security_id", "align": "left", "sortable": True},
-                {"name": "security_exchange", "label": "Exchange", "field": "security_exchange", "align": "left", "sortable": True},
-                {"name": "security_type", "label": "SecType", "field": "security_type", "align": "left", "sortable": True},
-                {"name": "ex_destination", "label": "ExDestination", "field": "ex_destination", "align": "left", "sortable": True},
-                {"name": "created_at", "label": "Saved At", "field": "created_at", "align": "left", "sortable": True},
-            ],
-            rows=related_rows,
-            row_key="message_id",
-            selection="single",
-            pagination=10,
-        ).classes("w-full")
-
-def render_analysis_panel():
-    MAX_COMPARE_MESSAGES = 10
-
-    # --- FIX UI REDESIGN WORKSPACE SKELETON ---
-    with ui.row().classes("w-full no-wrap items-start"):
-
-        # 1. CONTROL SECTION
-        with ui.column().classes("q-pa-md bg-grey-2").style(
-            "width: 260px; min-width: 260px; position: sticky; top: 0; height: 100vh; overflow-y: auto;"
+        with ui.column().classes("q-pa-md").style(
+            "margin-left: 280px; "
+            "width: calc(100% - 280px);"
         ):
-            ui.label("FIX Workspace").classes("text-xl font-bold")
-            ui.label(f"Compare basket: up to {MAX_COMPARE_MESSAGES} messages").classes(
-                "text-xs text-grey-7"
-            )
-            ui.separator().classes("q-my-md")
-
-            ui.label("Control").classes("text-md font-semibold")
-            control_area = ui.column().classes("w-full q-gutter-sm")
-
-        # Main workspace
-        with ui.column().classes("w-full q-pa-md"):
 
             # 2. CONTEXT / SELECTION SECTION
             with ui.card().classes("w-full q-pa-md q-mb-md"):
@@ -761,8 +253,57 @@ def render_analysis_panel():
     result_area = working_area
     saved_area = context_area
 
-    saved_compare_selection = []
+    with working_area:
+        workspace_output_area = ui.column().classes("w-full q-mt-md")
+
+    def workspace_message_key(message):
+        return message.get("id") or message.get("message_id")
+
+    # Messages currently selected for investigation.
+    # One message = Single
+    # Two messages = Pair Compare
+    # Three or more = Multi-Compare / Sequence
+    workspace_messages = []
+
+    # Temporary compatibility alias for the existing cross-session compare code.
+    saved_compare_selection = workspace_messages
+
+    def infer_workspace_mode() -> str:
+        count = len(workspace_messages)
+
+        if count == 0:
+            return "No messages selected"
+        if count == 1:
+            return "Single Message"
+        if count == 2:
+            return "Pair Compare"
+        return "Multi-Compare"
     
+    def workspace_status(message):
+
+        exec_type = message.get("exec_type") or ""
+        ord_status = message.get("ord_status") or ""
+
+        if exec_type in ("8", "Reject") or ord_status in ("8", "Rejected"):
+            return "negative", "Rejected"
+
+        if exec_type in ("4", "Canceled"):
+            return "primary", "Canceled"
+
+        if exec_type in ("5", "Replace"):
+            return "primary", "Replaced"
+
+        if exec_type in ("1", "PartialFill") or ord_status in ("1", "PartiallyFilled"):
+            return "warning", "Partial Fill"
+
+        if exec_type in ("2", "Fill") or ord_status in ("2", "Filled"):
+            return "positive", "Filled"
+
+        if exec_type in ("0", "New") or ord_status in ("0", "New"):
+            return "positive", "New"
+
+        return "grey", message.get("msg_type") or "Unknown"
+
     def render_sequence_insights(insights):
         if not insights:
             return
@@ -1172,10 +713,62 @@ def render_analysis_panel():
 
         result_area.clear()
 
+    def refresh_working_windows():
+            workspace_output_area.clear()
+
+            count = len(workspace_messages)
+
+            with workspace_output_area:
+                if count == 0:
+                    ui.label("No workspace messages selected.").classes(
+                        "text-sm text-grey-7"
+                    )
+                    return
+
+                if count == 1:
+                    message = workspace_messages[0]
+
+                    ui.label("Single Message").classes(
+                        "text-lg font-semibold"
+                    )
+
+                    ui.label(
+                        f"Session {message.get('session_id')} | "
+                        f"Message {message.get('message_index')}"
+                    ).classes("text-sm text-grey-7")
+
+                    ui.label(
+                        message.get("raw_text") or "No raw FIX text available."
+                    ).classes(
+                        "w-full text-xs font-mono whitespace-pre-wrap"
+                    )
+                    return
+
+                if count == 2:
+                    ui.label("Pair Compare").classes(
+                        "text-lg font-semibold"
+                    )
+
+                    for position, message in enumerate(workspace_messages, start=1):
+                        ui.label(
+                            f"Message {position}: "
+                            f"Session {message.get('session_id')} / "
+                            f"Msg {message.get('message_index')}"
+                        ).classes("text-sm")
+                    return
+
+                ui.label("Multi-Compare").classes(
+                    "text-lg font-semibold"
+                )
+
+                ui.label(
+                    f"{count} messages selected for sequence or multi-message comparison."
+                ).classes("text-sm text-grey-7")
+
     def refresh_saved_analyses():
         saved_area.clear()
 
-        sessions = list_fix_analysis_sessions(20)
+        sessions = list_fix_analysis_sessions(250)
 
         with saved_area:
             ui.label("Saved Analyses").classes("text-lg font-bold mt-4")
@@ -1257,6 +850,7 @@ def render_analysis_panel():
                             "id": msg.get("id"),
                             "session_id": msg.get("session_id"),
                             "message_index": msg.get("message_index"),
+                            "raw_text": msg.get("raw_text") or "",
                             "msg_seq_num": msg.get("msg_seq_num"),
                             "msg_type": msg.get("msg_type"),
                             "route": f"{msg.get('sender') or ''} → {msg.get('target') or ''}",
@@ -1269,6 +863,10 @@ def render_analysis_panel():
                             "last_qty": msg.get("last_qty"),
                             "cum_qty": msg.get("cum_qty"),
                             "leaves_qty": msg.get("leaves_qty"),
+                            "ord_status": msg.get("ord_status"),
+                            "exec_type": msg.get("exec_type"),
+                            "sending_time": msg.get("sending_time"),
+                            "transact_time": msg.get("transact_time"),
                         })
 
                     tag_result_area = ui.column().classes("w-full q-mt-md")
@@ -1543,6 +1141,67 @@ def render_analysis_panel():
                         pagination={"rowsPerPage": 0},
                     ).classes("w-full")
 
+                    def add_selected_messages_to_workspace():
+                        selected_rows = list(message_table.selected or [])
+
+                        if not selected_rows:
+                            ui.notify(
+                                "Select at least one saved message first.",
+                                color="warning",
+                            )
+                            return
+
+                        existing_keys = {
+                            workspace_message_key(message)
+                            for message in workspace_messages
+                        }
+
+                        new_rows = [
+                            row
+                            for row in selected_rows
+                            if workspace_message_key(row) not in existing_keys
+                        ]
+
+                        available_slots = MAX_COMPARE_MESSAGES - len(workspace_messages)
+
+                        if available_slots <= 0:
+                            ui.notify(
+                                f"The workspace already contains the maximum of "
+                                f"{MAX_COMPARE_MESSAGES} messages.",
+                                color="warning",
+                            )
+                            return
+
+                        rows_to_add = new_rows[:available_slots]
+                        workspace_messages.extend(rows_to_add)
+
+                        refresh_workspace_status()
+
+                        if not rows_to_add:
+                            ui.notify(
+                                "The selected messages are already in the workspace.",
+                                color="info",
+                            )
+                            return
+
+                        ui.notify(
+                            f"Added {len(rows_to_add)} message(s) to the investigation workspace.",
+                            color="positive",
+                        )
+
+                        if len(new_rows) > available_slots:
+                            ui.notify(
+                                f"Only {available_slots} message(s) were added because the "
+                                f"workspace limit is {MAX_COMPARE_MESSAGES}.",
+                                color="warning",
+                            )
+
+                    with ui.row().classes("q-gutter-sm q-mt-md"):
+                        ui.button(
+                            "Add to Workspace",
+                            on_click=add_selected_messages_to_workspace,
+                        ).props("outline color=secondary")
+
             def update_selected_session_note():
                 selected_rows = list(table.selected or [])
 
@@ -1623,16 +1282,128 @@ def render_analysis_panel():
                 rows=rows,
                 row_key="id",
                 selection="single",
-                pagination=10,
+                pagination=5,
             ).classes("w-full")
 
-        with control_area:
-            ui.separator().classes("q-my-md")
+    with control_area:
+        ui.separator().classes("q-my-md")
 
-            ui.button("Analyze", on_click=run_analysis).props("color=primary").classes("w-full")
-            ui.button("Refresh Saved Analyses", on_click=refresh_saved_analyses).props("outline").classes("w-full")
-            ui.button("Clear", on_click=clear_analysis).props("outline color=secondary").classes("w-full")
+        ui.label("Investigation Workspace").classes(
+            "text-sm font-semibold"
+        )
 
+        workspace_status_label = ui.label(
+            "No messages selected"
+        ).classes("text-sm text-grey-8")
+
+        workspace_count_label = ui.label(
+            f"0 / {MAX_COMPARE_MESSAGES} messages"
+        ).classes("text-xs text-grey-6")
+
+        workspace_items_area = ui.column().classes(
+            "w-full q-gutter-sm"
+        )
+
+        def remove_workspace_message(message_id):
+            workspace_messages[:] = [
+                message
+                for message in workspace_messages
+                if workspace_message_key(message) != message_id
+            ]
+            refresh_workspace_status()
+
+        def clear_investigation_workspace():
+            workspace_messages.clear()
+            refresh_workspace_status()
+            ui.notify(
+                "Investigation workspace cleared.",
+                color="info",
+            )
+
+        def refresh_workspace_status():
+            count = len(workspace_messages)
+
+            workspace_status_label.set_text(
+                infer_workspace_mode()
+            )
+            workspace_count_label.set_text(
+                f"{count} / {MAX_COMPARE_MESSAGES} messages"
+            )
+
+            workspace_items_area.clear()
+
+            with workspace_items_area:
+                if not workspace_messages:
+                    ui.label(
+                        "No messages added."
+                    ).classes("text-xs text-grey-6")
+                    return
+
+                for message in workspace_messages:
+                    message_id = workspace_message_key(message)
+                    color, status = workspace_status(message)
+
+                    with ui.card().classes("w-full q-pa-sm"):
+                        with ui.row().classes(
+                            "w-full items-center justify-between no-wrap"
+                        ):
+                            ui.badge(
+                                status,
+                                color=color,
+                            ).props("outline")
+
+                            ui.button(
+                                icon="close",
+                                on_click=lambda _event, key=message_id:
+                                    remove_workspace_message(key),
+                            ).props(
+                                "flat dense round size=sm color=negative"
+                            )
+
+                        timestamp = (
+                            message.get("transact_time")
+                            or message.get("sending_time")
+                            or "-"
+                        )
+
+                        ui.label(timestamp).classes(
+                            "text-xs text-grey-7"
+                        )
+
+                        ui.label(
+                            f"ClOrdID  {message.get('cl_ord_id') or '-'}"
+                        ).classes("text-xs")
+
+                        ui.label(
+                            f"OrderID  {message.get('order_id') or '-'}"
+                        ).classes("text-xs")
+
+                        ui.label(
+                            f"ExecID   {message.get('exec_id') or '-'}"
+                        ).classes("text-xs")
+
+            refresh_working_windows()
+
+        ui.button(
+            "Analyze",
+            on_click=run_analysis,
+        ).props("color=primary").classes("w-full")
+
+        ui.button(
+            "Refresh Saved Analyses",
+            on_click=refresh_saved_analyses,
+        ).props("outline").classes("w-full")
+
+        ui.button(
+            "Clear",
+            on_click=clear_analysis,
+        ).props("outline color=secondary").classes("w-full")
+
+        ui.button(
+            "Clear Workspace",
+            on_click=clear_investigation_workspace,
+        ).props("outline color=negative").classes("w-full")
+
+    refresh_workspace_status()
     refresh_saved_analyses()
 
-        
