@@ -1261,25 +1261,16 @@ def render_analysis_panel():
                         "text-lg font-semibold"
                     )
 
-                    session_id = message.get("session_id")
-                    message_index = message.get("message_index")
-                    session_text = session_id if session_id is not None else "Live"
-                    message_text = message_index if message_index is not None else "1"
-
                     ui.label(
-                        f"Session {session_text} | Message {message_text}"
+                        f"Session {message.get('session_id')} | "
+                        f"Message {message.get('message_index')}"
                     ).classes("text-sm text-grey-7")
 
-                    with ui.expansion(
-                        "View Raw FIX",
-                        icon="code",
-                        value=False,
-                    ).classes("w-full q-mt-sm"):
-                        ui.label(
-                            message.get("raw_text") or "No raw FIX text available."
-                        ).classes(
-                            "w-full text-xs font-mono whitespace-pre-wrap break-all"
-                        )
+                    ui.label(
+                        message.get("raw_text") or "No raw FIX text available."
+                    ).classes(
+                        "w-full text-xs font-mono whitespace-pre-wrap"
+                    )
                     return
 
                 if count == 2:

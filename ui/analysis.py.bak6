@@ -44,16 +44,9 @@ def _format_summary_with_pipes(summary: str) -> str:
 
     # Preserve decimal points and identifiers; only replace sentence boundaries
     # immediately followed by another labeled summary field.
-    text = re.sub(r"\.\s+(?=[A-Z][A-Za-z0-9 /_-]+:)", " | ", text)
+    text = re.sub(r"\.\s+(?=[A-Z][A-Za-z /]+:)", " | ", text)
     text = re.sub(r"\n+", " | ", text)
-    text = re.sub(r"\s*\|\s*", " | ", text).strip(" |")
-
-    # Emphasize report field names without hardcoding FIX tags.
-    return re.sub(
-        r"(^|\|\s*)([A-Z][A-Za-z0-9 /_-]*?):",
-        lambda match: f"{match.group(1)}**{match.group(2).strip()}:**",
-        text,
-    )
+    return re.sub(r"\s*\|\s*", " | ", text).strip(" |")
 
 @app.post("/analysis/clipboard-image-ocr")
 async def clipboard_image_ocr(request: Request):
@@ -1001,7 +994,7 @@ def render_analysis_panel():
 
                 with ui.row().classes("w-full no-wrap items-start q-gutter-md"):
                     with ui.column().classes("decoded-table-column").style(
-                        "width: calc(80% - 8px); min-width: 0;"
+                        "width: calc(87% - 8px); min-width: 0;"
                     ):
                         with ui.element("div").classes("w-full border rounded decoded-values-scroll"):
                                             decoded_table = ui.table(
@@ -1062,7 +1055,7 @@ def render_analysis_panel():
                                             """)
 
                     with ui.card().classes("tag-inspector q-pa-md").style(
-                        "width: calc(20% - 8px); min-width: 280px; position: sticky; top: 132px;"
+                        "width: calc(13% - 8px); min-width: 210px; position: sticky; top: 132px;"
                     ):
                         ui.label("Tag Inspector").classes("text-md font-semibold")
                         ui.label("Select a decoded row to inspect its dictionary details.").classes(
@@ -1178,53 +1171,12 @@ def render_analysis_panel():
                     else:
                         ui.notify(f"Analysis already exists as session {session_id}. Save skipped.", color="info")
 
-                def add_current_message_to_workspace():
-                    candidate_messages = build_related_match_messages_from_result(result) or []
-                    current_message = dict(candidate_messages[0]) if candidate_messages else {}
-                    current_message.setdefault("raw_text", raw_a)
-                    current_message.setdefault("message_index", 1)
-                    current_message.setdefault("source_type", "live_analysis")
-
-                    current_key = workspace_message_key(current_message) or (
-                        "live_analysis",
-                        current_message.get("message_index"),
-                        current_message.get("raw_text"),
-                    )
-                    existing_keys = {
-                        workspace_message_key(message) or (
-                            message.get("source_type") or "workspace",
-                            message.get("message_index"),
-                            message.get("raw_text"),
-                        )
-                        for message in workspace_messages
-                    }
-
-                    if current_key in existing_keys:
-                        ui.notify("The current message is already in the workspace / compare basket.", color="info")
-                        return
-
-                    if len(workspace_messages) >= MAX_COMPARE_MESSAGES:
-                        ui.notify(
-                            f"The workspace already contains the maximum of {MAX_COMPARE_MESSAGES} messages.",
-                            color="warning",
-                        )
-                        return
-
-                    workspace_messages.append(current_message)
-                    refresh_workspace_status()
-                    ui.notify("Added current message to the workspace / compare basket.", color="positive")
-
                 with reporting_area:
                     render_related_saved_matches(result)
-                    with ui.row().classes("q-gutter-sm q-mt-md"):
-                        ui.button(
-                            "Add Current to Workspace / Compare Basket",
-                            on_click=add_current_message_to_workspace,
-                        ).props("outline color=secondary")
-                        ui.button(
-                            "Save Analysis",
-                            on_click=save_current_single_result,
-                        ).props("color=primary outline")
+                    ui.button(
+                        "Save Analysis",
+                        on_click=save_current_single_result,
+                    ).props("color=primary outline").classes("q-mt-md")
 
             toolbar_status_label.set_text("Complete")
             toolbar_status_label.classes(replace="text-sm text-green-7 q-ml-auto")
@@ -1257,29 +1209,20 @@ def render_analysis_panel():
                 if count == 1:
                     message = workspace_messages[0]
 
-                    ui.label("Workspace Preview").classes(
+                    ui.label("Single Message").classes(
                         "text-lg font-semibold"
                     )
 
-                    session_id = message.get("session_id")
-                    message_index = message.get("message_index")
-                    session_text = session_id if session_id is not None else "Live"
-                    message_text = message_index if message_index is not None else "1"
-
                     ui.label(
-                        f"Session {session_text} | Message {message_text}"
+                        f"Session {message.get('session_id')} | "
+                        f"Message {message.get('message_index')}"
                     ).classes("text-sm text-grey-7")
 
-                    with ui.expansion(
-                        "View Raw FIX",
-                        icon="code",
-                        value=False,
-                    ).classes("w-full q-mt-sm"):
-                        ui.label(
-                            message.get("raw_text") or "No raw FIX text available."
-                        ).classes(
-                            "w-full text-xs font-mono whitespace-pre-wrap break-all"
-                        )
+                    ui.label(
+                        message.get("raw_text") or "No raw FIX text available."
+                    ).classes(
+                        "w-full text-xs font-mono whitespace-pre-wrap"
+                    )
                     return
 
                 if count == 2:

@@ -1,7 +1,6 @@
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 import json
-import re
 from nicegui import ui
 from core.analysis.analyzers.fix.fix_insights import build_sequence_insights
 from core.analysis.analyzers.fix.analyzer import analyze_fix_message
@@ -34,26 +33,6 @@ DEBUG_FIX_ANALYSIS_UI = True
 def debug_print(*args, **kwargs):
     if DEBUG_FIX_ANALYSIS_UI:
         print(*args, **kwargs, flush=True)
-
-
-def _format_summary_with_pipes(summary: str) -> str:
-    """Format labeled analysis summary clauses as a compact pipe-separated report."""
-    text = str(summary or "").strip()
-    if not text:
-        return "No summary generated."
-
-    # Preserve decimal points and identifiers; only replace sentence boundaries
-    # immediately followed by another labeled summary field.
-    text = re.sub(r"\.\s+(?=[A-Z][A-Za-z0-9 /_-]+:)", " | ", text)
-    text = re.sub(r"\n+", " | ", text)
-    text = re.sub(r"\s*\|\s*", " | ", text).strip(" |")
-
-    # Emphasize report field names without hardcoding FIX tags.
-    return re.sub(
-        r"(^|\|\s*)([A-Z][A-Za-z0-9 /_-]*?):",
-        lambda match: f"{match.group(1)}**{match.group(2).strip()}:**",
-        text,
-    )
 
 @app.post("/analysis/clipboard-image-ocr")
 async def clipboard_image_ocr(request: Request):
@@ -217,17 +196,6 @@ def _extract_text_from_uploaded_file(tmp_path: str, suffix: str) -> str:
 def render_analysis_panel():
     MAX_COMPARE_MESSAGES = 10
 
-    ui.add_head_html("""
-    <style>
-    .analysis-table-scroll {max-width: 100%; overflow: auto;}
-    .analysis-table-scroll .q-table__middle,
-    .technical-analysis-pane .q-table__middle {max-height: 62vh; overflow: auto;}
-    .analysis-table-scroll thead tr th,
-    .technical-analysis-pane thead tr th {position: sticky; top: 0; z-index: 6; background: white;}
-    .technical-analysis-pane .q-table {min-width: max-content;}
-    </style>
-    """)
-
     async def handle_analysis_upload(e, target_box):
         upload_status_label.set_text("Reading file and running OCR...")
         upload_status_label.classes(replace="text-sm text-orange-7")
@@ -260,73 +228,162 @@ def render_analysis_panel():
         finally:
             upload_spinner.visible = False
 
-    input_panel_ref = {"panel": None}
+    load_dialog = ui.dialog()
+    with load_dialog, ui.card().classes("w-full").style("min-width: 75vw; max-width: 1100px;"):
+        ui.label("Load Analysis Input").classes("text-xl font-bold")
+        ui.label(
+            "Paste FIX text, paste a screenshot, or upload an image/PDF. OCR text remains editable before analysis."
+        ).classes("text-sm text-grey-7")
+        with ui.row().classes("w-full items-center q-gutter-sm"):
+            upload_spinner = ui.spinner(size="sm")
+            upload_spinner.visible = False
+            upload_status_label = ui.label("Ready for text, screenshot, image, or PDF.").classes("text-sm text-grey-7")
 
-    def toggle_input_panel():
-        panel = input_panel_ref.get("panel")
-        if panel is None:
-            return
-        panel.value = not bool(panel.value)
-        panel.update()
+        with ui.tabs().classes("w-full") as input_tabs:
+            tab_a = ui.tab("Message A / Sequence")
+            tab_b = ui.tab("Message B")
 
-    ui.add_body_html(r"""
+        with ui.tab_panels(input_tabs, value=tab_a).classes("w-full"):
+            with ui.tab_panel(tab_a):
+                raw_input = ui.textarea(
+                    label="FIX message(s) / extracted OCR text",
+                    placeholder="Paste one FIX message, a sequence, or extracted OCR text...",
+                ).props("outlined autogrow").classes("w-full analysis-fix-input max-h-80 overflow-auto")
+                ui.upload(
+                    label="Upload Message A image/PDF",
+                    on_upload=lambda e: handle_analysis_upload(e, raw_input),
+                    auto_upload=True,
+                    max_files=1,
+                ).props("accept=image/*,.pdf").classes("w-full q-mt-sm")
+                ui.html('''
+                <div id="analysis-screenshot-paste-box-a" tabindex="0"
+                     style="border:2px dashed #aaa;border-radius:8px;padding:14px;margin-top:12px;text-align:center;color:#666;cursor:pointer;background:#fafafa;">
+                    Click here, then paste a Message A screenshot with Cmd+V / Ctrl+V
+                </div>
+                ''').classes("w-full")
+
+            with ui.tab_panel(tab_b):
+                compare_input_box = ui.textarea(
+                    label="Message B / Compare Against",
+                    placeholder="Paste the second FIX message here...",
+                ).props("outlined autogrow").classes("w-full analysis-fix-compare-input max-h-80 overflow-auto")
+                ui.upload(
+                    label="Upload Message B image/PDF",
+                    on_upload=lambda e: handle_analysis_upload(e, compare_input_box),
+                    auto_upload=True,
+                    max_files=1,
+                ).props("accept=image/*,.pdf").classes("w-full q-mt-sm")
+                ui.html('''
+                <div id="analysis-screenshot-paste-box-b" tabindex="0"
+                     style="border:2px dashed #aaa;border-radius:8px;padding:14px;margin-top:12px;text-align:center;color:#666;cursor:pointer;background:#fafafa;">
+                    Click here, then paste a Message B screenshot with Cmd+V / Ctrl+V
+                </div>
+                ''').classes("w-full")
+
+        with ui.row().classes("w-full justify-end q-gutter-sm"):
+            ui.button("Close", on_click=load_dialog.close).props("outline")
+
+    ui.add_body_html(r'''
     <script>
     (() => {
-      if (window.__nasAiAnalysisPasteInstalled) return;
-      window.__nasAiAnalysisPasteInstalled = true;
       let activePasteBoxId = null;
+
+      function getPasteBoxes() {
+        return [
+          document.getElementById('analysis-screenshot-paste-box-a'),
+          document.getElementById('analysis-screenshot-paste-box-b')
+        ].filter(Boolean);
+      }
+
+      function resetPasteBoxes() {
+        getPasteBoxes().forEach(box => {
+          if (box.id !== activePasteBoxId) {
+            box.style.borderColor = '#aaa';
+            box.style.background = '#fafafa';
+          }
+        });
+      }
+
       document.addEventListener('click', event => {
-        const box = event.target.closest('#analysis-screenshot-paste-box-a, #analysis-screenshot-paste-box-b');
+        const box = event.target.closest(
+          '#analysis-screenshot-paste-box-a, #analysis-screenshot-paste-box-b'
+        );
         if (!box) return;
+
         event.preventDefault();
         event.stopPropagation();
         activePasteBoxId = box.id;
+        resetPasteBoxes();
         box.focus();
         box.style.borderColor = '#1976d2';
         box.style.background = '#eef6ff';
         box.innerText = 'Paste the screenshot now with Cmd+V / Ctrl+V';
-      }, true);
+      });
+
       document.addEventListener('paste', async event => {
         if (!activePasteBoxId) return;
-        const box = document.getElementById(activePasteBoxId);
-        if (!box) return;
+
+        const activeBox = document.getElementById(activePasteBoxId);
+        if (!activeBox) {
+          activePasteBoxId = null;
+          return;
+        }
+
         const items = event.clipboardData && event.clipboardData.items;
-        const imageItem = items && Array.from(items).find(item => item.type && item.type.startsWith('image/'));
-        if (!imageItem) return;
+        if (!items) return;
+
+        const imageItem = Array.from(items).find(
+          item => item.type && item.type.startsWith('image/')
+        );
+        if (!imageItem) {
+          activeBox.innerText = 'Clipboard does not contain an image.';
+          activeBox.style.borderColor = '#f59e0b';
+          activeBox.style.background = '#fff7ed';
+          return;
+        }
+
         event.preventDefault();
-        box.innerText = 'Running OCR on pasted screenshot...';
-        box.style.borderColor = '#f59e0b';
-        box.style.background = '#fff7ed';
+        const file = imageItem.getAsFile();
         const reader = new FileReader();
+        activeBox.innerText = 'Running OCR on pasted screenshot...';
+        activeBox.style.borderColor = '#f59e0b';
+        activeBox.style.background = '#fff7ed';
+
         reader.onload = async () => {
           try {
             const response = await fetch('/analysis/clipboard-image-ocr', {
-              method: 'POST', headers: {'Content-Type': 'application/json'},
+              method: 'POST',
+              headers: {'Content-Type': 'application/json'},
               body: JSON.stringify({image_data_url: reader.result}),
             });
             const result = await response.json();
-            if (!result.ok || !result.text) throw new Error(result.error || 'No OCR text extracted');
+            if (!result.ok || !result.text) {
+              throw new Error(result.error || 'No OCR text extracted');
+            }
+
             const selector = activePasteBoxId.endsWith('-b')
-              ? 'textarea.analysis-fix-compare-input' : 'textarea.analysis-fix-input';
+              ? 'textarea.analysis-fix-compare-input'
+              : 'textarea.analysis-fix-input';
             const textarea = document.querySelector(selector);
-            if (!textarea) throw new Error('Could not find target input');
+            if (!textarea) throw new Error('Could not find the target input box');
+
             textarea.value = result.text;
             textarea.dispatchEvent(new Event('input', {bubbles: true}));
             textarea.dispatchEvent(new Event('change', {bubbles: true}));
-            box.innerText = 'OCR text inserted. Review it before analysis.';
-            box.style.borderColor = '#16a34a';
-            box.style.background = '#f0fdf4';
+            activeBox.innerText = 'OCR text inserted. Review it before analysis.';
+            activeBox.style.borderColor = '#16a34a';
+            activeBox.style.background = '#f0fdf4';
           } catch (error) {
-            box.innerText = 'OCR failed: ' + error.message;
-            box.style.borderColor = '#dc2626';
-            box.style.background = '#fef2f2';
+            activeBox.innerText = 'OCR failed: ' + error.message;
+            activeBox.style.borderColor = '#dc2626';
+            activeBox.style.background = '#fef2f2';
           }
         };
-        reader.readAsDataURL(imageItem.getAsFile());
-      }, true);
+        reader.readAsDataURL(file);
+      });
     })();
     </script>
-    """)
+    ''')
 
     with ui.row().classes("items-center q-gutter-sm q-px-md bg-white shadow-2").style(
         "position: fixed; left: 260px; right: 0; top: 82px; min-height: 64px; z-index: 110;"
@@ -340,7 +397,7 @@ def render_analysis_panel():
             value="Single Message",
             label="Mode",
         ).props("outlined dense").classes("w-56")
-        ui.button("Input", icon="upload", on_click=toggle_input_panel).props("outline")
+        ui.button("Load / Edit Input", icon="upload", on_click=load_dialog.open).props("outline")
         toolbar_actions_area = ui.row().classes("items-center q-gutter-sm")
         toolbar_status_label = ui.label("Ready").classes("text-sm text-grey-7 q-ml-auto")
 
@@ -373,90 +430,36 @@ def render_analysis_panel():
             "padding-top: 76px;"
         ):
 
-            # 2. INPUT SECTION
-            with ui.expansion("Input", value=False, icon="upload_file").classes(
-                "w-full q-mb-md bg-white shadow-1 rounded-borders"
-            ) as input_panel:
-                input_panel_ref["panel"] = input_panel
-                ui.label(
-                    "Paste FIX text, paste a screenshot, or upload an image/PDF. OCR text remains editable before analysis."
-                ).classes("text-sm text-grey-7 q-px-md")
-                with ui.row().classes("w-full items-center q-gutter-sm q-px-md"):
-                    upload_spinner = ui.spinner(size="sm")
-                    upload_spinner.visible = False
-                    upload_status_label = ui.label(
-                        "Ready for text, screenshot, image, or PDF."
-                    ).classes("text-sm text-grey-7")
-                with ui.tabs().classes("w-full") as input_tabs:
-                    tab_a = ui.tab("Message A / Sequence")
-                    tab_b = ui.tab("Message B")
-                with ui.tab_panels(input_tabs, value=tab_a).classes("w-full"):
-                    with ui.tab_panel(tab_a):
-                        raw_input = ui.textarea(
-                            label="FIX message(s) / extracted OCR text",
-                            placeholder="Paste one FIX message, a sequence, or extracted OCR text...",
-                        ).props("outlined autogrow").classes(
-                            "w-full analysis-fix-input max-h-80 overflow-auto"
-                        )
-                        ui.upload(
-                            label="Upload Message A image/PDF",
-                            on_upload=lambda e: handle_analysis_upload(e, raw_input),
-                            auto_upload=True,
-                            max_files=1,
-                        ).props("accept=image/*,.pdf").classes("w-full q-mt-sm")
-                        ui.html(
-                            '<div id="analysis-screenshot-paste-box-a" tabindex="0" '
-                            'style="border:2px dashed #aaa;border-radius:8px;padding:14px;margin-top:12px;'
-                            'text-align:center;color:#666;cursor:pointer;background:#fafafa;">'
-                            'Click here, then paste a Message A screenshot with Cmd+V / Ctrl+V</div>'
-                        ).classes("w-full")
-                    with ui.tab_panel(tab_b):
-                        compare_input_box = ui.textarea(
-                            label="Message B / Compare Against",
-                            placeholder="Paste the second FIX message here...",
-                        ).props("outlined autogrow").classes(
-                            "w-full analysis-fix-compare-input max-h-80 overflow-auto"
-                        )
-                        ui.upload(
-                            label="Upload Message B image/PDF",
-                            on_upload=lambda e: handle_analysis_upload(e, compare_input_box),
-                            auto_upload=True,
-                            max_files=1,
-                        ).props("accept=image/*,.pdf").classes("w-full q-mt-sm")
-                        ui.html(
-                            '<div id="analysis-screenshot-paste-box-b" tabindex="0" '
-                            'style="border:2px dashed #aaa;border-radius:8px;padding:14px;margin-top:12px;'
-                            'text-align:center;color:#666;cursor:pointer;background:#fafafa;">'
-                            'Click here, then paste a Message B screenshot with Cmd+V / Ctrl+V</div>'
-                        ).classes("w-full")
-                input_timeline_area = ui.column().classes("w-full q-px-md q-pb-md")
-
-            # 3. CONTEXT / SAVED SECTION
-            with ui.expansion("Saved Sessions / Context", value=False, icon="folder_open").classes(
+            # 2. CONTEXT / SELECTION SECTION
+            with ui.expansion("Context / Selection", value=True, icon="folder_open").classes(
                 "w-full q-mb-md bg-white shadow-1 rounded-borders"
             ):
                 ui.label(
-                    "Saved analyses, message selection, and investigation workspace."
+                    "Saved sessions, message selection, and investigation workspace."
                 ).classes("text-sm text-grey-7 q-px-md")
                 context_area = ui.column().classes("w-full q-pa-md overflow-auto").style(
-                    "max-height: 48vh;"
+                    "max-height: 42vh;"
                 )
 
-            # 4. BUSINESS REPORT
-            with ui.card().classes("w-full q-pa-md q-mb-md business-report-pane"):
-                ui.label("Business Report").classes("text-lg font-semibold")
-                ui.label(
-                    "Summary, warnings, insights, related messages, and reporting actions."
-                ).classes("text-sm text-grey-7")
-                reporting_area = ui.column().classes("w-full q-mt-md")
+            # 3 + 4. TECHNICAL AND REPORTING WINDOWS
+            with ui.row().classes("w-full no-wrap items-stretch q-gutter-md"):
+                with ui.card().classes("q-pa-md technical-analysis-pane").style(
+                    "width: 74%; min-width: 0; height: calc(100vh - 260px); overflow-y: auto;"
+                ):
+                    ui.label("Technical Analysis").classes("text-lg font-semibold")
+                    ui.label(
+                        "Raw FIX, decoded tags, selected tag details, and message windows."
+                    ).classes("text-sm text-grey-7")
+                    working_area = ui.column().classes("w-full q-mt-md")
 
-            # 5. TECHNICAL EVIDENCE
-            with ui.card().classes("w-full q-pa-md technical-analysis-pane"):
-                ui.label("Technical Evidence").classes("text-lg font-semibold")
-                ui.label(
-                    "Sequence details, related groups, messages, decoded tags, comparisons, business objects, and raw FIX."
-                ).classes("text-sm text-grey-7")
-                working_area = ui.column().classes("w-full q-mt-md")
+                with ui.card().classes("q-pa-md").style(
+                    "width: 26%; min-width: 300px; height: calc(100vh - 260px); overflow-y: auto;"
+                ):
+                    ui.label("Business Report").classes("text-lg font-semibold")
+                    ui.label(
+                        "Summary, warnings, insights, related messages, and reporting actions."
+                    ).classes("text-sm text-grey-7")
+                    reporting_area = ui.column().classes("w-full q-mt-md")
 
     with reporting_area:
         save_note_input = ui.textarea(
@@ -464,14 +467,14 @@ def render_analysis_panel():
             placeholder="Add context before saving an analysis...",
         ).props("outlined autogrow").classes("w-full")
 
-    # Stable output containers.
+    # Temporary compatibility aliases.
+    # Existing code can keep using these while we migrate gradually.
+    result_area = working_area
     saved_area = context_area
 
     with working_area:
         workspace_output_area = ui.column().classes("w-full")
         technical_result_area = ui.column().classes("w-full q-mt-md")
-
-    result_area = technical_result_area
 
     def workspace_message_key(message):
         return message.get("id") or message.get("message_id")
@@ -548,190 +551,6 @@ def render_analysis_panel():
                 for change in info_changes:
                     ui.label(f"- {change.get('summary')}").classes("text-grey-8")
 
-    def render_related_saved_matches(result):
-        messages = build_related_match_messages_from_result(result)
-        if not messages:
-            return
-
-        related_rows = []
-        seen = set()
-
-        for message in messages:
-            for match in find_related_saved_fix_messages(message, limit=20) or []:
-                key = (match.get("message_id") or match.get("id"), match.get("match_reason"))
-                if key in seen:
-                    continue
-                seen.add(key)
-                related_rows.append({
-                    "session_id": match.get("session_id"),
-                    "message_id": match.get("message_id") or match.get("id"),
-                    "message_index": match.get("message_index"),
-                    "match_strength": match.get("match_strength") or match.get("strength"),
-                    "match_reason": match.get("match_reason") or match.get("reason"),
-                    "msg_type": match.get("msg_type"),
-                    "cl_ord_id": match.get("cl_ord_id"),
-                    "order_id": match.get("order_id"),
-                    "exec_id": match.get("exec_id"),
-                    "symbol": match.get("symbol"),
-                })
-
-        if not related_rows:
-            return
-
-        with ui.expansion(
-            f"Related Saved Messages ({len(related_rows)})",
-            value=False,
-            icon="link",
-        ).classes("w-full q-mt-md bg-grey-1 rounded-borders"):
-            ui.table(
-                columns=[
-                    {"name": "session_id", "label": "Session", "field": "session_id", "align": "left", "sortable": True},
-                    {"name": "message_index", "label": "Message", "field": "message_index", "align": "left", "sortable": True},
-                    {"name": "match_strength", "label": "Strength", "field": "match_strength", "align": "left", "sortable": True},
-                    {"name": "match_reason", "label": "Reason", "field": "match_reason", "align": "left"},
-                    {"name": "msg_type", "label": "MsgType", "field": "msg_type", "align": "left"},
-                    {"name": "cl_ord_id", "label": "ClOrdID", "field": "cl_ord_id", "align": "left"},
-                    {"name": "order_id", "label": "OrderID", "field": "order_id", "align": "left"},
-                    {"name": "exec_id", "label": "ExecID", "field": "exec_id", "align": "left"},
-                    {"name": "symbol", "label": "Symbol", "field": "symbol", "align": "left"},
-                ],
-                rows=related_rows,
-                row_key="message_id",
-                pagination={"rowsPerPage": 10},
-            ).classes("w-full")
-
-    def render_sequence_evidence(result):
-        ui.label("Sequence Summary").classes("text-lg font-semibold")
-        ui.markdown(str(result.get("summary") or "No sequence summary generated.")).classes(
-            "w-full q-pa-md bg-grey-1 rounded-borders"
-        )
-
-        groups = result.get("groups") or []
-        if groups:
-            ui.label("Related Groups").classes("text-lg font-semibold q-mt-md")
-            group_rows = []
-            for group in groups:
-                exec_ids = group.get("exec_ids") or []
-                exec_id_display = ", ".join(exec_ids[:5])
-                if len(exec_ids) > 5:
-                    exec_id_display += f", ... +{len(exec_ids) - 5} more"
-                group_rows.append({
-                    "group_label": group.get("group_label"),
-                    "message_count": group.get("message_count"),
-                    "message_indexes": ", ".join(str(x) for x in group.get("message_indexes") or []),
-                    "cl_ord_ids": ", ".join(group.get("cl_ord_ids") or []),
-                    "order_ids": ", ".join(group.get("order_ids") or []),
-                    "secondary_order_ids": ", ".join(group.get("secondary_order_ids") or []),
-                    "exec_ids": exec_id_display,
-                })
-            with ui.element("div").classes("w-full overflow-auto analysis-table-scroll"):
-                ui.table(
-                    columns=[
-                        {"name": "group_label", "label": "Group", "field": "group_label", "align": "left", "sortable": True},
-                        {"name": "message_count", "label": "Messages", "field": "message_count", "align": "left", "sortable": True},
-                        {"name": "message_indexes", "label": "Message #", "field": "message_indexes", "align": "left"},
-                        {"name": "cl_ord_ids", "label": "ClOrdID(s)", "field": "cl_ord_ids", "align": "left"},
-                        {"name": "order_ids", "label": "OrderID(s)", "field": "order_ids", "align": "left"},
-                        {"name": "secondary_order_ids", "label": "SecondaryOrderID(s)", "field": "secondary_order_ids", "align": "left"},
-                        {"name": "exec_ids", "label": "ExecID(s)", "field": "exec_ids", "align": "left"},
-                    ],
-                    rows=group_rows, row_key="group_label", pagination={"rowsPerPage": 0},
-                ).classes("w-full")
-
-        messages = result.get("messages") or []
-        if messages:
-            with ui.expansion(f"Messages ({len(messages)})", value=False, icon="view_list").classes(
-                "w-full q-mt-md bg-grey-1 rounded-borders"
-            ):
-                ui.label(
-                    "Select exactly two rows, then compare them. The table scrolls horizontally for all FIX identifiers and quantities."
-                ).classes("text-sm text-grey-7 q-pa-sm")
-                rows = []
-                for msg in messages:
-                    rows.append({
-                        "message_index": msg.get("message_index"),
-                        "msg_seq_num": msg.get("msg_seq_num"),
-                        "group_label": msg.get("group_label"),
-                        "msg_type": msg.get("msg_type"),
-                        "route": f"{msg.get('sender') or ''} → {msg.get('target') or ''}",
-                        "time": msg.get("transact_time") or msg.get("sending_time"),
-                        "cl_ord_id": msg.get("cl_ord_id"),
-                        "order_id": msg.get("order_id"),
-                        "secondary_order_id": msg.get("secondary_order_id"),
-                        "exec_id": msg.get("exec_id"),
-                        "exec_type": msg.get("exec_type"),
-                        "ord_status": msg.get("ord_status"),
-                        "symbol": msg.get("symbol"),
-                        "order_qty": msg.get("order_qty"),
-                        "last_qty": msg.get("last_qty"),
-                        "cum_qty": msg.get("cum_qty"),
-                        "leaves_qty": msg.get("leaves_qty"),
-                        "raw_text": msg.get("raw_text"),
-                    })
-                columns = [
-                    {"name": "message_index", "label": "#", "field": "message_index", "align": "left", "sortable": True},
-                    {"name": "msg_seq_num", "label": "Seq", "field": "msg_seq_num", "align": "left", "sortable": True},
-                    {"name": "group_label", "label": "Group", "field": "group_label", "align": "left", "sortable": True},
-                    {"name": "msg_type", "label": "MsgType", "field": "msg_type", "align": "left", "sortable": True},
-                    {"name": "route", "label": "Route", "field": "route", "align": "left", "sortable": True},
-                    {"name": "time", "label": "Time", "field": "time", "align": "left", "sortable": True},
-                    {"name": "cl_ord_id", "label": "ClOrdID", "field": "cl_ord_id", "align": "left", "sortable": True},
-                    {"name": "order_id", "label": "OrderID", "field": "order_id", "align": "left", "sortable": True},
-                    {"name": "secondary_order_id", "label": "SecondaryOrderID", "field": "secondary_order_id", "align": "left", "sortable": True},
-                    {"name": "exec_id", "label": "ExecID", "field": "exec_id", "align": "left", "sortable": True},
-                    {"name": "exec_type", "label": "ExecType", "field": "exec_type", "align": "left", "sortable": True},
-                    {"name": "ord_status", "label": "OrdStatus", "field": "ord_status", "align": "left", "sortable": True},
-                    {"name": "symbol", "label": "Symbol", "field": "symbol", "align": "left", "sortable": True},
-                    {"name": "order_qty", "label": "OrderQty", "field": "order_qty", "align": "left", "sortable": True},
-                    {"name": "last_qty", "label": "LastQty", "field": "last_qty", "align": "left", "sortable": True},
-                    {"name": "cum_qty", "label": "CumQty", "field": "cum_qty", "align": "left", "sortable": True},
-                    {"name": "leaves_qty", "label": "LeavesQty", "field": "leaves_qty", "align": "left", "sortable": True},
-                ]
-                compare_result_area = ui.column().classes("w-full q-mt-md")
-                message_table = ui.table(
-                    columns=columns, rows=rows, row_key="message_index",
-                    selection="multiple", pagination={"rowsPerPage": 0},
-                ).classes("w-full")
-                def compare_selected_messages():
-                    selected_rows = list(message_table.selected or [])
-                    if len(selected_rows) != 2:
-                        ui.notify("Please select exactly 2 messages to compare.", color="warning")
-                        return
-
-                    existing_keys = {workspace_message_key(item) for item in workspace_messages}
-                    for selected in selected_rows:
-                        key = workspace_message_key(selected) or (
-                            "live",
-                            selected.get("message_index"),
-                            selected.get("raw_text"),
-                        )
-                        if key not in existing_keys and len(workspace_messages) < MAX_COMPARE_MESSAGES:
-                            workspace_messages.append(selected)
-                            existing_keys.add(key)
-                    refresh_workspace_status()
-
-                    compare_result_area.clear()
-                    comparison = compare_fix_messages(
-                        selected_rows[0].get("raw_text") or "",
-                        selected_rows[1].get("raw_text") or "",
-                    )
-                    with compare_result_area:
-                        render_compare_result(comparison)
-                ui.button(
-                    "Compare Selected Messages", on_click=compare_selected_messages
-                ).props("outline").classes("q-mt-sm")
-
-        input_timeline_area.clear()
-        timeline_summary = result.get("timeline_summary") or ""
-        if timeline_summary:
-            with input_timeline_area:
-                with ui.expansion("Raw Timeline / Parsed Messages", value=False, icon="schedule").classes(
-                    "w-full bg-grey-1 rounded-borders"
-                ):
-                    ui.code(timeline_summary).classes(
-                        "w-full max-h-80 overflow-auto whitespace-pre-wrap"
-                    )
-
     def run_analysis():
         toolbar_status_label.set_text("Analyzing...")
         result_area.clear()
@@ -789,29 +608,16 @@ def render_analysis_panel():
             result_area.clear()
             toolbar_status_label.set_text("Complete")
 
-            reporting_area.clear()
-            with reporting_area:
-                ui.label("Summary").classes("text-lg font-semibold")
-                ui.markdown(_format_summary_with_pipes(result.get("summary"))).classes(
-                    "w-full q-pa-md bg-grey-1 rounded-borders"
-                )
-                warnings = result.get("warnings") or []
-                if warnings:
-                    ui.label("Warnings").classes("text-lg font-semibold text-red-7 q-mt-md")
-                    for warning in warnings:
-                        ui.label(f"- {warning}").classes("text-red-7")
-
             with result_area:
                 if result.get("input_type") == "fix_compare":
                     render_compare_result(result)
                     return
 
                 if result.get("input_type") == "fix_sequence":
-                    render_sequence_evidence(result)
+                    render_sequence_result(result)
                     insights = build_sequence_insights(result.get("messages") or [])
-                    with reporting_area:
-                        render_sequence_insights(insights)
-                        render_related_saved_matches(result)
+                    render_sequence_insights(insights)
+                    render_related_saved_matches(result)
 
                     def save_current_sequence_result():
                         save_note = (save_note_input.value or "").strip()
@@ -858,36 +664,56 @@ def render_analysis_panel():
 
                         refresh_saved_analyses()
 
-                    with reporting_area:
-                        ui.button(
-                            "Save Analysis",
-                            on_click=save_current_sequence_result,
-                        ).props("color=primary outline").classes("q-mt-md")
+                    ui.button(
+                        "Save Analysis",
+                        on_click=save_current_sequence_result,
+                    ).props("color=primary outline").classes("q-mt-md")
 
                     return
+
+                ui.label("Plain-English Summary").classes("text-lg font-bold")
+
+                summary_text = str(result.get("summary") or "").strip()
+
+                ui.textarea(
+                    value=summary_text or "No summary generated.",
+                ).props(
+                    "readonly outlined autogrow"
+                ).classes(
+                    "w-full bg-gray-100"
+                )
+
+                ui.label(
+                    f"Parsed tags: {result.get('parsed_count', 0)} | "
+                    f"Dictionary hits: {result.get('dictionary_hits', 0)} | "
+                    f"Misses: {result.get('dictionary_misses', 0)} | "
+                    f"Enum hits: {result.get('enum_hits', 0)}"
+                ).classes("text-sm text-gray-500")
+
+                warnings = result.get("warnings") or []
+                if warnings:
+                    ui.label("Warnings").classes("text-lg font-bold mt-4")
+                    for warning in warnings:
+                        ui.label(warning).classes("text-red-600")
 
                 business_object = result.get("business_object", {}) or {}
 
                 parties = business_object.get("parties") or []
 
                 if parties:
-                    with ui.expansion(
-                        f"Parties ({len(parties)})",
-                        value=False,
-                        icon="groups",
-                    ).classes("w-full q-mt-md bg-grey-1 rounded-borders"):
-                        with ui.element("div").classes("w-full max-h-80 overflow-auto border rounded"):
-                            ui.table(
-                                columns=[
-                                    {"name": "party_id", "label": "Party ID", "field": "party_id", "align": "left"},
-                                    {"name": "party_id_source", "label": "Source", "field": "party_id_source", "align": "left"},
-                                    {"name": "party_role", "label": "Role", "field": "party_role", "align": "left"},
-                                    {"name": "party_role_name", "label": "Role Meaning", "field": "party_role_name", "align": "left"},
-                                ],
-                                rows=parties,
-                                row_key="party_id",
-                                pagination=False,
-                            ).classes("w-full")
+                    ui.label("Parties").classes("text-lg font-bold mt-4")
+
+                    ui.table(
+                        columns=[
+                            {"name": "party_id", "label": "Party ID", "field": "party_id", "align": "left"},
+                            {"name": "party_id_source", "label": "Source", "field": "party_id_source", "align": "left"},
+                            {"name": "party_role", "label": "Role", "field": "party_role", "align": "left"},
+                            {"name": "party_role_name", "label": "Role Meaning", "field": "party_role_name", "align": "left"},
+                        ],
+                        rows=parties,
+                        row_key="party_id",
+                        pagination=10,
+                    ).classes("w-full max-h-80 overflow-auto")
 
                 ui.label("Decoded Values").classes("text-lg font-bold mt-4")
 
@@ -971,25 +797,6 @@ def render_analysis_panel():
                 .decoded-values-scroll .q-table__middle table {
                     min-width: max-content;
                 }
-
-                .business-report-pane {
-                    overflow: visible;
-                }
-
-                .tag-inspector {
-                    max-height: calc(100vh - 210px);
-                    overflow-y: auto;
-                }
-
-                @media (max-width: 1200px) {
-                    .business-report-pane,
-                    .tag-inspector,
-                    .decoded-table-column {
-                        width: 100% !important;
-                        min-width: 0 !important;
-                        position: static !important;
-                    }
-                }
                 </style>
                 """)
 
@@ -999,164 +806,104 @@ def render_analysis_panel():
 
                 reset_decoded_sort_button = ui.button("Reset sorting").props("outline size=sm")
 
-                with ui.row().classes("w-full no-wrap items-start q-gutter-md"):
-                    with ui.column().classes("decoded-table-column").style(
-                        "width: calc(80% - 8px); min-width: 0;"
-                    ):
-                        with ui.element("div").classes("w-full border rounded decoded-values-scroll"):
-                                            decoded_table = ui.table(
-                                                columns=[
-                                                    {"name": "_seq", "label": "#", "field": "_seq", "align": "left", "sortable": True},
-                                                    {"name": "tag", "label": "Tag", "field": "_tag_sort", "align": "left", "sortable": True},
-                                                    {"name": "tag_name", "label": "Tag Name", "field": "tag_name", "align": "left", "sortable": True},
-                                                    {"name": "value", "label": "Value", "field": "value", "align": "left", "sortable": True},
-                                                    {"name": "value_name", "label": "Value Name", "field": "value_name", "align": "left", "sortable": True},
-                                                ],
-                                                rows=rows,
-                                                row_key="_seq",
-                                                selection="single",
-                                                pagination={
-                                                    "sortBy": "_seq",
-                                                    "descending": False,
-                                                    "rowsPerPage": 0,
-                                                },
-                                            ).classes("w-full")
+                with ui.element("div").classes("w-full border rounded decoded-values-scroll"):
+                    decoded_table = ui.table(
+                        columns=[
+                            {"name": "_seq", "label": "#", "field": "_seq", "align": "left", "sortable": True},
+                            {"name": "tag", "label": "Tag", "field": "_tag_sort", "align": "left", "sortable": True},
+                            {"name": "tag_name", "label": "Tag Name", "field": "tag_name", "align": "left", "sortable": True},
+                            {"name": "tag_status", "label": "Tag Status", "field": "tag_status", "align": "left", "sortable": True},
+                            {"name": "tag_warning", "label": "Tag Warning", "field": "tag_warning", "align": "left"},
+                            {"name": "ocr_repair_warning", "label": "OCR Repair", "field": "ocr_repair_warning", "align": "left"},
+                            {"name": "value", "label": "Value", "field": "value", "align": "left", "sortable": True},
+                            {"name": "value_name", "label": "Value Name", "field": "value_name", "align": "left", "sortable": True},
+                            {"name": "has_enums", "label": "Has Enums", "field": "has_enums", "align": "left", "sortable": True},
+                            {"name": "enum_valid", "label": "Enum Valid", "field": "enum_valid", "align": "left", "sortable": True},
+                            {"name": "enum_warning", "label": "Enum Warning", "field": "enum_warning", "align": "left"},
+                            {"name": "description", "label": "Description", "field": "description", "align": "left"},
+                            {"name": "ocr_inferred", "label": "OCR Inferred", "field": "ocr_inferred", "align": "left", "sortable": True},
+                            {"name": "ocr_score", "label": "OCR Score", "field": "ocr_score", "align": "left", "sortable": True},
+                        ],
+                        rows=rows,
+                        pagination={
+                            "sortBy": "_seq",
+                            "descending": False,
+                            "rowsPerPage": 0,
+                        },
+                    ).classes("w-full")
 
-                                            def reset_decoded_sorting():
-                                                decoded_table.rows = sorted(
-                                                    rows,
-                                                    key=lambda row: row.get("_seq", 0),
-                                                )
-                                                decoded_table.pagination = {
-                                                    "sortBy": "_seq",
-                                                    "descending": False,
-                                                    "rowsPerPage": 0,
-                                                }
-                                                decoded_table.update()
-
-                                            reset_decoded_sort_button.on_click(reset_decoded_sorting)
-
-                                            decoded_table.add_slot("body", r"""
-                                            <q-tr
-                                              :props="props"
-                                              @click="props.selected = !props.selected"
-                                              :class="(
-                                                props.row.enum_valid === false ||
-                                                props.row.enum_valid === 'Review' ||
-                                                props.row.enum_valid === 'Parse Review' ||
-                                                props.row.enum_valid === 'OCR Review' ||
-                                                props.row.enum_warning ||
-                                                props.row.tag_warning ||
-                                                props.row.ocr_repair_warning
-                                              ) ? 'text-red' : ''"
-                                            >
-                                              <q-td
-                                                v-for="col in props.cols"
-                                                :key="col.name"
-                                                :props="props"
-                                                style="white-space: nowrap; vertical-align: top;"
-                                              >
-                                                {{ col.name === 'tag' ? props.row.tag : col.value }}
-                                              </q-td>
-                                            </q-tr>
-                                            """)
-
-                    with ui.card().classes("tag-inspector q-pa-md").style(
-                        "width: calc(20% - 8px); min-width: 280px; position: sticky; top: 132px;"
-                    ):
-                        ui.label("Tag Inspector").classes("text-md font-semibold")
-                        ui.label("Select a decoded row to inspect its dictionary details.").classes(
-                            "text-xs text-grey-7 q-mb-md"
+                    def reset_decoded_sorting():
+                        decoded_table.rows = sorted(
+                            rows,
+                            key=lambda row: row.get("_seq", 0),
                         )
-                        inspector_state = ui.badge("No tag selected", color="grey").props("outline")
-                        inspector_tag = ui.label("Tag: —").classes("font-semibold")
-                        inspector_name = ui.label("Name: —")
-                        inspector_value = ui.label("Current Value: —")
-                        inspector_meaning = ui.label("Meaning: —")
-                        ui.separator().classes("q-my-sm")
-                        inspector_dictionary = ui.label("Dictionary Status: —").classes("text-sm")
-                        inspector_enums = ui.label("Enumerations: —").classes("text-sm")
-                        inspector_enum_valid = ui.label("Enum Validation: —").classes("text-sm")
-                        inspector_ocr = ui.label("OCR Processing: —").classes("text-sm")
-                        inspector_ocr_score = ui.label("OCR Confidence: —").classes("text-sm")
-                        ui.separator().classes("q-my-sm")
-                        ui.label("Description").classes("text-sm font-semibold")
-                        inspector_description = ui.label("Select a row to view its description.").classes(
-                            "text-sm text-grey-8 whitespace-pre-wrap"
+                        decoded_table.pagination = {
+                            "sortBy": "_seq",
+                            "descending": False,
+                            "rowsPerPage": 0,
+                        }
+                        decoded_table.update()
+
+                    reset_decoded_sort_button.on_click(reset_decoded_sorting)
+
+                    decoded_table.add_slot("body", r"""
+                    <q-tr
+                      :props="props"
+                      :class="(
+                        props.row.enum_valid === false ||
+                        props.row.enum_valid === 'Review' ||
+                        props.row.enum_valid === 'Parse Review' ||
+                        props.row.enum_valid === 'OCR Review' ||
+                        props.row.enum_warning ||
+                        props.row.tag_warning ||
+                        props.row.ocr_repair_warning
+                      ) ? 'text-red' : ''"
+                    >
+                      <q-td
+                        v-for="col in props.cols"
+                        :key="col.name"
+                        :props="props"
+                        :style="(
+                          col.name === 'ocr_repair_warning' ||
+                          col.name === 'tag_warning' ||
+                          col.name === 'enum_warning'
                         )
-                        ui.separator().classes("q-my-sm")
-                        ui.label("Review Notes").classes("text-sm font-semibold")
-                        inspector_warnings = ui.label("None").classes(
-                            "text-sm text-grey-8 whitespace-pre-wrap"
-                        )
+                          ? 'max-width: 160px; min-width: 90px; white-space: normal; word-break: break-word; overflow-wrap: anywhere; vertical-align: top; font-size: 11px;'
+                          : (
+                              col.name === 'description'
+                            )
+                              ? 'max-width: 320px; min-width: 220px; white-space: normal; word-break: break-word; overflow-wrap: anywhere; vertical-align: top; font-size: 12px;'
+                              : 'white-space: nowrap; vertical-align: top;'"
+                      >
+                        {{ col.name === 'tag' ? props.row.tag : col.value }}
+                      </q-td>
+                    </q-tr>
+                    """)
 
-                    def populate_tag_inspector(row):
-                        if not row:
-                            return
+                parties = business_object.get("parties") or []
 
-                        tag_warning = str(row.get("tag_warning") or "").strip()
-                        enum_warning = str(row.get("enum_warning") or "").strip()
-                        ocr_review = str(row.get("ocr_repair_warning") or "").strip()
-                        enum_valid = row.get("enum_valid")
-                        tag_status = str(row.get("tag_status") or "").strip()
-                        ocr_inferred = row.get("ocr_inferred")
+                if parties:
+                    ui.label("Parties").classes("text-lg font-bold mt-4")
 
-                        has_validation_issue = bool(
-                            tag_warning
-                            or enum_warning
-                            or str(enum_valid).lower() in {"false", "review", "parse review", "ocr review"}
-                        )
-                        has_ocr_review = bool(ocr_review or ocr_inferred)
-                        is_unknown = tag_status.lower() in {"custom", "unknown", "missing", "not_found", "not found"}
+                    with ui.element("div").classes("w-full max-h-80 overflow-auto border rounded"):
+                        ui.table(
+                            columns=[
+                                {"name": "party_id", "label": "Party ID", "field": "party_id", "align": "left"},
+                                {"name": "party_id_source", "label": "Source", "field": "party_id_source", "align": "left"},
+                                {"name": "party_role", "label": "Role", "field": "party_role", "align": "left"},
+                                {"name": "party_role_name", "label": "Role Meaning", "field": "party_role_name", "align": "left"},
+                            ],
+                            rows=parties,
+                            row_key="party_id",
+                            pagination=False,
+                        ).classes("w-full")
 
-                        if has_validation_issue:
-                            inspector_state.set_text("Review required")
-                            inspector_state.props("color=negative outline")
-                        elif has_ocr_review:
-                            inspector_state.set_text("OCR review")
-                            inspector_state.props("color=warning outline")
-                        elif is_unknown:
-                            inspector_state.set_text("Custom / unknown")
-                            inspector_state.props("color=purple outline")
-                        else:
-                            inspector_state.set_text("Known / valid")
-                            inspector_state.props("color=positive outline")
+                ui.label("Business Object").classes("text-lg font-bold mt-4")
 
-                        inspector_tag.set_text(f"Tag: {row.get('tag') or '—'}")
-                        inspector_name.set_text(f"Name: {row.get('tag_name') or '—'}")
-                        inspector_value.set_text(f"Current Value: {row.get('value') or '—'}")
-                        inspector_meaning.set_text(f"Meaning: {row.get('value_name') or '—'}")
-                        inspector_dictionary.set_text(f"Dictionary Status: {tag_status or '—'}")
-                        inspector_enums.set_text(f"Enumerations: {'Yes' if row.get('has_enums') else 'No'}")
-                        inspector_enum_valid.set_text(f"Enum Validation: {enum_valid if enum_valid not in (None, '') else '—'}")
-                        inspector_ocr.set_text(
-                            "OCR Processing: "
-                            + (ocr_review or ("Value inferred/repaired" if ocr_inferred else "No OCR repair recorded"))
-                        )
-                        inspector_ocr_score.set_text(
-                            f"OCR Confidence: {row.get('ocr_score') if row.get('ocr_score') not in (None, '') else '—'}"
-                        )
-                        inspector_description.set_text(row.get("description") or "No description available.")
-
-                        notes = [part for part in (tag_warning, enum_warning, ocr_review) if part]
-                        inspector_warnings.set_text("\n".join(notes) or "None")
-
-                    def update_selected_tag_inspector():
-                        selected = list(decoded_table.selected or [])
-                        if selected:
-                            populate_tag_inspector(selected[0])
-
-                    decoded_table.on("selection", lambda _event: update_selected_tag_inspector())
-
-                with ui.expansion(
-                    "Business Object",
-                    value=False,
-                    icon="data_object",
-                ).classes("w-full q-mt-md bg-grey-1 rounded-borders"):
-                    ui.code(
-                        json.dumps(business_object, indent=2, ensure_ascii=False),
-                        language="json",
-                    ).classes("w-full max-h-96 overflow-auto")
+                ui.code(
+                    json.dumps(business_object, indent=2, ensure_ascii=False),
+                    language="json",
+                ).classes("w-full max-h-96 overflow-auto")
 
                 def save_current_single_result():
                     save_note = (save_note_input.value or "").strip()
@@ -1178,53 +925,12 @@ def render_analysis_panel():
                     else:
                         ui.notify(f"Analysis already exists as session {session_id}. Save skipped.", color="info")
 
-                def add_current_message_to_workspace():
-                    candidate_messages = build_related_match_messages_from_result(result) or []
-                    current_message = dict(candidate_messages[0]) if candidate_messages else {}
-                    current_message.setdefault("raw_text", raw_a)
-                    current_message.setdefault("message_index", 1)
-                    current_message.setdefault("source_type", "live_analysis")
+                render_related_saved_matches(result)
 
-                    current_key = workspace_message_key(current_message) or (
-                        "live_analysis",
-                        current_message.get("message_index"),
-                        current_message.get("raw_text"),
-                    )
-                    existing_keys = {
-                        workspace_message_key(message) or (
-                            message.get("source_type") or "workspace",
-                            message.get("message_index"),
-                            message.get("raw_text"),
-                        )
-                        for message in workspace_messages
-                    }
-
-                    if current_key in existing_keys:
-                        ui.notify("The current message is already in the workspace / compare basket.", color="info")
-                        return
-
-                    if len(workspace_messages) >= MAX_COMPARE_MESSAGES:
-                        ui.notify(
-                            f"The workspace already contains the maximum of {MAX_COMPARE_MESSAGES} messages.",
-                            color="warning",
-                        )
-                        return
-
-                    workspace_messages.append(current_message)
-                    refresh_workspace_status()
-                    ui.notify("Added current message to the workspace / compare basket.", color="positive")
-
-                with reporting_area:
-                    render_related_saved_matches(result)
-                    with ui.row().classes("q-gutter-sm q-mt-md"):
-                        ui.button(
-                            "Add Current to Workspace / Compare Basket",
-                            on_click=add_current_message_to_workspace,
-                        ).props("outline color=secondary")
-                        ui.button(
-                            "Save Analysis",
-                            on_click=save_current_single_result,
-                        ).props("color=primary outline")
+                ui.button(
+                    "Save Analysis",
+                    on_click=save_current_single_result,
+                ).props("color=primary outline").classes("q-mt-md")
 
             toolbar_status_label.set_text("Complete")
             toolbar_status_label.classes(replace="text-sm text-green-7 q-ml-auto")
@@ -1257,29 +963,20 @@ def render_analysis_panel():
                 if count == 1:
                     message = workspace_messages[0]
 
-                    ui.label("Workspace Preview").classes(
+                    ui.label("Single Message").classes(
                         "text-lg font-semibold"
                     )
 
-                    session_id = message.get("session_id")
-                    message_index = message.get("message_index")
-                    session_text = session_id if session_id is not None else "Live"
-                    message_text = message_index if message_index is not None else "1"
-
                     ui.label(
-                        f"Session {session_text} | Message {message_text}"
+                        f"Session {message.get('session_id')} | "
+                        f"Message {message.get('message_index')}"
                     ).classes("text-sm text-grey-7")
 
-                    with ui.expansion(
-                        "View Raw FIX",
-                        icon="code",
-                        value=False,
-                    ).classes("w-full q-mt-sm"):
-                        ui.label(
-                            message.get("raw_text") or "No raw FIX text available."
-                        ).classes(
-                            "w-full text-xs font-mono whitespace-pre-wrap break-all"
-                        )
+                    ui.label(
+                        message.get("raw_text") or "No raw FIX text available."
+                    ).classes(
+                        "w-full text-xs font-mono whitespace-pre-wrap"
+                    )
                     return
 
                 if count == 2:
@@ -1351,8 +1048,6 @@ def render_analysis_panel():
                 with_input=True,
             ).props("outlined dense").classes("w-full q-mt-md")
 
-            saved_session_viewer = ui.column().classes("w-full q-mt-md")
-
             def open_selected_session():
                 selected_rows = list(table.selected or [])
 
@@ -1372,9 +1067,9 @@ def render_analysis_panel():
 
                 messages = list_fix_analysis_messages(session_id)
 
-                saved_session_viewer.clear()
+                technical_result_area.clear()
 
-                with saved_session_viewer:
+                with technical_result_area:
                     ui.label(
                         f"Saved Analysis Session {session_id}"
                     ).classes("text-lg font-bold")
@@ -1436,18 +1131,18 @@ def render_analysis_panel():
                                 ui.notify("This message is already in the compare basket.", color="info")
                                 return
 
-                        if len(workspace_messages) >= MAX_COMPARE_MESSAGES:
-                            ui.notify(
-                                f"The workspace already contains {MAX_COMPARE_MESSAGES} messages.",
-                                color="warning",
-                            )
-                            return
+                        if len(saved_compare_selection) >= 2:
+                            saved_compare_selection.clear()
 
-                        workspace_messages.append(selected)
-                        refresh_workspace_status()
+                        saved_compare_selection.append({
+                            "message_id": message_id,
+                            "session_id": session_id,
+                            "message_index": message_index,
+                        })
 
                         ui.notify(
-                            f"Added session {session_id} message {message_index} to the investigation workspace.",
+                            f"Added session {session_id} message {message_index} to compare basket "
+                            f"({len(saved_compare_selection)}/2).",
                             color="positive",
                         )
 
