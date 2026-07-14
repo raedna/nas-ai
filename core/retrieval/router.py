@@ -713,17 +713,24 @@ def run_query_with_method(
                         _lp = _linked_pts[0].payload or {}
                         _lname = _lp.get("primary_name") or _link["target_identifier"]
                         _source_file = _lp.get("source_file") or _link["target_identifier"]
-                        _full = _fetchall(
-                            """SELECT payload->>'text' AS text FROM chunks
-                               WHERE collection_name = %s
-                               AND payload->>'source_file' = %s
-                               ORDER BY id LIMIT 3""",
-                            (_link["target_collection"], _source_file)
-                        )
-                        if _full:
-                            _ldesc = "\n\n".join(r["text"] for r in _full if r["text"])
+                        # The LINKED CHUNK's own text wins when present —
+                        # aggregating by source_file merges every memory note
+                        # (they all share 'user_memory') into one preview,
+                        # which defeated the note-relevance filter.
+                        if _lp.get("text"):
+                            _ldesc = str(_lp["text"])
                         else:
-                            _ldesc = str(_lp.get("description") or "")
+                            _full = _fetchall(
+                                """SELECT payload->>'text' AS text FROM chunks
+                                   WHERE collection_name = %s
+                                   AND payload->>'source_file' = %s
+                                   ORDER BY id LIMIT 3""",
+                                (_link["target_collection"], _source_file)
+                            )
+                            if _full:
+                                _ldesc = "\n\n".join(r["text"] for r in _full if r["text"])
+                            else:
+                                _ldesc = str(_lp.get("description") or "")
                         _idrow = _fetchall(
                             "SELECT id FROM chunks WHERE collection_name=%s AND "
                             "(identifier=%s OR primary_name=%s OR payload->>'source_file'=%s) "

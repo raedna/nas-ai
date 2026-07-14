@@ -1487,6 +1487,38 @@ def chat_turn(question: str, history: list, available_collections: list,
     all_related = [s for s in all_related
                    if s.get("collection") != "memory"]
 
+    # QUESTION-anchored memory (not just winner-anchored): notes linked to
+    # any identifier the QUESTION names must surface even when arbitration
+    # crowned an unrelated document — the note annotates the subject the
+    # user asked about, not whichever chunk won.
+    try:
+        import re as _re_qm
+        _qm_ids = _re_qm.findall(r"\b[a-zA-Z0-9_\-]+\.[a-zA-Z0-9]{2,5}\b",
+                                 standalone_question)
+        _qm_ids += [c for c in _re_qm.findall(r"\b[A-Z][A-Z0-9_]{3,}\b",
+                                              standalone_question)
+                    if c not in _qm_ids]
+        _seen_notes = {str(m.get("preview") or "")[:80] for m in _memory_sections}
+        for _qid in _qm_ids[:3]:
+            _qm_rows = fetchall(
+                """SELECT c.nlp_text FROM cross_links l
+                   JOIN chunks c ON c.collection_name = l.source_collection
+                                AND c.identifier = l.source_identifier
+                   WHERE l.source_collection = 'memory'
+                   AND l.status = 'confirmed'
+                   AND l.target_identifier ILIKE %s""", (_qid,))
+            for _r in _qm_rows:
+                _txt = str(_r["nlp_text"] or "").strip()
+                if _txt and _txt[:80] not in _seen_notes:
+                    _seen_notes.add(_txt[:80])
+                    _memory_sections.append(
+                        {"collection": "memory", "preview": _txt,
+                         "title": _txt[:80], "match_type": "question_anchor",
+                         "confidence": 0.85})
+    except Exception as _e:
+        if DEBUG:
+            print(f"DEBUG question-anchored memory failed: {_e}")
+
     high_confidence = [
         s for s in all_related
         if s.get("confidence", 0) >= RELATED_MERGE_THRESHOLD
@@ -1569,11 +1601,83 @@ def chat_turn(question: str, history: list, available_collections: list,
     # Memory notes compose verbatim — the user's own words with their date
     # line, never paraphrased, visible whether they agree with the data or
     # contradict it (the conflict shows itself; the data stays the record).
-    for _ms in _memory_sections[:2]:
+    #
+    # RELEVANCE: a note rides an answer only if it shares a content word
+    # with the QUESTION beyond the linked identifier itself — "what column
+    # for the date" surfaces the date-column note, not the 5AM one. A
+    # generic entity question ("what is gsact.txt") has no tokens beyond
+    # the identifier: ALL its notes compose (capped).
+    import re as _re_mem
+    try:
+        from core.query_helpers import load_doc_query_hints as _ldqh
+        _mnoise = set()
+        for _k in ("discovery_noise_words", "question_words", "stopwords"):
+            _mnoise.update(_ldqh().get(_k, []))
+    except Exception:
+        _mnoise = set()
+    _mt = lambda t: {w for w in _re_mem.findall(r"[a-z0-9]{2,}", str(t).lower())
+                     if w not in _mnoise}
+    _id_toks = _mt((query_run.get("answer_payload") or {}).get("identifier") or "")
+    _id_toks |= _mt(collection or "")
+    # The payload is not always populated — the question's own filename/code
+    # tokens are identifier tokens too (else 'gsact'/'txt' count as content
+    # words and every note about the entity looks "relevant").
+    _q_fnames = _re_mem.findall(r"\b[a-zA-Z0-9_\-]+\.[a-zA-Z0-9]{2,5}\b",
+                                standalone_question)
+    for _fn in _q_fnames:
+        _id_toks |= _mt(_fn)
+    _q_extra = _mt(standalone_question) - _id_toks
+    _relevant = []
+    for _ms in _memory_sections:
+        _note_toks = _mt(_ms.get("preview") or _ms.get("title") or "")
+        if not _q_extra or (_q_extra & _note_toks):
+            _relevant.append(_ms)
+
+    # CONFLICT NUDGE: under a STRUCTURED record, a note overlapping one of
+    # the record's field LABELS ("date column" ~ "Date Column to Check")
+    # earns the update-the-source suggestion. Proximity flag, not a truth
+    # claim — the user judges which side is right.
+    _labels = []          # (token_set, original_label_text)
+    if answer_kind == "structured":
+        for _ln in str(primary_answer).splitlines():
+            if ":" in _ln:
+                _lab_txt = _ln.split(":", 1)[0].strip(" -*")
+                _labels.append((_mt(_lab_txt), _lab_txt))
+    _src_file = str((query_run.get("answer_payload") or {}).get("source_file") or "")
+    if not _src_file and _q_fnames and collection:
+        try:
+            _sf_row = fetchall(
+                "SELECT source_file FROM chunks WHERE collection_name = %s "
+                "AND identifier = %s LIMIT 1", (collection, _q_fnames[0]))
+            _src_file = str(_sf_row[0]["source_file"]) if _sf_row else ""
+        except Exception:
+            pass
+
+    _memory_alert = None
+    _mem_header_done = False
+    for _ms in _relevant[:2]:
         _note = str(_ms.get("preview") or _ms.get("title") or "").strip()
         if _note and _note[:80] not in str(response):
-            response = (str(response) + "\n\n---\n**From memory:**\n\n"
-                        + _note[:600])
+            if not _mem_header_done:
+                response = str(response) + "\n\n---\n**From memory:**"
+                _mem_header_done = True
+            response = str(response) + "\n\n" + _note[:600]
+            _note_toks = _mt(_note) - _id_toks
+            # identifier tokens prove the note is about the same ENTITY —
+            # never that it disputes a FIELD ('...file name gsact.txt — ...'
+            # put the identifier on the label side and false-fired the alert)
+            for _lab_toks, _lab_txt in _labels:
+                if len((_lab_toks - _id_toks) & _note_toks) >= 2:
+                    # Surfaced at SOURCE level by the UI (red banner) and
+                    # NAMES the disputed field — with several notes shown,
+                    # "a note disagrees" said nothing.
+                    _memory_alert = (
+                        f"Your note about '{_lab_txt}' disagrees with this "
+                        f"record"
+                        + (f" — if the note is right, update {_src_file}"
+                           if _src_file else "")
+                        + ".")
+                    break
     # Step 1 (retrieval-quality rework): related previews are NO LONGER appended into
     # the answer body — that was concatenating whole, often unrelated, articles.
 
@@ -1583,6 +1687,7 @@ def chat_turn(question: str, history: list, available_collections: list,
     return {
         "role": "assistant",
         "content": response,
+        "memory_alert": _memory_alert,
         "method": "retrieval",
         "collection": collection,
         "collections_queried": query_run.get("collections_queried", [collection]),

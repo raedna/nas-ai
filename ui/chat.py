@@ -153,6 +153,9 @@ def render_chat_panel():
         else:
             render_answer(card, content, build_image_items(payload), show_ocr=True)
         with card:
+            if isinstance(resp, dict) and resp.get("memory_alert"):
+                ui.label(f"⚠ {resp['memory_alert']}").classes(
+                    "text-red-600 font-medium mt-1")
             if isinstance(resp, dict) and resp.get("collection"):
                 ui.label(f"Source: {resp['collection']} · {resp.get('method', '')}").classes(
                     "text-xs text-gray-500 mt-1")

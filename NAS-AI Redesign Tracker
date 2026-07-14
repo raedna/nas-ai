@@ -787,3 +787,27 @@ Verified end-to-end without manual SQL: "remember that THE FILE comes in at
 
 M2 COMPLETE. Remaining in memory arc: conflict nudge ("consider updating
 <source_file>"), RELATED-01, then M3 preferences / M4 feedback learning.
+
+## M2 FINAL (2026-07-14) — relevance, question anchoring, named conflict alert
+
+- Note relevance: composes only notes sharing question content-words beyond
+  the identifier; generic entity questions compose all (cap 2). Fixed the
+  preview aggregation that merged ALL memory notes into one section (they
+  share source_file 'user_memory' — linked chunk's own text now wins).
+- QUESTION-anchored memory: notes linked to identifiers the QUESTION names
+  surface even when arbitration crowned an unrelated document.
+- Conflict alert: red banner at source level, NAMES the disputed field
+  ("Your note about 'Date Column to Check' disagrees...") + update-the-
+  source suggestion with the real filename; identifier tokens never count
+  as field-label evidence (false-positive fix); single "From memory" header.
+- Verified matrix: time question -> time note only, no alert; date-column
+  question -> column note + named alert; generic entity question -> both
+  notes + named alert.
+
+Watch items logged: recon exact-match missed "what time does the gsact.txt
+arrive?" phrasing (identifier lookup skipped — retrieval item, not memory);
+wrong-entity doc answers (kb's Overnight-Systems 5AM confidently answered a
+gsact question); CL-04 hop builder shares the preview-aggregation pattern.
+
+MEMORY ARC STATUS: M1 sessions, M2 capture/annotation COMPLETE.
+Next: RELATED-01, heterogeneous splitter, M3 preferences, M4 feedback.
