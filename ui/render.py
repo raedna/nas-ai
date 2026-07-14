@@ -13,6 +13,25 @@ from nicegui import ui
 _MARKER = re.compile(r"\[(?:Embedded image OCR from|image):\s*([^\]]+)\]")
 
 
+def _map_media_path(p):
+    """Translate stored media paths via config media_path_map — payload paths
+    are ABSOLUTE (e.g. /Volumes/raedsync/... on the NAS share); when working
+    remotely the files live in a local mirror instead. Uses the mapped path
+    only if it exists; data is never modified. Remove the config key when
+    the original mounts are back."""
+    try:
+        from core.system_config import load_system_config
+        mapping = load_system_config().get("media_path_map", {}) or {}
+        for prefix, repl in mapping.items():
+            if p and str(p).startswith(prefix):
+                cand = str(repl) + str(p)[len(prefix):]
+                if Path(cand).exists():
+                    return cand
+    except Exception:
+        pass
+    return p
+
+
 def build_image_items(payload):
     """Turn an answer payload's embedded-image fields into [{path, caption, ocr}]."""
     if not payload:
@@ -25,7 +44,7 @@ def build_image_items(payload):
     for i, p in enumerate(paths):
         tgt = targets[i] if i < len(targets) else None
         items.append({
-            "path": p,
+            "path": _map_media_path(p),
             "caption": tgt or (Path(p).name if p else ""),
             "ocr": ocr_map.get(tgt, ""),
         })

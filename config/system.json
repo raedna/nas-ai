@@ -42,5 +42,6 @@
       "mixed"
     ],
     "top_k": 25
-  }
+  },
+  "halo": {"boilerplate_prefixes": ["*** Moore Europe Legal Disclaimer"]}
 }

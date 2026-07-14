@@ -216,5 +216,20 @@
       "field_filters": []
     },
     "template_config": {}
+  },
+  "halo_tickets": {
+    "path": "/Users/raednasr/RaedsMacM1/nas-ai/halo_tickets",
+    "allowed_filetypes": [
+      "docs"
+    ],
+    "allowed_extensions": [
+      ".md"
+    ],
+    "exclude_dirs": [],
+    "exclude_extensions": [],
+    "asset_search_roots": [],
+    "source_label": "",
+    "routing_description": "Halo ITSM support tickets: incidents, requests, resolutions and troubleshooting threads for Charles River, recon, tidal, FIX and trading systems",
+    "notes": ""
   }
 }

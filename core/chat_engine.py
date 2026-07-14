@@ -174,7 +174,11 @@ def select_collections(question: str, history: list, available_collections: list
     except Exception:
         _noise_words = set()
         _hints = {}
-    _q_words = [w for w in re.findall(r"[a-z0-9]{3,}", question.lower())
+    # Words need 3+ chars; pure NUMERICS are admitted at 2 ('tag 22' — tag
+    # numbers are 2-3 digits and were invisible to every anchor tier, leaving
+    # such questions to centroid luck). The numeric-anchor context rule still
+    # gates them: a number only anchors when preceded by a namespace term.
+    _q_words = [w for w in re.findall(r"[a-z0-9]{3,}|\d{2}", question.lower())
                 if w not in _noise_words]
     # VOCAB-01: spell-correct unknown tokens against the GLOBAL vocabulary so
     # typo'd questions anchor and embed like their intended words
@@ -358,6 +362,10 @@ def select_collections(question: str, history: list, available_collections: list
             if DEBUG and _rows:
                 print("DEBUG centroid routing:",
                       [(r["collection"], round(float(r["best_sim"]), 3)) for r in _rows[:5]])
+            # Stash the full ranking for the empty-answer widening retry.
+            select_collections._last_ranking = [r["collection"] for r in _rows]
+            # ...and the question vector for concept-section relevance.
+            select_collections._last_qvec = _qv
             if _rows and float(_rows[0]["best_sim"]) >= _min_sim:
                 _lead = float(_rows[0]["best_sim"])
                 _picked = [r["collection"] for r in _rows
@@ -589,6 +597,18 @@ def run_parallel_queries(collections: list, question: str, single_item: bool = F
     import re as _re
     _qtoks = {t for t in _re.findall(r"[a-z0-9]{3,}", question.lower())}
 
+    # M4 v1: feedback prior — net thumbs for THIS question (normalized exact
+    # match) per collection. Sits one rung ABOVE routing order: it settles
+    # only the ties that were previously settled by arbitrary ordering, and
+    # can never overrule exact-key, name, or groundedness rungs.
+    try:
+        from core.feedback_store import feedback_prior
+        _fb_net = feedback_prior(question)
+    except Exception:
+        _fb_net = {}
+    if DEBUG and _fb_net:
+        print(f"DEBUG feedback prior: {_fb_net}")
+
     def _arb_score(col, idx):
         r = results.get(col, {})
         m = str(r.get("method") or "")
@@ -614,7 +634,7 @@ def run_parallel_queries(collections: list, question: str, single_item: bool = F
             _tc = _re.sub(r"[^a-z0-9]", "", _title.lower())
             _tvar = _qtoks | {t[:-1] for t in _qtoks if t.endswith("s") and len(t) > 3}
             _thits = sum(1 for t in _tvar if t in _tc)
-            return (mrank, 3 - min(_thits, 3), 2, idx)
+            return (mrank, 3 - min(_thits, 3), 2, -_fb_net.get(col, 0), idx)
         # Groundedness is graded: an EQUALS filter on a real field whose value
         # matches a question token (identifier_namespace = tag) outranks a
         # 'contains' on free text (nlp_text contains FIX tag) — equality is a
@@ -634,7 +654,7 @@ def run_parallel_queries(collections: list, question: str, single_item: bool = F
             elif any(v.startswith(t) or t.startswith(v)
                      for v in _ct_vals for t in _qtoks):
                 grounded = 1
-        return (mrank, 0 if name_hit else 1, grounded, idx)
+        return (mrank, 0 if name_hit else 1, grounded, -_fb_net.get(col, 0), idx)
 
     _candidates = [(col, i) for i, col in enumerate(collections)
                    if not _is_empty_answer(results.get(col, {}).get("result", ""))]
@@ -1442,6 +1462,27 @@ def chat_turn(question: str, history: list, available_collections: list,
 
     # Step 3: retrieve answer (parallel across selected collections)
     query_run = run_parallel_queries(collections, standalone_question)
+
+    # Routing hardening (DL-01 incident): a NARROW route that came back
+    # EMPTY widens once to the top-3 centroid candidates before giving up.
+    # A jittery centroid lead (obsidian 0.740 vs xml 0.609 on 'what is tag
+    # 22' — same question routed 3-wide two hours earlier) must cost one
+    # retry, never the answer. Fires only on empty results from a
+    # sub-3-collection route; the ranking comes from the routing pass that
+    # already ran.
+    def _empty_result(qr):
+        t = _result_to_text(qr.get("result", ""))
+        return (not t.strip()) or any(m in t for m in (
+            "No answer found", "No record found", "Found 0 item"))
+    if _empty_result(query_run) and len(collections) < 3:
+        _ranked = [c for c in getattr(select_collections, "_last_ranking", [])
+                   if c in available_collections]
+        _retry_cols = list(dict.fromkeys(collections + _ranked))[:3]
+        if len(_retry_cols) > len(collections):
+            if DEBUG:
+                print(f"DEBUG routing widened after empty answer: "
+                      f"{collections} -> {_retry_cols}")
+            query_run = run_parallel_queries(_retry_cols, standalone_question)
     _mark("retrieval")
     if DEBUG:
         print("DEBUG standalone_question:", standalone_question)
@@ -1524,16 +1565,63 @@ def chat_turn(question: str, history: list, available_collections: list,
         if s.get("confidence", 0) >= RELATED_MERGE_THRESHOLD
         and not (s.get("match_type") == "concept" and _is_structured_collection(s.get("collection", "")))
     ]
+    # RELATED-01: high-confidence sections are NOT excluded from the list —
+    # the old "merge into answer" TEXT path was removed in the retrieval
+    # rework, so the >= threshold bucket displayed nowhere ("too relevant to
+    # display"). It still feeds the image-payload merge below; the list is
+    # ranked and capped, so strong confirmed edges displace weak hops.
     related_sections = [
         s for s in all_related
-        if s.get("confidence", 0) < RELATED_MERGE_THRESHOLD
-        and not (s.get("match_type") == "concept" and _is_structured_collection(s.get("collection", "")))
+        if not (s.get("match_type") == "concept" and _is_structured_collection(s.get("collection", "")))
     ]
     # Rank + cap: confirmed edges (exact/ner/wikilink) first, hops next,
     # similarity/concept last; confidence desc within each class. A long
     # unranked list buries the procedure notes the user actually needs.
-    _type_rank = {"exact": 0, "wikilink": 0, "ner": 0,
+    _type_rank = {"exact": 0, "wikilink": 0, "ner": 0, "confirmed": 0,
                   "wikilink_hop": 1, "name_similarity": 2, "concept": 3}
+    # Concept sections are ANSWER-anchored (cluster adjacency) — gate them
+    # by QUESTION relevance instead: cosine(question, anchor chunk) using
+    # vectors that already exist. Token overlap can't do this ('fix the
+    # issue' vs the FIX protocol collide lexically, not semantically).
+    # Floor from config concept_links.question_relevance_min (0.0 = log
+    # only); concepts capped at 2 slots regardless.
+    try:
+        _qvec = getattr(select_collections, "_last_qvec", None)
+        _concepts = [s for s in related_sections
+                     if str(s.get("match_type")) == "concept"]
+        if _qvec and _concepts:
+            from core.system_config import load_system_config as _lsc
+            _qr_min = float(_lsc().get("concept_links", {})
+                            .get("question_relevance_min", 0.0))
+            _cids = [str((s.get("anchor_chunk_ids") or [None])[0])
+                     for s in _concepts]
+            _crows = fetchall(
+                """SELECT id, 1 - (embedding <=> %s::vector) AS sim
+                   FROM chunks WHERE id = ANY(%s::text[])""",
+                (_qvec, [c for c in _cids if c and c != "None"]))
+            _sim_by_id = {str(r["id"]): float(r["sim"]) for r in _crows}
+            _kept_c = 0
+            _filtered = []
+            for sec in related_sections:
+                if str(sec.get("match_type")) != "concept":
+                    _filtered.append(sec)
+                    continue
+                _cid = str((sec.get("anchor_chunk_ids") or [None])[0])
+                _sim = _sim_by_id.get(_cid)
+                if DEBUG:
+                    print(f"DEBUG concept relevance: {sec.get('title')!r} "
+                          f"q-sim={_sim if _sim is not None else 'n/a'}")
+                if _sim is not None and _sim < _qr_min:
+                    continue
+                if _kept_c >= 2:
+                    continue
+                _kept_c += 1
+                _filtered.append(sec)
+            related_sections = _filtered
+    except Exception as _e:
+        if DEBUG:
+            print(f"DEBUG concept relevance failed: {_e}")
+
     related_sections = sorted(
         related_sections,
         key=lambda s: (_type_rank.get(str(s.get("match_type") or "concept"), 3),

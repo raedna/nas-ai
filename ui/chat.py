@@ -160,14 +160,29 @@ def render_chat_panel():
                 ui.label(f"Source: {resp['collection']} · {resp.get('method', '')}").classes(
                     "text-xs text-gray-500 mt-1")
             if isinstance(resp, dict) and resp.get("method") != "memory_capture":
-                def _remember_answer(q=text, a=content):
-                    from core.memory_store import remember
-                    remember(f"Q: {q}\nA: {a[:500]}",
-                             session_id=state["session_id"],
-                             context_question=q, origin="button")
-                    ui.notify("Saved to memory", type="positive")
-                ui.button("Remember this", on_click=_remember_answer).props(
-                    "flat dense size=sm icon=bookmark_add").classes("mt-1")
+                with ui.row().classes("items-center gap-1 mt-1"):
+                    def _remember_answer(q=text, a=content):
+                        from core.memory_store import remember
+                        remember(f"Q: {q}\nA: {a[:500]}",
+                                 session_id=state["session_id"],
+                                 context_question=q, origin="button")
+                        ui.notify("Saved to memory", type="positive")
+                    ui.button("Remember this", on_click=_remember_answer).props(
+                        "flat dense size=sm icon=bookmark_add")
+
+                    # M4a: feedback capture — consumption comes later, once
+                    # a real corpus of verdicts exists to design against.
+                    def _vote(verdict, q=text, a=content, r=resp):
+                        from core.feedback_store import record_feedback
+                        record_feedback(q, a, verdict,
+                                        collection=r.get("collection"),
+                                        method=r.get("method"),
+                                        session_id=state["session_id"])
+                        ui.notify("Feedback saved", type="positive")
+                    ui.button(on_click=lambda: _vote("up")).props(
+                        "flat dense size=sm icon=thumb_up")
+                    ui.button(on_click=lambda: _vote("down")).props(
+                        "flat dense size=sm icon=thumb_down")
             for s in (resp.get("related_sections") if isinstance(resp, dict) else []) or []:
                 label = (f"[{s.get('collection')}] {s.get('title')} · "
                          f"{s.get('match_type')} {float(s.get('confidence') or 0):.2f}")

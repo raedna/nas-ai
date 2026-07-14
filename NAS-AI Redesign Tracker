@@ -811,3 +811,57 @@ gsact question); CL-04 hop builder shares the preview-aggregation pattern.
 
 MEMORY ARC STATUS: M1 sessions, M2 capture/annotation COMPLETE.
 Next: RELATED-01, heterogeneous splitter, M3 preferences, M4 feedback.
+
+## RELATED-01 DONE + routing hardening (2026-07-14)
+
+- High-confidence sections rejoin the Related list (the >=0.80 "merge"
+  bucket displayed nowhere since the text-merge removal); 'confirmed' added
+  to the type rank (was sorting below hops); image-payload merge unchanged.
+- Concept sections: capped at 2, rank last — KEPT (user call) after the
+  q-sim experiment measured NO separation between junk and genuine
+  (junk 0.495-0.532 vs genuine 0.506, question-to-anchor bge cosine).
+  The measurement harness stays in (DEBUG concept relevance lines).
+- Routing hardening: sub-3-collection routes that answer EMPTY widen once
+  to the top-3 centroid candidates ('what is tag 22' solo-routed to
+  obsidian on a jittery 0.13 centroid lead and gave up). Plus: 2-char
+  NUMERIC tokens now reach the anchor tiers ('22' was under the 3-char
+  floor; the namespace-term context rule gates them) — tag-number questions
+  anchor deterministically to xml.
+
+## EMBED-01 (NEW, roadmap)
+
+bge-large compresses short-text similarity into a ~0.5 band — the ceiling
+behind centroid-margin tuning, concept-link noise, and the failed concept
+relevance floor. Candidate: stronger embedder (evaluate when next section
+completes). Cost: FULL re-embed of all collections + remeasure every
+similarity floor in config. Acceptance test already built: the q-sim
+harness must SEPARATE junk from genuine concepts on the broadcaster /
+bad-dates pair.
+
+## HALO pilot DONE (2026-07-15) + new items
+
+Pilot complete: normalizer (config-driven noise outcomes/authors + boilerplate
+prefixes), triage script (ticket -> distilled queries -> standard pipeline),
+tickets-as-markdown-files ingestion (3 tickets -> 31 chunks cold, ZERO
+pipeline changes — the "ultimate test" passed incidentally). Payoff verified:
+FRA question answered from the kb runbook WITH the Halo ticket as a related
+section at 0.81 — cross-source assembly on day one.
+
+- HALO-02: API fetcher — auth in config, incremental sync on last_update,
+  images/attachments downloaded AT SYNC TIME (embedded img URLs carry
+  expiring JWTs), local asset folder + existing OCR pipeline.
+- HALO-03: ticket metadata -> payload description_fields (team, client,
+  status, categories, opened_by/closed_by/replied_by from the action thread,
+  computed resolution time) — unlocks the aggregation path ("how many open
+  tickets for Moore", "who closed it", "time to close").
+- HALO-04: learned boilerplate (paragraphs recurring across many tickets =
+  boilerplate by frequency, like vocab) — replaces the config prefix list.
+- HALO-05: linkable ticket ids (pure digits fail the NER distinctive filter
+  — ticket-to-ticket mentions don't cross-link).
+- RETR-05 (NEW, logged from testing): term-collision hijack — "issues with
+  FRA bad date" swings entirely to the Tidal "Files With Bad Dates" runbook;
+  the named alert concept ('bad dates') overpowers the actual subject (FRA).
+  Same family as the wrong-entity 5AM answer (Overnight Systems) and the
+  recon exact-match phrasing miss. Likely needs: BM25 AND-variant relaxation
+  awareness in rerank pool + subject-token weighting. Investigate as a
+  retrieval-quality batch with the other two.
