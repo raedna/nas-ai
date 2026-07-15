@@ -36,34 +36,6 @@ def debug_print(*args, **kwargs):
         print(*args, **kwargs, flush=True)
 
 
-def _build_normalized_fix_text(decoded_rows, source_text: str = "") -> str:
-    """Reconstruct a canonical FIX message from parsed tag/value rows."""
-    fields = []
-    has_begin_string = False
-
-    for row in decoded_rows or []:
-        tag = str(row.get("tag") or "").split("#", 1)[0].strip()
-        value = str(row.get("value") or "").strip()
-
-        if not tag or not value:
-            continue
-
-        if tag == "8":
-            has_begin_string = True
-
-        fields.append(f"{tag}={value}")
-
-    # OCR/table input can occasionally omit Tag 8 from decoded rows.
-    # Recover the FIX version generically from the source text so the
-    # sequence analyzer can identify the message boundary.
-    if fields and not has_begin_string:
-        version_match = re.search(r"\bFIX\.\d+\.\d+\b", str(source_text or ""))
-        if version_match:
-            fields.insert(0, f"8={version_match.group(0)}")
-
-    return "\x01".join(fields) + ("\x01" if fields else "")
-
-
 def _format_summary_with_pipes(summary: str) -> str:
     """Format labeled analysis summary clauses as a compact pipe-separated report."""
     text = str(summary or "").strip()
@@ -85,7 +57,6 @@ def _format_summary_with_pipes(summary: str) -> str:
 
 @app.post("/analysis/clipboard-image-ocr")
 async def clipboard_image_ocr(request: Request):
-    tmp_path = None
     try:
         data = await request.json()
 
@@ -151,12 +122,6 @@ async def clipboard_image_ocr(request: Request):
             "ok": False,
             "error": str(ex),
         }
-    finally:
-        if tmp_path:
-            try:
-                Path(tmp_path).unlink(missing_ok=True)
-            except Exception as cleanup_ex:
-                debug_print(f"=== CLIPBOARD TEMP CLEANUP FAILED: {cleanup_ex} ===")
 
 def _get_upload_filename(e) -> str:
     file_obj = getattr(e, "file", None)
@@ -254,49 +219,16 @@ def render_analysis_panel():
 
     ui.add_head_html("""
     <style>
-    .analysis-table-scroll {
-        width: 100%;
-        max-width: 100%;
-        min-width: 0;
-        overflow-x: auto;
-    }
-
-    .technical-analysis-pane {
-        width: 100%;
-        max-width: 100%;
-        min-width: 0;
-        overflow-x: hidden;
-    }
-
-    .technical-analysis-pane .q-table,
-    .technical-analysis-pane .q-table__container {
-        width: 100%;
-        max-width: 100%;
-        min-width: 0;
-    }
-
+    .analysis-table-scroll {max-width: 100%; overflow: auto;}
     .analysis-table-scroll .q-table__middle,
-    .technical-analysis-pane .q-table__middle {
-        width: 100%;
-        max-width: 100%;
-        min-width: 0;
-        max-height: 62vh;
-        overflow-x: auto;
-        overflow-y: auto;
-    }
-
+    .technical-analysis-pane .q-table__middle {max-height: 62vh; overflow: auto;}
     .analysis-table-scroll thead tr th,
-    .technical-analysis-pane thead tr th {
-        position: sticky;
-        top: 0;
-        z-index: 6;
-        background: white;
-    }
+    .technical-analysis-pane thead tr th {position: sticky; top: 0; z-index: 6; background: white;}
+    .technical-analysis-pane .q-table {min-width: max-content;}
     </style>
     """)
 
     async def handle_analysis_upload(e, target_box):
-        tmp_path = None
         upload_status_label.set_text("Reading file and running OCR...")
         upload_status_label.classes(replace="text-sm text-orange-7")
         upload_spinner.visible = True
@@ -327,11 +259,6 @@ def render_analysis_panel():
             debug_print(f"=== ANALYSIS UPLOAD FAILED: {ex} ===")
         finally:
             upload_spinner.visible = False
-            if tmp_path:
-                try:
-                    Path(tmp_path).unlink(missing_ok=True)
-                except Exception as cleanup_ex:
-                    debug_print(f"=== UPLOAD TEMP CLEANUP FAILED: {cleanup_ex} ===")
 
     input_panel_ref = {"panel": None}
 
@@ -440,14 +367,10 @@ def render_analysis_panel():
             control_area = ui.column().classes("w-full q-gutter-sm")
 
         # Main workspace
-        with ui.column().classes("q-pa-md min-w-0").style(
+        with ui.column().classes("q-pa-md").style(
             "margin-left: 280px; "
             "width: calc(100% - 280px); "
-            "max-width: calc(100% - 280px); "
-            "min-width: 0; "
-            "box-sizing: border-box; "
-            "padding-top: 76px; "
-            "overflow-x: hidden;"
+            "padding-top: 76px;"
         ):
 
             # 2. INPUT SECTION
@@ -569,30 +492,6 @@ def render_analysis_panel():
     # Three or more = Multi-Compare / Sequence
     workspace_messages = []
     live_analysis_messages = []
-
-    def normalized_workspace_text(message):
-        normalized = str(message.get("normalized_raw_text") or "").strip()
-
-        if normalized and re.search(r"(?<![A-Za-z0-9])8\s*=\s*FIX\.\d", normalized):
-            return normalized
-
-        raw_text = str(message.get("raw_text") or "").strip()
-        if not raw_text:
-            return ""
-
-        try:
-            decoded = analyze_fix_message(raw_text)
-            normalized = _build_normalized_fix_text(
-                decoded.get("decoded_rows") or [],
-                source_text=raw_text,
-            )
-            if normalized:
-                message["normalized_raw_text"] = normalized
-                return normalized
-        except Exception as ex:
-            debug_print(f"=== WORKSPACE NORMALIZATION FAILED: {ex} ===")
-
-        return raw_text if "8=FIX" in raw_text or "BeginString" in raw_text else ""
 
     def add_messages_to_workspace(messages, source_label="message"):
         existing_keys = {workspace_message_key(message) for message in workspace_messages}
@@ -796,10 +695,10 @@ def render_analysis_panel():
                         return
                     ui.table(
                         columns=[
-                            {"name": "tag", "label": "Tag ID", "field": "tag", "align": "left", "sortable": True},
+                            {"name": "tag", "label": "Tag", "field": "tag", "align": "left", "sortable": True},
                             {"name": "tag_name", "label": "Name", "field": "tag_name", "align": "left", "sortable": True},
-                            {"name": "value", "label": "Tag Value", "field": "value", "align": "left", "sortable": True},
-                            {"name": "value_name", "label": "Tag Value Name", "field": "value_name", "align": "left", "sortable": True},
+                            {"name": "value", "label": "Value", "field": "value", "align": "left", "sortable": True},
+                            {"name": "value_name", "label": "Value Name", "field": "value_name", "align": "left", "sortable": True},
                         ],
                         rows=tag_rows,
                         row_key="_seq",
@@ -849,209 +748,28 @@ def render_analysis_panel():
                     on_click=add_selected_to_workspace,
                 ).props("outline color=secondary")
 
-            with ui.element("div").classes(
-                "w-full max-w-full overflow-x-auto analysis-table-scroll"
-            ).style(
-                "min-width: 0;"
-            ):
-                message_table = ui.table(
-                    columns=[
-                        {"name": "message_index", "label": "#", "field": "message_index", "align": "left", "sortable": True},
-                        {"name": "msg_seq_num", "label": "Seq", "field": "msg_seq_num", "align": "left", "sortable": True},
-                        {"name": "msg_type", "label": "MsgType", "field": "msg_type", "align": "left", "sortable": True},
-                        {"name": "route", "label": "Route", "field": "route", "align": "left", "sortable": True},
-                        {"name": "time", "label": "Time", "field": "time", "align": "left", "sortable": True},
-                        {"name": "cl_ord_id", "label": "ClOrdID", "field": "cl_ord_id", "align": "left", "sortable": True},
-                        {"name": "order_id", "label": "OrderID", "field": "order_id", "align": "left", "sortable": True},
-                        {"name": "secondary_order_id", "label": "SecondaryOrderID", "field": "secondary_order_id", "align": "left", "sortable": True},
-                        {"name": "exec_id", "label": "ExecID", "field": "exec_id", "align": "left", "sortable": True},
-                        {"name": "symbol", "label": "Symbol", "field": "symbol", "align": "left", "sortable": True},
-                        {"name": "order_qty", "label": "OrderQty", "field": "order_qty", "align": "left", "sortable": True},
-                        {"name": "last_qty", "label": "LastQty", "field": "last_qty", "align": "left", "sortable": True},
-                        {"name": "cum_qty", "label": "CumQty", "field": "cum_qty", "align": "left", "sortable": True},
-                        {"name": "leaves_qty", "label": "LeavesQty", "field": "leaves_qty", "align": "left", "sortable": True},
-                    ],
-                    rows=rows,
-                    row_key="message_index",
-                    selection="multiple",
-                    pagination={"rowsPerPage": 0},
-                ).classes("w-full")
-
-    def render_multi_message_comparison(messages):
-        """Render a tag-by-tag comparison matrix for 3–10 analyzed FIX messages."""
-        messages = list(messages or [])
-
-        if len(messages) < 3:
-            return
-
-        messages = messages[:MAX_COMPARE_MESSAGES]
-
-        # Preserve tag order based on first appearance across the selected messages.
-        tag_order = []
-        tag_metadata = {}
-        values_by_message = []
-
-        for message_position, message in enumerate(messages, start=1):
-            message_values = {}
-
-            for row in message.get("decoded_rows") or []:
-                tag = str(row.get("tag") or "").split("#", 1)[0].strip()
-
-                if not tag:
-                    continue
-
-                if tag not in tag_order:
-                    tag_order.append(tag)
-
-                tag_metadata.setdefault(
-                    tag,
-                    {
-                        "tag_name": row.get("tag_name") or "",
-                    },
-                )
-
-                raw_value = str(row.get("value") or "").strip()
-                value_name = str(row.get("value_name") or "").strip()
-
-                display_value = raw_value
-                if value_name and value_name != raw_value:
-                    display_value = f"{raw_value} ({value_name})"
-
-                message_values[tag] = display_value
-
-            values_by_message.append(message_values)
-
-        comparison_rows = []
-
-        for row_index, tag in enumerate(tag_order, start=1):
-            row = {
-                "_seq": row_index,
-                "tag": int(tag) if tag.isdigit() else tag,
-                "tag_name": tag_metadata.get(tag, {}).get("tag_name") or "",
-            }
-
-            distinct_values = set()
-            present_count = 0
-
-            for message_position, message_values in enumerate(values_by_message, start=1):
-                value = message_values.get(tag, "")
-                row[f"message_{message_position}"] = value
-
-                if value:
-                    present_count += 1
-                    distinct_values.add(value)
-
-            if present_count < len(messages):
-                status = "Missing in one or more"
-            elif len(distinct_values) <= 1:
-                status = "Same"
-            else:
-                status = "Changed"
-
-            row["status"] = status
-            comparison_rows.append(row)
-
-        columns = [
-            {
-                "name": "_seq",
-                "label": "#",
-                "field": "_seq",
-                "align": "left",
-                "sortable": True,
-            },
-            {
-                "name": "tag",
-                "label": "Tag ID",
-                "field": "tag",
-                "align": "left",
-                "sortable": True,
-            },
-            {
-                "name": "tag_name",
-                "label": "Tag Name",
-                "field": "tag_name",
-                "align": "left",
-                "sortable": True,
-            },
-        ]
-
-        for message_position, message in enumerate(messages, start=1):
-            session_id = message.get("session_id")
-            message_index = message.get("message_index") or message_position
-
-            if session_id is not None:
-                label = f"Msg {message_position} · S{session_id}/M{message_index}"
-            else:
-                label = f"Msg {message_position} · Live"
-
-            columns.append(
-                {
-                    "name": f"message_{message_position}",
-                    "label": label,
-                    "field": f"message_{message_position}",
-                    "align": "left",
-                    "sortable": True,
-                }
-            )
-
-        columns.append(
-            {
-                "name": "status",
-                "label": "Status",
-                "field": "status",
-                "align": "left",
-                "sortable": True,
-            }
-        )
-
-        changed_count = sum(
-            1 for row in comparison_rows
-            if row.get("status") != "Same"
-        )
-
-        with ui.expansion(
-            f"Multi-Message Comparison ({changed_count} differing tags)",
-            value=True,
-            icon="difference",
-        ).classes("w-full q-mt-md bg-grey-1 rounded-borders"):
-
-            ui.label(
-                f"Comparing {len(messages)} workspace messages. "
-                "Message columns follow the workspace order."
-            ).classes("text-sm text-grey-7 q-pa-sm")
-
-            with ui.element("div").classes(
-                "w-full max-w-full overflow-x-auto analysis-table-scroll"
-            ).style("min-width: 0;"):
-                comparison_table = ui.table(
-                    columns=columns,
-                    rows=comparison_rows,
-                    row_key="_seq",
-                    pagination={
-                        "rowsPerPage": 0,
-                        "sortBy": "_seq",
-                        "descending": False,
-                    },
-                ).classes("w-full")
-
-                comparison_table.add_slot("body", r"""
-                <q-tr
-                  :props="props"
-                  :class="{
-                    'text-red-7': props.row.status === 'Changed',
-                    'text-orange-8': props.row.status === 'Missing in one or more'
-                  }"
-                >
-                  <q-td
-                    v-for="col in props.cols"
-                    :key="col.name"
-                    :props="props"
-                    style="white-space: nowrap; vertical-align: top;"
-                  >
-                    {{ col.value }}
-                  </q-td>
-                </q-tr>
-                """)
+            message_table = ui.table(
+                columns=[
+                    {"name": "message_index", "label": "#", "field": "message_index", "align": "left", "sortable": True},
+                    {"name": "msg_seq_num", "label": "Seq", "field": "msg_seq_num", "align": "left", "sortable": True},
+                    {"name": "msg_type", "label": "MsgType", "field": "msg_type", "align": "left", "sortable": True},
+                    {"name": "route", "label": "Route", "field": "route", "align": "left", "sortable": True},
+                    {"name": "time", "label": "Time", "field": "time", "align": "left", "sortable": True},
+                    {"name": "cl_ord_id", "label": "ClOrdID", "field": "cl_ord_id", "align": "left", "sortable": True},
+                    {"name": "order_id", "label": "OrderID", "field": "order_id", "align": "left", "sortable": True},
+                    {"name": "secondary_order_id", "label": "SecondaryOrderID", "field": "secondary_order_id", "align": "left", "sortable": True},
+                    {"name": "exec_id", "label": "ExecID", "field": "exec_id", "align": "left", "sortable": True},
+                    {"name": "symbol", "label": "Symbol", "field": "symbol", "align": "left", "sortable": True},
+                    {"name": "order_qty", "label": "OrderQty", "field": "order_qty", "align": "left", "sortable": True},
+                    {"name": "last_qty", "label": "LastQty", "field": "last_qty", "align": "left", "sortable": True},
+                    {"name": "cum_qty", "label": "CumQty", "field": "cum_qty", "align": "left", "sortable": True},
+                    {"name": "leaves_qty", "label": "LeavesQty", "field": "leaves_qty", "align": "left", "sortable": True},
+                ],
+                rows=rows,
+                row_key="message_index",
+                selection="multiple",
+                pagination={"rowsPerPage": 0},
+            ).classes("w-full")
 
     def render_sequence_evidence(result):
         ui.label("Sequence Summary").classes("text-lg font-semibold")
@@ -1092,7 +810,6 @@ def render_analysis_panel():
                 ).classes("w-full")
 
         messages = result.get("messages") or []
-        render_multi_message_comparison(messages)
         render_loaded_messages(messages, title="Loaded Messages", expanded=False)
 
         input_timeline_area.clear()
@@ -1165,48 +882,26 @@ def render_analysis_panel():
                 for message in result.get("messages") or []:
                     candidate = dict(message)
                     candidate.setdefault("source_type", "live_sequence")
-                    candidate.setdefault("normalized_raw_text", candidate.get("raw_text") or "")
                     live_analysis_messages.append(candidate)
             elif result.get("input_type") == "fix_compare":
-                decoded_a = analyze_fix_message(raw_a)
-                decoded_b = analyze_fix_message(raw_b)
                 live_analysis_messages.extend([
                     {
                         "source_type": "live_compare",
                         "message_index": 1,
                         "raw_text": raw_a,
-                        "normalized_raw_text": _build_normalized_fix_text(
-                            decoded_a.get("decoded_rows") or [],
-                            source_text=raw_a,
-                        ),
                     },
                     {
                         "source_type": "live_compare",
                         "message_index": 2,
                         "raw_text": raw_b,
-                        "normalized_raw_text": _build_normalized_fix_text(
-                            decoded_b.get("decoded_rows") or [],
-                            source_text=raw_b,
-                        ),
                     },
                 ])
             else:
                 candidates = build_related_match_messages_from_result(result) or []
                 current_message = dict(candidates[0]) if candidates else {}
-
                 current_message.setdefault("raw_text", raw_a)
-
-                current_message.setdefault(
-                    "normalized_raw_text",
-                    _build_normalized_fix_text(
-                        result.get("decoded_rows") or [],
-                        source_text=raw_a,
-                    ),
-                )
-
                 current_message.setdefault("message_index", 1)
                 current_message.setdefault("source_type", "live_analysis")
-
                 live_analysis_messages.append(current_message)
 
             result_area.clear()
@@ -1433,10 +1128,10 @@ def render_analysis_panel():
                                             decoded_table = ui.table(
                                                 columns=[
                                                     {"name": "_seq", "label": "#", "field": "_seq", "align": "left", "sortable": True},
-                                                    {"name": "tag", "label": "Tag ID", "field": "_tag_sort", "align": "left", "sortable": True},
+                                                    {"name": "tag", "label": "Tag", "field": "_tag_sort", "align": "left", "sortable": True},
                                                     {"name": "tag_name", "label": "Tag Name", "field": "tag_name", "align": "left", "sortable": True},
-                                                    {"name": "value", "label": "Tag Value", "field": "value", "align": "left", "sortable": True},
-                                                    {"name": "value_name", "label": "Tag Value Name", "field": "value_name", "align": "left", "sortable": True},
+                                                    {"name": "value", "label": "Value", "field": "value", "align": "left", "sortable": True},
+                                                    {"name": "value_name", "label": "Value Name", "field": "value_name", "align": "left", "sortable": True},
                                                 ],
                                                 rows=rows,
                                                 row_key="_seq",
@@ -1476,13 +1171,6 @@ def render_analysis_panel():
                                                 props.row.ocr_repair_warning
                                               ) ? 'text-red' : ''"
                                             >
-                                              <q-td auto-width>
-                                                <q-checkbox
-                                                  v-model="props.selected"
-                                                  dense
-                                                  @click.stop
-                                                />
-                                              </q-td>
                                               <q-td
                                                 v-for="col in props.cols"
                                                 :key="col.name"
@@ -1921,10 +1609,10 @@ def render_analysis_panel():
                             decoded_table = ui.table(
                                 columns=[
                                     {"name": "position_index", "label": "#", "field": "position_index", "align": "left", "sortable": True},
-                                    {"name": "tag", "label": "Tag ID", "field": "tag", "align": "left", "sortable": True},
+                                    {"name": "tag", "label": "Tag", "field": "tag", "align": "left", "sortable": True},
                                     {"name": "tag_name", "label": "Name", "field": "tag_name", "align": "left", "sortable": True},
-                                    {"name": "value", "label": "Tag Value", "field": "value", "align": "left", "sortable": True},
-                                    {"name": "value_name", "label": "Tag Value Name", "field": "value_name", "align": "left", "sortable": True},
+                                    {"name": "value", "label": "Value", "field": "value", "align": "left", "sortable": True},
+                                    {"name": "value_name", "label": "Value Name", "field": "value_name", "align": "left", "sortable": True},
                                     {"name": "description", "label": "Description", "field": "description", "align": "left"},
                                     {"name": "tag_warning", "label": "Tag Warning", "field": "tag_warning", "align": "left"},
                                     {"name": "enum_warning", "label": "Enum Warning", "field": "enum_warning", "align": "left"},
@@ -2194,13 +1882,9 @@ def render_analysis_panel():
                 ui.notify("The workspace must contain exactly 2 messages for pair comparison.", color="warning")
                 return
 
-            raw_messages = [normalized_workspace_text(message) for message in workspace_messages]
-            missing = [index + 1 for index, raw in enumerate(raw_messages) if not raw]
-            if missing:
-                ui.notify(
-                    "Could not normalize workspace message(s): " + ", ".join(map(str, missing)),
-                    color="negative",
-                )
+            raw_messages = [str(message.get("raw_text") or "").strip() for message in workspace_messages]
+            if not all(raw_messages):
+                ui.notify("One or more workspace messages do not contain raw FIX text.", color="negative")
                 return
 
             comparison = compare_fix_messages(raw_messages[0], raw_messages[1])
@@ -2215,23 +1899,13 @@ def render_analysis_panel():
                 ui.notify("Add at least 3 messages to the workspace for multi-message comparison.", color="warning")
                 return
 
-            raw_messages = [normalized_workspace_text(message) for message in workspace_messages]
-            missing = [index + 1 for index, raw in enumerate(raw_messages) if not raw]
-            if missing:
-                ui.notify(
-                    "Could not normalize workspace message(s): " + ", ".join(map(str, missing)),
-                    color="negative",
-                )
+            raw_messages = [str(message.get("raw_text") or "").strip() for message in workspace_messages]
+            raw_messages = [raw for raw in raw_messages if raw]
+            if len(raw_messages) < 3:
+                ui.notify("At least 3 workspace messages must contain raw FIX text.", color="negative")
                 return
 
             sequence_result = analyze_fix_sequence("\n".join(raw_messages))
-            analyzed_count = len(sequence_result.get("messages") or [])
-            if analyzed_count != len(workspace_messages):
-                ui.notify(
-                    f"Expected {len(workspace_messages)} messages but the sequence analyzer returned {analyzed_count}.",
-                    color="negative",
-                )
-                return
             insights = build_sequence_insights(sequence_result.get("messages") or [])
 
             reporting_area.clear()
