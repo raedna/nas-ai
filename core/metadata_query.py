@@ -94,6 +94,13 @@ def _field_values(collection: str, fields: set, df_keys=frozenset()) -> Dict[str
         if len(vals) == 1:
             fields.discard(f)
             continue
+        # Enum-ish fields have SHORT values. A "value" longer than ~80 chars
+        # is prose (description bodies) — in a small collection every field
+        # clears the <=20-distinct bar, and listing ticket bodies as values
+        # exploded one spec prompt to 34k chars (> model context, HTTP 400).
+        # The field stays queryable; its values just aren't enumerated.
+        if any(len(v) > 80 for v in vals):
+            continue
         if 0 < len(vals) <= 20:
             values[f] = vals
     return values
@@ -370,6 +377,17 @@ def run_metadata_query(collection: str, question: str, intent_mode: str = None) 
         # this on variance runs; exact token=value equality never does.
         _qt = {t for t in _re0.findall(r"[a-z0-9]{3,}", question.lower())}
         _qt |= {t[:-1] for t in list(_qt) if t.endswith("s") and len(t) > 3}
+        # Declared value aliases (config value_aliases.<collection>): site
+        # vocabulary mapped to the data's own terms ('resolved' -> 'Closed').
+        # DECLARED, not guessed — the LLM never invents these mappings.
+        try:
+            from core.system_config import load_system_config
+            _aliases = {str(k).lower(): str(v) for k, v in
+                        (load_system_config().get("value_aliases", {})
+                         .get(collection, {}) or {}).items()}
+        except Exception:
+            _aliases = {}
+        _alias_targets = {v for t, v in _aliases.items() if t in _qt}
         _filtered_fields = {f["field"] for f in spec["filters"]}
         for _fld, _vals in sorted(field_values.items()):
             if _fld in _filtered_fields:
@@ -377,9 +395,18 @@ def run_metadata_query(collection: str, question: str, intent_mode: str = None) 
             for _v in _vals:
                 if str(_v).lower() in _qt:
                     spec["filters"].append(
-                        {"field": _fld, "op": "equals", "value": str(_v)})
+                        {"field": _fld, "op": "equals", "value": str(_v),
+                         "_injected": True})
                     _filtered_fields.add(_fld)
                     print(f"[METADATA] value-anchor filter injected: {_fld} = {_v}")
+                    break
+                if str(_v) in _alias_targets:
+                    spec["filters"].append(
+                        {"field": _fld, "op": "equals", "value": str(_v),
+                         "_injected": True})
+                    _filtered_fields.add(_fld)
+                    print(f"[METADATA] alias filter injected: {_fld} = {_v} "
+                          f"(declared alias)")
                     break
 
         for f in spec["filters"]:
@@ -407,6 +434,11 @@ def run_metadata_query(collection: str, question: str, intent_mode: str = None) 
         _q_low = question.lower()
         for f in spec["filters"]:
             if f.get("op") != "equals":
+                _g_kept.append(f)
+                continue
+            if f.get("_injected"):
+                # deterministically injected (token==value or declared
+                # alias) — grounded by construction, not an LLM claim
                 _g_kept.append(f)
                 continue
             _v_raw = str(f.get("value", "")).lower()
@@ -503,6 +535,18 @@ def run_metadata_query(collection: str, question: str, intent_mode: str = None) 
         # filter on a LIST question sent the whole answer to the degenerate
         # guard and lost the collection its seat in arbitration).
         if spec["filters"] and _count_with(spec["filters"]) == 0:
+            # Injected-anchor retreat FIRST: anchors are heuristic guesses,
+            # LLM filters that survived the groundedness guard are claims.
+            # When a guess contradicts a claim across chunk levels
+            # (action_type=Resolved lives on ticket_action rows; the injected
+            # identifier_namespace=ticket matched only headers -> 0), the
+            # guess retreats. Claims are NEVER dropped this way (NA-04 law).
+            _claims = [f for f in spec["filters"] if not f.get("_injected")]
+            if _claims and len(_claims) < len(spec["filters"])                     and _count_with(_claims) > 0:
+                print(f"[METADATA] injected anchors retreated (contradicted "
+                      f"grounded claims): kept {_claims}")
+                spec["filters"] = _claims
+        if spec["filters"] and _count_with(spec["filters"]) == 0:
             _keep = [f for f in spec["filters"] if _count_with([f]) > 0]
             if _keep and _count_with(_keep) > 0:
                 print(f"[METADATA] dropped zero-result filters, kept: {_keep}")
@@ -556,8 +600,26 @@ def run_metadata_query(collection: str, question: str, intent_mode: str = None) 
             # (truncated). Other targets (dates, types, paths) stay bare values.
             _companion = {"identifier": "primary_name", "primary_name": "description"}.get(tf)
             if _companion:
+                # DISPLAY key: when the collection's schema maps the identifier
+                # role to a real payload field (halo: ticket_id), listings show
+                # THAT value — '44539', not the internal chunk id '44539-a17'.
+                # Query semantics unchanged; label only. Collections whose
+                # schema column mirrors the chunk identifier (recon) render
+                # identically.
+                _disp = tf
+                if tf == "identifier":
+                    try:
+                        _id_cols = _collection_schema(collection).get("identifier") or []
+                        _all_fields, _dfk = fields, df_keys
+                        for _c in _id_cols:
+                            if _c in _all_fields and _c != "identifier":
+                                _disp = _field_expr(_c, _dfk)
+                                break
+                    except Exception:
+                        _disp = tf
                 rows = fetchall(
-                    f"SELECT DISTINCT {tf} AS v, {_companion} AS c FROM chunks "
+                    f"SELECT DISTINCT {tf} AS v0, COALESCE({_disp}, {tf}) AS v, "
+                    f"{_companion} AS c FROM chunks "
                     f"WHERE {where} AND {tf} IS NOT NULL ORDER BY v LIMIT 200",
                     tuple(params))
                 # Markdown-safe: blank line before the list (CommonMark) and
@@ -571,6 +633,7 @@ def run_metadata_query(collection: str, question: str, intent_mode: str = None) 
                     if not r["v"] or r["v"] in _seen_v:
                         continue  # one line per distinct value even if companions differ
                     _seen_v.add(r["v"])
+                    _seen_v.add(r.get("v0"))
                     c = _trunc(r.get("c"))
                     # Code-like companions (no spaces, e.g. job names) need code
                     # spans so markdown doesn't italicize their underscores.

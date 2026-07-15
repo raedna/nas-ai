@@ -37,6 +37,8 @@ from core.db import fetchall, get_conn
 WHITELIST = {
     "chunks", "files", "collections", "enum_values",
     "concept_vectors", "cross_links", "background_tasks",
+    "chat_sessions", "chat_messages", "answer_feedback",
+    "collection_vocab", "schemas", "sql_snippets",
 }
 
 # Statements / functions that must never appear in a generated query.

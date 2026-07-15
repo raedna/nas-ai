@@ -1011,6 +1011,28 @@ def front_of_pipe(question: str, history: list) -> dict:
                 # through verbatim. The 3B echoed 'recon' as 'recent' once —
                 # models may not be trusted to copy; code copies.
                 out["standalone_query"] = question
+                # ...but the False CLAIM is vetted too: the 3B once answered
+                # {is_followup: false, reason: 'missing subject'} — seeing
+                # the pronoun and ignoring it. An unresolved-reference
+                # function word + existing history = suspect; the 14B
+                # contextualizer re-decides. (Closed-class words, config
+                # front_followup_markers.)
+                try:
+                    from core.system_config import load_system_config as _lsc2
+                    _markers = set(_lsc2().get("front_followup_markers", []) or [
+                        "it", "they", "them", "their", "theirs", "those",
+                        "these", "that", "this", "one", "ones"])
+                except Exception:
+                    _markers = {"it", "they", "them", "their", "theirs",
+                                "those", "these", "that", "this", "one", "ones"}
+                import re as _re_fm
+                _qtk = set(_re_fm.findall(r"[a-z']+", question.lower()))
+                if recent and (_qtk & _markers):
+                    ctx3 = contextualize_query(question, history)
+                    if ctx3.get("is_followup"):
+                        out["is_followup"] = True
+                        out["standalone_query"] = ctx3["standalone_query"]
+                        out["reason"] = "escalated: marker word, 3B said standalone"
             else:
                 # A claimed follow-up whose "rewrite" equals the original is
                 # a FAILED rewrite (the 3B kept 'it' unresolved and the whole
@@ -1018,12 +1040,17 @@ def front_of_pipe(question: str, history: list) -> dict:
                 # default model — follow-ups are the only case where rewrite
                 # quality decides the answer.
                 import re as _re_fp
-                _n = lambda t: _re_fp.sub(r"[^a-z0-9]+", " ", str(t).lower()).strip()
-                if _n(out["standalone_query"]) == _n(question):
+                _tk = lambda t: set(_re_fp.findall(r"[a-z0-9]+", str(t).lower()))
+                # A resolved follow-up must ADD context from history. A
+                # rewrite whose tokens are a subset of the original imported
+                # NOTHING — covers both the no-op ('it' unresolved) and the
+                # fragment ('what ticket number are they?' -> 'ticket
+                # number', which lost the resolved-tickets subject).
+                if _tk(out["standalone_query"]) <= _tk(question):
                     ctx2 = contextualize_query(question, history)
                     out["is_followup"] = ctx2["is_followup"]
                     out["standalone_query"] = ctx2["standalone_query"]
-                    out["reason"] = "escalated: fast rewrite was a no-op"
+                    out["reason"] = "escalated: fast rewrite added no context"
             if DEBUG:
                 print(f"DEBUG front_of_pipe ({_model or 'default'}):", out)
             return out

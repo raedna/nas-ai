@@ -1,18 +1,29 @@
 {
   "docs": {
-    "extensions": ["txt", "md", "rtf", "docx"],
+    "extensions": [
+      "txt",
+      "md",
+      "rtf",
+      "docx"
+    ],
     "parser": "doc",
     "serializer": "doc",
     "template_config": {}
   },
   "tables": {
-    "extensions": ["csv", "xlsx", "xls"],
+    "extensions": [
+      "csv",
+      "xlsx",
+      "xls"
+    ],
     "parser": "table",
     "serializer": "table",
     "template_config": {}
   },
   "xml": {
-    "extensions": ["xml"],
+    "extensions": [
+      "xml"
+    ],
     "parser": "xml",
     "serializer": "xml",
     "template_config": {
@@ -20,7 +31,14 @@
     }
   },
   "image": {
-    "extensions": ["png", "jpg", "jpeg", "webp", "tif", "tiff"],
+    "extensions": [
+      "png",
+      "jpg",
+      "jpeg",
+      "webp",
+      "tif",
+      "tiff"
+    ],
     "parser": "image",
     "serializer": "image",
     "template_config": {
@@ -28,27 +46,56 @@
     }
   },
   "pdf": {
-    "extensions": ["pdf"],
+    "extensions": [
+      "pdf"
+    ],
     "parser": "pdf",
     "serializer": "pdf",
     "template_config": {}
   },
   "astro": {
-    "extensions": ["fit", "fits", "fts", "xisf"],
+    "extensions": [
+      "fit",
+      "fits",
+      "fts",
+      "xisf"
+    ],
     "parser": "astro",
     "serializer": "astro",
     "template_config": {}
   },
   "audio": {
-    "extensions": ["mp3", "wav", "m4a", "flac", "aac", "ogg"],
+    "extensions": [
+      "mp3",
+      "wav",
+      "m4a",
+      "flac",
+      "aac",
+      "ogg"
+    ],
     "parser": "audio",
     "serializer": "audio",
     "template_config": {}
   },
   "video": {
-    "extensions": ["mp4", "mov", "mkv", "avi", "wmv", "m4v"],
+    "extensions": [
+      "mp4",
+      "mov",
+      "mkv",
+      "avi",
+      "wmv",
+      "m4v"
+    ],
     "parser": "video",
     "serializer": "video",
+    "template_config": {}
+  },
+  "halo": {
+    "extensions": [
+      "json"
+    ],
+    "parser": "halo",
+    "serializer": "halo",
     "template_config": {}
   }
 }

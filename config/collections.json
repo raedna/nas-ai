@@ -220,11 +220,9 @@
   "halo_tickets": {
     "path": "/Users/raednasr/RaedsMacM1/nas-ai/halo_tickets",
     "allowed_filetypes": [
-      "docs"
+      "halo"
     ],
-    "allowed_extensions": [
-      ".md"
-    ],
+    "allowed_extensions": [],
     "exclude_dirs": [],
     "exclude_extensions": [],
     "asset_search_roots": [],

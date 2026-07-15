@@ -865,3 +865,43 @@ section at 0.81 — cross-source assembly on day one.
   recon exact-match phrasing miss. Likely needs: BM25 AND-variant relaxation
   awareness in rerank pool + subject-token weighting. Investigate as a
   retrieval-quality batch with the other two.
+
+## HALO-02/03 DONE + M4 consumption proven live (2026-07-15/16)
+
+**Tickets are DATA now.** halo_parser + halo_serializer: one chunk per
+meaningful item (header + kept actions), payload carries team/client/status/
+categories/who/action_type/action_datetime, DECLARED schema saved under stem
+'halo_ticket' (first collection whose schema is a fact, not an inference).
+Combined JSON per ticket = sync/hash unit. Fetcher live against UAT: OAuth2
+client-credentials (tenant param), /api/Status name resolution, images
+downloaded at sync time (expiring JWTs). Credentials outside the repo,
+config holds a pointer only.
+
+**Verified end to end**: "how many tickets are resolved" (no 'halo' in the
+question) -> routed by vocabulary ownership -> action_type=Resolved claim ->
+alias (declared value_aliases: resolved->Closed) + namespace anchor injected
+-> INJECTED-ANCHOR RETREAT (guesses yield to claims; NA-04 law untouched) ->
+count 2 -> arbitration win WITH the feedback prior participating
+(kb_docs: -1 from a real thumbs-down). "what tickets are resolved?" lists
+both with resolvers.
+
+Fixes en route:
+- _field_values: >80-char values are prose, not enums — small collections
+  cleared the <=20-distinct bar with whole ticket bodies and blew a spec
+  prompt to 34k chars (HTTP 400, context overflow). Value-shape test added.
+- value_aliases (top-level config): declared site vocabulary -> data terms;
+  injected filters marked _injected and trusted by the groundedness guard
+  (grounded by construction).
+- 3B tripwire #4: is_followup=FALSE claims vetted — marker function words
+  (their/it/those, config front_followup_markers) + history -> 14B
+  re-decides ('what are their numbers?' was declared standalone with reason
+  'missing subject'). Rule now total: the fast model classifies, but every
+  assertion it makes crosses a deterministic gate.
+- Rewrite subset guard: a follow-up rewrite whose tokens ⊆ original added
+  no context -> escalate (caught the 'ticket number' fragment).
+- LLM client failures now print prompt size + server error body (found the
+  34k prompt in one look).
+
+Backlog: HALO-04 boilerplate learner, HALO-05 linkable ticket ids, image
+dedupe by content hash, action-id vs ticket_id display in listings,
+--full UAT sync when ready. Then RETR-05 batch, MCP discussion, EMBED-01.

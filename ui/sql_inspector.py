@@ -111,11 +111,55 @@ def _ask_the_data(names):
 
 
 def _raw_sql(names):
+    from core.sql_snippets import list_snippets, save_snippet, delete_snippet
     ui.label("Read-only SELECT / WITH only. Whitelisted tables, statement "
              "timeout, row cap.").classes("text-sm text-gray-600")
+
+    # Saved-statement library: pick to load, Save stores the current box.
+    with ui.row().classes("w-full items-center gap-2"):
+        saved = ui.select({}, label="Saved statements", with_input=True
+                          ).props("outlined dense clearable").classes("w-96")
+        ui.button("Save current", on_click=lambda: _save_current()).props("flat")
+        ui.button("Delete selected", on_click=lambda: _delete_selected()).props(
+            "flat color=negative")
+
     sql_box = ui.textarea(
         label="SQL", placeholder="SELECT collection_name, COUNT(*) FROM files GROUP BY 1"
     ).props("outlined autogrow").classes("w-full font-mono")
+
+    _snips = {}
+
+    def _refresh_saved():
+        _snips.clear()
+        opts = {}
+        for r in list_snippets():
+            _snips[r["id"]] = r["sql"]
+            opts[r["id"]] = r["label"]
+        saved.set_options(opts)
+
+    def _on_pick(e):
+        if saved.value in _snips:
+            sql_box.value = _snips[saved.value]
+    saved.on_value_change(_on_pick)
+
+    def _save_current():
+        sql = (sql_box.value or "").strip()
+        if not sql:
+            ui.notify("Nothing to save", type="warning")
+            return
+        label = sql.replace("\n", " ")[:80]
+        save_snippet(label, sql)
+        _refresh_saved()
+        ui.notify("Saved", type="positive")
+
+    def _delete_selected():
+        if saved.value in _snips:
+            delete_snippet(saved.value)
+            saved.value = None
+            _refresh_saved()
+            ui.notify("Deleted", type="warning")
+
+    _refresh_saved()
     ui.button("Run SQL", on_click=lambda: do_run()).props("unelevated")
     out = ui.column().classes("w-full mt-2")
 

@@ -11,6 +11,8 @@ from PDF.pdf_parser import parse_pdf
 from PDF.pdf_serializer import pdf_serializer
 from ASTRO.astro_parser import parse_astro
 from ASTRO.astro_serializer import astro_serializer
+from HALO.halo_parser import parse_halo
+from HALO.halo_serializer import halo_serializer
 
 registry = ComponentRegistry()
 
@@ -31,3 +33,6 @@ registry.register_serializer("pdf", pdf_serializer)
 
 registry.register_parser("astro", parse_astro)
 registry.register_serializer("astro", astro_serializer)
+
+registry.register_parser("halo", parse_halo)
+registry.register_serializer("halo", halo_serializer)

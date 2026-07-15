@@ -40,6 +40,14 @@ def render_ingestion_panel():
     with ui.row().classes("w-full items-center gap-2"):
         coll = ui.select(names, label="Collection", with_input=True).props("outlined dense").classes("w-64")
         force = ui.checkbox("Force re-ingest")
+
+        def _refresh_tab():
+            coll.set_options([r["name"] for r in collection_stats()])
+            scan_box.clear()
+            path_status.set_text("")
+            ui.notify("Ingestion tab refreshed", type="positive")
+        ui.button(icon="refresh", on_click=lambda: _refresh_tab()).props(
+            "flat round dense").tooltip("Reload collections and clear scan results")
     path_status = ui.label("").classes("text-sm")
     with ui.row().classes("gap-2"):
         ui.button("Path Check", on_click=lambda: do_path_check()).props("outline")

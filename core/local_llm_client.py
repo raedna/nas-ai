@@ -76,7 +76,16 @@ def call_local_llm_json(system_prompt, user_prompt, temperature=0.0,
     except Exception as e:
         # Never fail silently — callers treat None as "LLM unavailable" and
         # fall back; without this line there is no way to know WHY.
-        print(f"[LLM] call failed ({type(e).__name__}): {str(e)[:200]}")
+        _detail = ""
+        _resp = getattr(e, "response", None)
+        if _resp is not None:
+            try:
+                _detail = f" | server said: {_resp.text[:300]}"
+            except Exception:
+                pass
+        _plen = len(system_prompt or "") + len(user_prompt or "")
+        print(f"[LLM] call failed ({type(e).__name__}): {str(e)[:200]}"
+              f" | prompt {_plen} chars, model {payload.get('model')}{_detail}")
         return None
 
 

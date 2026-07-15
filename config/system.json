@@ -43,5 +43,9 @@
     ],
     "top_k": 25
   },
-  "halo": {"boilerplate_prefixes": ["*** Moore Europe Legal Disclaimer"]}
+  "halo": {
+    "credentials_file": "/Users/raednasr/RaedsMacM1/nas-ai/halo_creds/halo_creds.json",
+    "tickets_dir": "/Users/raednasr/RaedsMacM1/nas-ai/halo_tickets"
+  },
+  "value_aliases": {"halo_tickets": {"resolved": "Closed", "open": "New"}}
 }
