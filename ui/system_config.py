@@ -169,3 +169,60 @@ def _system_settings_section():
         ui.notify("System settings saved.", type="positive")
 
     ui.button("Save system settings", on_click=do_save).props("unelevated").classes("mt-3")
+
+    # ---- Value aliases manager (journaled writes via core.config_store) ----
+    ui.separator().classes("my-3")
+    ui.label("Value Aliases").classes("text-lg font-bold")
+    ui.label("Site vocabulary mapped to the data's own terms — 'resolved' means "
+             "'Closed' in halo_tickets. Declared here, injected deterministically, "
+             "trusted by the groundedness guard. Every change is backed up to "
+             "config/history/.").classes("text-xs text-gray-500 mb-1")
+
+    from core.ui_data import collection_stats as _cs_va
+    _va_cols = [r["name"] for r in _cs_va()]
+    alias_box = ui.column().classes("w-full gap-1")
+
+    def _va_refresh():
+        from core.config_store import get_key
+        alias_box.clear()
+        data = get_key("value_aliases") or {}
+        with alias_box:
+            if not any(data.values() if isinstance(data, dict) else []):
+                ui.label("No aliases defined yet.").classes("text-gray-500")
+            for _coll, _pairs in sorted((data or {}).items()):
+                for _tok, _val in sorted((_pairs or {}).items()):
+                    with ui.row().classes("items-center gap-2"):
+                        ui.label(f"{_coll}:").classes("text-sm text-gray-600 w-40")
+                        ui.label(f"'{_tok}' → '{_val}'").classes("flex-grow")
+                        def _rm(c=_coll, t=_tok):
+                            from core.config_store import delete_key
+                            delete_key(f"value_aliases.{c}.{t}")
+                            ui.notify("Alias removed", type="warning")
+                            _va_refresh()
+                        ui.button(on_click=_rm).props(
+                            "flat dense size=sm icon=close color=negative")
+
+    with ui.row().classes("w-full items-center gap-2 mt-1"):
+        va_coll = ui.select(_va_cols, label="Collection", with_input=True
+                            ).props("outlined dense").classes("w-56")
+        va_tok = ui.input("User word (e.g. resolved)").props(
+            "outlined dense").classes("w-48")
+        va_val = ui.input("Data value (e.g. Closed)").props(
+            "outlined dense").classes("w-56")
+
+        def _va_add():
+            from core.config_store import set_key
+            if not (va_coll.value and (va_tok.value or "").strip()
+                    and (va_val.value or "").strip()):
+                ui.notify("Collection, word and value are all required",
+                          type="warning")
+                return
+            set_key(f"value_aliases.{va_coll.value}."
+                    f"{va_tok.value.strip().lower()}", va_val.value.strip())
+            va_tok.value = ""
+            va_val.value = ""
+            ui.notify("Alias added — live immediately", type="positive")
+            _va_refresh()
+        ui.button("Add alias", on_click=_va_add).props("unelevated")
+
+    _va_refresh()

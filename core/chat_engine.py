@@ -110,7 +110,8 @@ Respond with JSON only:
 
 DEBUG = True
 
-def select_collections(question: str, history: list, available_collections: list) -> list:
+def select_collections(question: str, history: list, available_collections: list,
+                       explicit: bool = False) -> list:
     """
     3-tier collection routing:
     Tier 1 — identifier/filename direct DB matchc
@@ -122,6 +123,42 @@ def select_collections(question: str, history: list, available_collections: list
 
     selected = []
     seen = set()
+
+    # ON-DEMAND collections (config collections.json routing_mode:
+    # "on_demand" — e.g. halo_tickets): consulted only when the question
+    # NAMES them (name-token anchor below) or when the empty-answer
+    # widening retry reaches for them. The consulting archive speaks when
+    # spoken to; curated collections carry the default conversation.
+    select_collections._withheld = []
+    _on_demand = set()
+    try:
+        if explicit:
+            raise StopIteration  # user chose these collections — skip withholding
+        import json as _j_od
+        from core.paths import COLLECTIONS_PATH as _CP_OD
+        with open(_CP_OD, "r") as _f_od:
+            _cc_od = _j_od.load(_f_od)
+        _on_demand = {c for c, cfg in _cc_od.items()
+                      if str((cfg or {}).get("routing_mode", "auto")) == "on_demand"}
+    except StopIteration:
+        pass
+    except Exception as _e_od:
+        print(f"[ROUTING] on-demand config read failed "
+              f"({type(_e_od).__name__}): {_e_od}")
+    if _on_demand:
+        _qw_od = set(re.findall(r"[a-z0-9]{3,}", question.lower()))
+        _named_od = set()
+        for _c_od in _on_demand:
+            _compact_od = re.sub(r"[^a-z0-9]", "", _c_od.lower())
+            if any(_w in _compact_od for _w in _qw_od):
+                _named_od.add(_c_od)   # question names it — full citizen this turn
+        _skip_od = (_on_demand - _named_od) & set(available_collections)
+        if _skip_od:
+            select_collections._withheld = sorted(_skip_od)
+            available_collections = [c for c in available_collections
+                                     if c not in _skip_od]
+            if DEBUG:
+                print(f"DEBUG on-demand withheld: {sorted(_skip_od)}")
 
     # Procedural cue — used only as a Tier 2 prompt hint (Tier 1 hits are merged
     # AFTER Tier 2 ordering per CODE-027, so no skip is needed).
@@ -1360,8 +1397,14 @@ def resolve_fact(fact: str, history: list) -> str:
         return fact
 
 
+def _is_empty_answer_text(t: str) -> bool:
+    return (not t.strip()) or any(m in t for m in (
+        "No answer found", "No record found", "couldn't find",
+        "No matching records"))
+
+
 def chat_turn(question: str, history: list, available_collections: list,
-              session_id=None) -> dict:
+              session_id=None, explicit_collections: bool = False) -> dict:
     """
     Process one chat turn. Returns:
     {
@@ -1423,12 +1466,18 @@ def chat_turn(question: str, history: list, available_collections: list,
     # resolves its subject from the conversation before entering memory.
     if ctx["intent"] == "statement":
         import re as _re_st
-        _lead = (_re_st.findall(r"[a-z']+", question.lower()) or [""])[0]
         _interrog = {"what", "which", "when", "where", "who", "why", "how",
-                     "is", "are", "was", "were", "do", "does", "did", "can",
-                     "could", "will", "would", "should", "list", "show",
-                     "find", "give", "tell", "compare", "count"}
-        if "?" in question or _lead in _interrog:
+                     "list", "show", "find", "give", "tell", "compare",
+                     "count", "can", "could", "should", "would"}
+        _aux_lead = {"is", "are", "was", "were", "do", "does", "did", "will"}
+        _toks_st = _re_st.findall(r"[a-z']+", question.lower())
+        _lead = (_toks_st or [""])[0]
+        # Veto scans the WHOLE message, not the first word: "I have an FRA
+        # dates issue. what steps can I take" led with 'I' and was silently
+        # memorized. A mis-capture is worse than a mis-retrieval — explicit
+        # "remember that..." remains for statements that mention questions.
+        if ("?" in question or _lead in _aux_lead
+                or (set(_toks_st) & _interrog)):
             ctx["intent"] = "retrieval"  # guard override, fall through
         else:
             try:
@@ -1450,14 +1499,39 @@ def chat_turn(question: str, history: list, available_collections: list,
                 ctx["intent"] = "retrieval"
 
     if ctx["intent"] == "chat":
-        response = generate_conversational_response(question, history)
-        return {
-            "role": "assistant",
-            "content": response,
-            "method": "chat",
-            "collection": None,
-            "related_sections": []
-        }
+        # Tripwire #5 — the COSTLIEST misclassification: 'chat' answers come
+        # from the model's world knowledge with NO retrieval and NO source.
+        # A question misrouted here is a fabrication machine ("how do I deal
+        # with FRA date issues" got textbook finance advice). Deterministic
+        # gate: 'chat' is permitted only for SHORT messages whose content
+        # words are unknown to every collection's vocabulary — anything the
+        # corpus has words for goes to retrieval and earns a grounded answer
+        # or an honest miss.
+        import re as _re_ch
+        _cw = [w for w in _re_ch.findall(r"[a-z0-9]{3,}", question.lower())]
+        _corpus_owned = []
+        if _cw:
+            try:
+                _rows_ch = fetchall(
+                    "SELECT DISTINCT word FROM collection_vocab "
+                    "WHERE word = ANY(%s::text[]) LIMIT 5", (_cw,))
+                _corpus_owned = [r["word"] for r in _rows_ch]
+            except Exception:
+                pass
+        if len(_cw) > 5 or _corpus_owned:
+            if DEBUG:
+                print(f"DEBUG chat-intent vetoed -> retrieval "
+                      f"(len={len(_cw)}, corpus words={_corpus_owned})")
+            ctx["intent"] = "retrieval"
+        else:
+            response = generate_conversational_response(question, history)
+            return {
+                "role": "assistant",
+                "content": response,
+                "method": "chat",
+                "collection": None,
+                "related_sections": []
+            }
 
     standalone_question = ctx["standalone_query"]
     effective_history = history if ctx["is_followup"] else []
@@ -1471,7 +1545,9 @@ def chat_turn(question: str, history: list, available_collections: list,
     _mark("multi_item_gate")
 
     # Step 2: select collections (1–3, ranked by relevance)
-    collections = select_collections(standalone_question, effective_history, available_collections)
+    collections = select_collections(standalone_question, effective_history,
+                                     available_collections,
+                                     explicit=explicit_collections)
     _mark("routing")
 
     if sub_questions and collections:
@@ -1504,6 +1580,10 @@ def chat_turn(question: str, history: list, available_collections: list,
     if _empty_result(query_run) and len(collections) < 3:
         _ranked = [c for c in getattr(select_collections, "_last_ranking", [])
                    if c in available_collections]
+        # withheld on-demand collections get their turn when curated
+        # sources came up empty — precedent as the second line of defense
+        _ranked += [c for c in getattr(select_collections, "_withheld", [])
+                    if c in available_collections]
         _retry_cols = list(dict.fromkeys(collections + _ranked))[:3]
         if len(_retry_cols) > len(collections):
             if DEBUG:
@@ -1799,10 +1879,45 @@ def chat_turn(question: str, history: list, available_collections: list,
     print("DEBUG merged_image_payload:", merged_image_payload is not None)
     print("DEBUG query_run answer_payload:", bool(query_run.get("answer_payload")))
 
+    # On-demand hint: a withheld collection whose OWN vocabulary contains a
+    # content word of the question probably has something to say — tell the
+    # user how to ask it, never answer from it uninvited.
+    _od_hint = None
+    try:
+        _wh = getattr(select_collections, "_withheld", [])
+        if _wh and not _is_empty_answer_text(str(response)):
+            import re as _re_wh
+            _qw_wh = [w for w in _re_wh.findall(r"[a-z0-9]{3,}",
+                                                standalone_question.lower())]
+            if _qw_wh:
+                # vocabulary stores STEMMED lexemes ('issue' -> 'issu') —
+                # match surface forms AND their lexemes, same as vocab
+                # membership does
+                _lex_rows = fetchall(
+                    """SELECT to_tsvector('english', w)::text AS v
+                       FROM unnest(%s::text[]) AS w""", (_qw_wh,))
+                _terms_wh = set(_qw_wh)
+                for _lr in _lex_rows:
+                    _m_wh = _re_wh.match(r"'([^']+)'", str(_lr["v"] or ""))
+                    if _m_wh:
+                        _terms_wh.add(_m_wh.group(1))
+                _own = fetchall(
+                    """SELECT DISTINCT collection FROM collection_vocab
+                       WHERE collection = ANY(%s::text[])
+                       AND word = ANY(%s::text[])""",
+                    (_wh, sorted(_terms_wh)))
+                _own_cols = [r["collection"] for r in _own]
+                if _own_cols:
+                    _od_hint = {"collections": _own_cols,
+                                "question": standalone_question}
+    except Exception:
+        pass
+
     return {
         "role": "assistant",
         "content": response,
         "memory_alert": _memory_alert,
+        "od_hint": _od_hint,
         "method": "retrieval",
         "collection": collection,
         "collections_queried": query_run.get("collections_queried", [collection]),

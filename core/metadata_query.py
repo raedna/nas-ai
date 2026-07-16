@@ -419,6 +419,26 @@ def run_metadata_query(collection: str, question: str, intent_mode: str = None) 
                         f["field"], f["op"] = fld, "equals"
                     break
 
+        # Multi-word CONTAINS phrases match nothing unless the words are
+        # adjacent in the text ('FRA dates' never occurs; 'FRA' and 'dates'
+        # both do). Degrade to one contains-filter per content word — AND
+        # semantics preserved, adjacency requirement dropped.
+        _split_f = []
+        for f in spec["filters"]:
+            _v = str(f.get("value", ""))
+            if (f.get("op") == "contains" and " " in _v.strip()
+                    and not f.get("_injected")):
+                _words_cf = [w for w in _re0.findall(r"[a-z0-9]{3,}", _v.lower())]
+                if len(_words_cf) > 1:
+                    print(f"[METADATA] split phrase contains filter: "
+                          f"{_v!r} -> {_words_cf}")
+                    for _w_cf in _words_cf:
+                        _split_f.append({"field": f["field"], "op": "contains",
+                                         "value": _w_cf})
+                    continue
+            _split_f.append(f)
+        spec["filters"] = _split_f
+
         # Value-groundedness guard (deterministic): an equals filter is a CLAIM
         # that the question mentions that value. Shown the listed values, the
         # LLM force-maps unknown terms to the nearest one ('Barclays' -> BOA)
@@ -548,7 +568,15 @@ def run_metadata_query(collection: str, question: str, intent_mode: str = None) 
                 spec["filters"] = _claims
         if spec["filters"] and _count_with(spec["filters"]) == 0:
             _keep = [f for f in spec["filters"] if _count_with([f]) > 0]
-            if _keep and _count_with(_keep) > 0:
+            _had_claims = any(not f.get("_injected") for f in spec["filters"])
+            _kept_claims = any(not f.get("_injected") for f in _keep)
+            if _had_claims and not _kept_claims:
+                # every CONTENT claim matches nothing — that IS the answer.
+                # Keeping only injected anchors would answer "about FRA"
+                # with "all tickets" (honest-looking breadth dump).
+                print("[METADATA] all content claims zero-result — honest "
+                      "zero kept (injected anchors may not stand alone)")
+            elif _keep and _count_with(_keep) > 0:
                 print(f"[METADATA] dropped zero-result filters, kept: {_keep}")
                 spec["filters"] = _keep
             # NOTE: never drop ALL filters. When every filter matches nothing,

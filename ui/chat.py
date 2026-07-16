@@ -102,8 +102,8 @@ def render_chat_panel():
             log.clear()
         _refresh_dropdown()
 
-    async def do_send():
-        text = (msg.value or "").strip()
+    async def do_send(text_override=None, forced_collections=None):
+        text = (text_override or msg.value or "").strip()
         if not text:
             return
         msg.value = ""
@@ -115,14 +115,17 @@ def render_chat_panel():
         # Refresh per send: a collection created MID-SESSION (the first
         # memory) must be routable on the very next question.
         _names_now = [r["name"] for r in collection_stats() if r["chunks"]]
-        avail = [c for c in (coll.value or [])] or _names_now
+        avail = (forced_collections
+                 or [c for c in (coll.value or [])] or _names_now)
+        _explicit = bool(forced_collections or coll.value)
         with log:
             card = ui.card().classes("w-full")
             with card:
                 ui.spinner()
 
         fn = partial(chat_turn, text, list(history), avail,
-                     session_id=state["session_id"])
+                     session_id=state["session_id"],
+                     explicit_collections=_explicit)
         try:
             resp = await run.io_bound(fn)
         except Exception as exc:
@@ -153,6 +156,15 @@ def render_chat_panel():
         else:
             render_answer(card, content, build_image_items(payload), show_ocr=True)
         with card:
+            _od = resp.get("od_hint") if isinstance(resp, dict) else None
+            if _od and _od.get("collections"):
+                async def _search_od(h=_od):
+                    await do_send(text_override=h["question"],
+                                  forced_collections=h["collections"])
+                ui.button(f"🔎 Search {', '.join(_od['collections'])} for this "
+                          f"question",
+                          on_click=_search_od).props("outline dense size=sm"
+                          ).classes("mt-1")
             if isinstance(resp, dict) and resp.get("memory_alert"):
                 ui.label(f"⚠ {resp['memory_alert']}").classes(
                     "text-red-600 font-medium mt-1")

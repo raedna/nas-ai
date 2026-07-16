@@ -46,7 +46,8 @@ def halo_serializer(parsed, file_path, template_config, file_tags, collection_na
     t = parsed["ticket"]
     tid = str(t.get("id"))
     summary = _clean_text(t.get("summary") or f"Ticket {tid}")
-    details = _clean_text(t.get("details") or "", cfg["boilerplate_prefixes"])
+    details = _clean_text(t.get("details") or "", cfg["boilerplate_prefixes"],
+                          cfg.get("boilerplate_truncate", ()))
     categories = [c for c in (t.get(f"category_{i}") for i in range(1, 5)) if c]
 
     # Names over ids wherever the data offers them: 'resolved'/'critical'
@@ -72,6 +73,9 @@ def halo_serializer(parsed, file_path, template_config, file_tags, collection_na
         "priority": str(_prio or t.get("priority_id")),
         "dateoccurred": str(t.get("dateoccurred") or "")[:16],
         "categories": categories,
+        # singular category = first entry — feeds the concept-vector group
+        # chooser (rank 4) the way obsidian's folder category does
+        "category": (categories[0] if categories else None),
         "doc_type": "ticket",
         "source_type": "halo",
         "source_file": f"halo_ticket_{tid}.json",
@@ -106,7 +110,8 @@ def halo_serializer(parsed, file_path, template_config, file_tags, collection_na
                       key=lambda x: str(x.get("datetime") or "")):
         outcome = str(act.get("outcome") or "").strip()
         who = str(act.get("who") or "").strip()
-        note = _clean_text(act.get("note") or "", cfg["boilerplate_prefixes"])
+        note = _clean_text(act.get("note") or "", cfg["boilerplate_prefixes"],
+                           cfg.get("boilerplate_truncate", ()))
         if not note:
             continue
         if outcome.lower() in cfg["noise_outcomes"]:
@@ -142,6 +147,11 @@ def halo_serializer(parsed, file_path, template_config, file_tags, collection_na
         items[0]["embedded_image_paths"] = [i.get("path") for i in imgs]
         items[0]["embedded_image_targets"] = [i.get("name") for i in imgs]
         items[0]["has_embedded_image_ocr"] = False
+        # The renderer inlines images at [image: name] MARKERS in the text —
+        # paths in the payload alone display nothing. Same convention as the
+        # doc pipeline.
+        items[0]["text"] += "\n\n" + "\n".join(
+            f"[image: {i.get('name')}]" for i in imgs if i.get("name"))
 
     _ensure_schema(collection_name)
     print(f"[HALO SERIALIZER] ticket {tid} -> 1 header + {kept} action chunks")

@@ -38,12 +38,22 @@ def _cfg():
             "OmniVista Solutions Inc. Disclaimer",
             "If this ticket has been resolved in error",
         ])],
+        # TRUNCATE markers: disclaimers are email TAILS, often glued mid-line
+        # ("Many thanks ... Chris *** Moore Europe Legal Disclaimer...") —
+        # everything FROM the marker TO THE END of the text is cut.
+        "boilerplate_truncate": [str(x) for x in c.get("boilerplate_truncate", [
+            "*** Moore Europe Legal Disclaimer",
+        ])],
     }
 
 
-def _clean_text(t: str, boilerplate_prefixes=()) -> str:
+def _clean_text(t: str, boilerplate_prefixes=(), truncate_markers=()) -> str:
     t = str(t or "")
     t = re.sub(r"\r\n?", "\n", t)
+    for _m in truncate_markers or ():
+        _i = t.find(_m)
+        if _i != -1:
+            t = t[:_i]
     if boilerplate_prefixes:
         kept = []
         for ln in t.split("\n"):

@@ -905,3 +905,29 @@ Fixes en route:
 Backlog: HALO-04 boilerplate learner, HALO-05 linkable ticket ids, image
 dedupe by content hash, action-id vs ticket_id display in listings,
 --full UAT sync when ready. Then RETR-05 batch, MCP discussion, EMBED-01.
+
+## Session close 2026-07-16 — eval certified; three fixes pending retest
+
+Full eval (eval_run_20260716_003522): NO regressions — AG byte-stable
+(AG-05 grounds via primary_name=m42 now, same count), latency steady
+(23.6s chat / 11.0s Ask) with tickets+memory+feedback live in the corpus.
+Smokes green across recon/fix/kb/obsidian/bbg except BBG-06 (intent flap,
+PREDATES today — carried item).
+
+Landed at end of day, AWAITING TOMORROW'S RETEST (restart + force re-ingest
+halo_tickets first):
+1. Statement-capture veto scans whole message (interrogative anywhere
+   vetoes; "I have an FRA issue. what steps..." was silently memorized —
+   TWICE, second time via stale process). Forget the junk notes.
+2. Halo image markers in header chunk text (renderer inlines at markers
+   only — paths alone display nothing). TEST: "what is ticket 44539" ->
+   two screenshots inline.
+3. boilerplate_truncate markers (disclaimers are TAILS, glued mid-line —
+   prefix stripping missed them; truncation also removes most quoted-chain
+   duplication). NOTE: Moore disclaimer seeded as CODE DEFAULT — pilot
+   expedience, move to config or replace with HALO-04 learner.
+
+Tomorrow's queue: retest trio -> commit -> BBG-06 intent diag -> HALO eval
+bucket -> RETR-05 (new exhibit: rerank ranked the FRA Waiting Period
+article THIRD despite pool position #1 — 'dates' collision inside the
+reranker, not just the pool).

@@ -55,8 +55,15 @@ def _get_group_field(collection):
     if distinct_sections > 1:
         return 'section_heading'
 
-    # 2. Multiple distinct namespaces — XML/FIX collections
-    if distinct_namespaces > 1:
+    # 2. Multiple distinct namespaces — XML/FIX collections. EXCEPT when
+    # the namespaces are prefix-extensions of one another ('ticket' /
+    # 'ticket_action'): those are header/detail LEVELS of one record type,
+    # structurally distinct but topically identical — grouping by them
+    # produced 2 giant clusters for halo_tickets and killed concept links.
+    _ns_vals = sorted({r.get('namespace') for r in sample if r.get('namespace')})
+    _ns_levels = (len(_ns_vals) > 1 and all(
+        v.startswith(_ns_vals[0]) for v in _ns_vals))
+    if distinct_namespaces > 1 and not _ns_levels:
         return 'identifier_namespace'
 
     # 3. Meaningful type values — broker names, object types etc.

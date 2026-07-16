@@ -99,3 +99,89 @@ stops mattering when every choice it makes is grounded, gated, or repaired.
 **Still open (tracked):** VOCAB-01 spell-correction (PP-03), PP-01 as the next
 chapter's acceptance bar, heterogeneous multi-item splitting (MI-04/XC-03), Phase 1b
 fix_version (AG-10), astro workflow profiles (DESIGN-01), SPEED-01.
+
+---
+
+# Addendum (July 2026): Beyond Retrieval --- Speed, Memory, and the Connector Era
+
+The redesign above ended with a system that answered correctly. Three
+arcs since have made it fast, personal, and self-feeding --- each
+governed by the same doctrine the redesign established: **LLMs perceive;
+deterministic structure decides.**
+
+## Speed without regression
+
+Latency work never touched answer quality machinery. The wins were
+call-count and token-count: one fast-model front call replacing two
+serialized 14B calls; identical per-collection intent calls memoized;
+chatty per-word database lookups batched; schemas cached in-process;
+throwaway "reason" tokens capped. Chat went from 137s average (1013s
+worst) to ~24s (68s worst) with the eval suite byte-stable on every
+structured answer. The enduring lesson from Apple-Silicon profiling:
+concurrent LLM requests time-slice one GPU --- the only real levers are
+fewer calls and fewer tokens.
+
+The fast model earned a constitution of its own. Caught fabricating four
+different ways --- mangling an echo, leaving a pronoun unresolved,
+shrinking a rewrite to a fragment, and declaring a question standalone
+while citing its missing subject --- it is now permitted to CLASSIFY but
+never to ASSERT: every string it produces either passes a deterministic
+gate (token-preservation, subset-detection, marker vetting) or is
+escalated to the larger model. Nothing a small model says is taken on
+faith, and nothing enters permanent state without a gate.
+
+## Memory as a collection
+
+The memory feature added no new answer path. A remembered fact --- typed
+with a trigger phrase, stated bare (behind interrogative vetoes), or
+saved from an answer --- becomes an ordinary chunk in an ordinary
+collection, inheriting routing, retrieval, arbitration, vocabulary and
+cross-links. Provenance is baked into the text itself, so no renderer
+can present recollection as record. Notes ride answers as verbatim
+"From memory" blocks --- anchored to what the QUESTION names, filtered
+for relevance --- and when a note disputes a field of a structured
+record, a red source-level alert names the field and the file to fix:
+data stays the single source of truth; memory is the annotation layer
+that pressures it to stay true.
+
+Feedback closes the loop conservatively: thumbs verdicts form a
+per-question prior that enters arbitration one rung above routing order
+--- settling only the ties that were previously arbitrary, never
+overruling a grounded answer. The system's first live act of learning
+was a thumbs-down flipping the winner of a repeated question ---
+observed in the arbitration debug as `feedback prior: {'kb_docs': -1}`.
+
+## Tickets as data
+
+The Halo ITSM connector proved the architecture's central bet: a wholly
+new data source --- support tickets over OAuth2, with expiring-JWT
+image links, status lookup tables, and email boilerplate --- ingested
+through the EXISTING pipeline with zero changes to retrieval,
+arbitration, or delivery. Tickets are parsed per-item (header + human
+actions), each chunk carrying both faces: text for "how was this
+fixed?", payload for "who resolved it and how many are open?". The
+serializer DECLARES its schema --- the first collection where schema is
+a fact rather than an inference --- and site vocabulary ('resolved'
+means Closed) is declared in config, injected deterministically, and
+subject to a retreat rule when a heuristic anchor contradicts a
+grounded claim.
+
+The loop this closes is the system's purpose in miniature: a ticket
+arrives; triage asks whether the knowledge base already answers it; the
+resolved ticket is normalized, ingested, cross-linked to the records it
+mentions; and the next similar question is answered partly by the
+support system's own history --- knowledge the organization generated
+by doing its work, made retrievable the same afternoon.
+
+## What the measurements refused to permit
+
+Two honest negatives are part of this record. Embedding-based relevance
+could not separate junk concept links from genuine ones (0.495--0.532
+vs 0.506 --- no gap), so no threshold was invented; the measurement
+harness now serves as the acceptance test for any future embedding
+model (EMBED-01). And a proposed hardcoded synonym ('resolved' =
+'closed') was redirected into declared configuration --- because the
+system's guards had just demonstrated, via a Barclays-to-BOA
+fabrication they correctly blocked, that undeclared semantic mappings
+are indistinguishable from hallucinations.
+
