@@ -601,8 +601,11 @@ def route_query(
         import re as _re_anc
         _anchors_cov = [m.lower() for m in _re_anc.findall(
             r"\b[a-zA-Z0-9_\-]+\.[a-zA-Z0-9]{2,5}\b", question)]
+        # {2,} not {3,}: 'FRA' is a 3-char code — the 4-char floor hid it
+        # from anchor coverage exactly as the old 3-char token floor hid
+        # tag '22' from the routing anchors.
         _anchors_cov += [c.lower() for c in _re_anc.findall(
-            r"\b[A-Z][A-Z0-9_]{3,}\b", question)]
+            r"\b[A-Z][A-Z0-9_]{2,}\b", question)]
         if _words or _anchors_cov:
             _hay = " ".join(str(payload.get(k) or "") for k in
                             ("nlp_text", "text", "primary_name", "description")).lower()

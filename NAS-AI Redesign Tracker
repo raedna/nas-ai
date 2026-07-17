@@ -965,3 +965,67 @@ THE ORIGINAL QUALITY BOARD IS EMPTY. Every named retrieval disease now has
 a deterministic cure with an eval receipt. Remaining work is new capability
 (M4b answer cache, HALO promotion queue, weak-answer widening, splitter,
 M3), platform (EMBED-01, MCP discussion), and cosmetics — not defects.
+
+## Platform group closure (2026-07-17)
+
+- **3B counter LIVE**: runtime_counters table bumps front_total /
+  front_escalated / chat_intent_vetoed / statement_vetoed. Read via SQL
+  Inspector. Decision rule: if front_escalated/front_total stays under
+  ~15% after a week of normal use, the fast model earns its keep; above
+  ~30%, drop the fast_model key (one config edit, code untouched).
+- **EMBED-01 bake-off harness** (diag_embed_bakeoff.py): per candidate
+  model — (1) junk-vs-genuine concept separation (acceptance: gap > +0.03;
+  bge baseline is NEGATIVE), (2) labeled-question routing accuracy + mean
+  top1-top2 margin vs sample centroids. Run baseline first, then
+  candidates; numbers pick the winner; migration (full re-embed + threshold
+  remeasure + full eval) scheduled ONLY on a clear win, and BEFORE the
+  corpus grows (Halo --full backfill, Confluence).
+- **MCP: formally DEFERRED** with revisit criteria — build the MCP layer
+  when (a) a second application needs NAS-AI's answers programmatically,
+  or (b) a desired data source offers MCP but no plain API. Neither exists
+  today. Direct API integration (the Halo pattern) remains the default.
+
+## EMBED-01 CLOSED: measured, migration unjustified (2026-07-17)
+
+Bake-off (diag_embed_bakeoff.py, fresh-embed pairs + labeled routing):
+  nomic-v1.5   gap +0.258 (partial junk set) | routing 6/7 | margin +0.040
+  qwen3-0.6b   gap +0.219 | routing 4/7 (UNPREFIXED — handicapped)
+  bge-m3       gap +0.206 | routing 5/7 | margin +0.087
+  bge-large    gap +0.170 | routing 6/7 | margin +0.043   (current)
+
+Verdict: nomic modestly ahead; no candidate dominates; migration cost
+(full re-embed, every threshold remeasured, eval cycles, 768-dim column
+change) not justified by +0.09 relative separation.
+
+Measurement honesty note: the harness pairs are EASIER than the in-system
+q-sim that motivated EMBED-01 (fresh embeds of name-matched chunks vs
+stored anchor-chunk vectors — the baseline separates here but didn't
+in-system). Relative standings valid; absolute "bge is broken" narrative
+retired.
+
+REVISIT TRIGGERS: (1) before any large corpus growth (Halo --full,
+Confluence) — migration cost grows permanently after; (2) if a fair
+prefixed rematch is ever wanted for qwen3/e5, add --query-prefix to the
+harness first. PLATFORM GROUP FULLY CLOSED (counter live, EMBED-01
+measured, MCP deferred by criterion).
+
+## Weak-answer widening + confidence rung DONE (2026-07-18)
+
+eval_run_20260718_000201: 19 diffs, ALL synthesis phrasing — zero banners
+added, zero winners flipped, latency identical. The changes only wake on
+weak answers, which the suite barely contains.
+
+The chain, verified live ("who is handling the FRA issue internally at
+Moore?" -> Guillaume from ticket 44539, fully automatic):
+1. weak markers (banner / closest-match stubs) now trigger the widening
+   retry, not just emptiness;
+2. anchor coverage floor lowered to 3-char codes (FRA/CRD/UAT mandatory);
+3. withheld archives join the retry FIRST (cap was filling with centroid
+   also-rans);
+4. arbitration CONFIDENCE rung — banner'd answers lose ties to unbannered
+   (ladder: method > name/title > groundedness > confidence > feedback >
+   order).
+
+URGENT-ISH: eval needs an ARCHIVE bucket (Guillaume-class questions) —
+today's machinery has no regression net in the suite. Next: M4b
+verified-answer cache, then splitter, then M3.

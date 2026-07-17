@@ -646,6 +646,19 @@ def run_parallel_queries(collections: list, question: str, single_item: bool = F
     if DEBUG and _fb_net:
         print(f"DEBUG feedback prior: {_fb_net}")
 
+    def _weak_answer(r):
+        """1 if the answer wears a weakness marker (low-coverage banner /
+        closest-match stub) — such answers lose TIES to confident ones.
+        The widening retry once added the archive only to watch a banner'd
+        obsidian note beat the ticket that actually named the person."""
+        t = _result_to_text(r.get("result", ""))
+        try:
+            from core.retrieval.router import LOW_COVERAGE_PREFIX as _LCP2
+        except Exception:
+            _LCP2 = "No direct match found"
+        return 1 if any(m in t for m in (
+            _LCP2, "No direct match found", "No exact match found")) else 0
+
     def _arb_score(col, idx):
         r = results.get(col, {})
         m = str(r.get("method") or "")
@@ -671,7 +684,8 @@ def run_parallel_queries(collections: list, question: str, single_item: bool = F
             _tc = _re.sub(r"[^a-z0-9]", "", _title.lower())
             _tvar = _qtoks | {t[:-1] for t in _qtoks if t.endswith("s") and len(t) > 3}
             _thits = sum(1 for t in _tvar if t in _tc)
-            return (mrank, 3 - min(_thits, 3), 2, -_fb_net.get(col, 0), idx)
+            return (mrank, 3 - min(_thits, 3), 2, _weak_answer(r),
+                    -_fb_net.get(col, 0), idx)
         # Groundedness is graded: an EQUALS filter on a real field whose value
         # matches a question token (identifier_namespace = tag) outranks a
         # 'contains' on free text (nlp_text contains FIX tag) — equality is a
@@ -691,7 +705,8 @@ def run_parallel_queries(collections: list, question: str, single_item: bool = F
             elif any(v.startswith(t) or t.startswith(v)
                      for v in _ct_vals for t in _qtoks):
                 grounded = 1
-        return (mrank, 0 if name_hit else 1, grounded, -_fb_net.get(col, 0), idx)
+        return (mrank, 0 if name_hit else 1, grounded, _weak_answer(r),
+                -_fb_net.get(col, 0), idx)
 
     _candidates = [(col, i) for i, col in enumerate(collections)
                    if not _is_empty_answer(results.get(col, {}).get("result", ""))]
@@ -1090,6 +1105,10 @@ def front_of_pipe(question: str, history: list) -> dict:
                     out["reason"] = "escalated: fast rewrite added no context"
             if DEBUG:
                 print(f"DEBUG front_of_pipe ({_model or 'default'}):", out)
+            from core.counters import bump
+            bump("front_total")
+            if "escalated" in str(out.get("reason", "")):
+                bump("front_escalated")
             return out
     except Exception as _e:
         if DEBUG:
@@ -1478,6 +1497,8 @@ def chat_turn(question: str, history: list, available_collections: list,
         # "remember that..." remains for statements that mention questions.
         if ("?" in question or _lead in _aux_lead
                 or (set(_toks_st) & _interrog)):
+            from core.counters import bump
+            bump("statement_vetoed")
             ctx["intent"] = "retrieval"  # guard override, fall through
         else:
             try:
@@ -1522,6 +1543,8 @@ def chat_turn(question: str, history: list, available_collections: list,
             if DEBUG:
                 print(f"DEBUG chat-intent vetoed -> retrieval "
                       f"(len={len(_cw)}, corpus words={_corpus_owned})")
+            from core.counters import bump
+            bump("chat_intent_vetoed")
             ctx["intent"] = "retrieval"
         else:
             response = generate_conversational_response(question, history)
@@ -1575,16 +1598,30 @@ def chat_turn(question: str, history: list, available_collections: list,
     # already ran.
     def _empty_result(qr):
         t = _result_to_text(qr.get("result", ""))
-        return (not t.strip()) or any(m in t for m in (
-            "No answer found", "No record found", "Found 0 item"))
+        if (not t.strip()) or any(m in t for m in (
+                "No answer found", "No record found", "Found 0 item")):
+            return True
+        # WEAK answers widen too (not just empty): the low-coverage banner
+        # and closest-match stubs are deterministic weakness markers — a
+        # curated answer that admits it can't help is the archive's cue.
+        # Cheap by construction: the retry below only fires when widening
+        # would actually ADD a collection (usually the on-demand archive).
+        try:
+            from core.retrieval.router import LOW_COVERAGE_PREFIX as _LCP
+        except Exception:
+            _LCP = "\u26a0"
+        return any(m in t for m in (
+            _LCP, "No direct match found", "No exact match found"))
     if _empty_result(query_run) and len(collections) < 3:
+        # WITHHELD archives come FIRST among additions — they are the whole
+        # point of this retry (a cap of 3 was filling with centroid
+        # also-rans like docx_test while halo_tickets queued behind them).
+        _withheld_w = [c for c in getattr(select_collections, "_withheld", [])
+                       if c in available_collections]
         _ranked = [c for c in getattr(select_collections, "_last_ranking", [])
                    if c in available_collections]
-        # withheld on-demand collections get their turn when curated
-        # sources came up empty — precedent as the second line of defense
-        _ranked += [c for c in getattr(select_collections, "_withheld", [])
-                    if c in available_collections]
-        _retry_cols = list(dict.fromkeys(collections + _ranked))[:3]
+        _retry_cols = list(dict.fromkeys(
+            collections + _withheld_w + _ranked))[:3]
         if len(_retry_cols) > len(collections):
             if DEBUG:
                 print(f"DEBUG routing widened after empty answer: "
