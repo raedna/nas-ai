@@ -1423,7 +1423,8 @@ def _is_empty_answer_text(t: str) -> bool:
 
 
 def chat_turn(question: str, history: list, available_collections: list,
-              session_id=None, explicit_collections: bool = False) -> dict:
+              session_id=None, explicit_collections: bool = False,
+              skip_cache: bool = False) -> dict:
     """
     Process one chat turn. Returns:
     {
@@ -1470,6 +1471,29 @@ def chat_turn(question: str, history: list, available_collections: list,
             "collection": "memory",
             "related_sections": [],
         }
+
+    # M4b: verified-answer cache — a question you already asked and 👍'd
+    # answers instantly (no front call, no routing, no LLM). Normalized
+    # exact match only; retired automatically when the source collection
+    # re-ingests or a later 👎 lands. "Run fresh" bypasses via skip_cache.
+    if not skip_cache:
+        try:
+            from core.feedback_store import verified_answer
+            _va = verified_answer(question)
+        except Exception:
+            _va = None
+        if _va:
+            _mark("verified_cache")
+            from core.counters import bump
+            bump("cache_served")
+            return {
+                "role": "assistant",
+                "content": _va["answer"],
+                "method": "verified_cache",
+                "collection": _va.get("collection"),
+                "verified_at": str(_va.get("verified_at"))[:16],
+                "related_sections": [],
+            }
 
     # Step 1 + 1b merged (SPEED-01 step 4): ONE fast-model call decides
     # chat-vs-retrieval AND the follow-up rewrite (was two serialized 14B

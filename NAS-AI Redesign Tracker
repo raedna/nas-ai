@@ -1029,3 +1029,18 @@ Moore?" -> Guillaume from ticket 44539, fully automatic):
 URGENT-ISH: eval needs an ARCHIVE bucket (Guillaume-class questions) —
 today's machinery has no regression net in the suite. Next: M4b
 verified-answer cache, then splitter, then M3.
+
+## M4b DONE (2026-07-18) — verified-answer cache
+
+👍-verified answers serve instantly on exact repeat questions (normalized
+match, before routing/LLM): "✓ verified answer · <date>" badge + Run fresh
+bypass. Staleness is QUERY-TIME, zero machinery: newer collection ingest
+retires the entry (files.updated_at comparison); a later 👎 outranks the
+👍. One thumb, two claims: exact answer (strong, expires with data) +
+collection preference at tie-break (weak, survives re-ingest). Thumbs are
+stateful in the UI (newest verdict colors its button). cache_served
+counter live. Verified: tag-22 served from cache with badge.
+
+MEMORY & LEARNING ARC COMPLETE (M1 sessions, M2 memory, M4a capture+prior,
+M4b cache). Remaining in group: splitter, M3 preferences, archive eval
+bucket.

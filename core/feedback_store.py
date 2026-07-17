@@ -75,6 +75,48 @@ def delete_feedback(feedback_id: int) -> None:
     execute("DELETE FROM answer_feedback WHERE id = %s", (feedback_id,))
 
 
+def verified_answer(question: str):
+    """M4b: the newest 👍-verified answer for THIS question (normalized
+    exact match), unless its source collection re-ingested since the
+    verdict — data changing retires stale verdicts at query time, no
+    invalidation machinery. Returns {answer, collection, verified_at} | None."""
+    ensure_feedback_table()
+    import re
+    qn = re.sub(r"[^a-z0-9]+", " ", str(question).lower()).strip()
+    rows = fetchall("""
+        SELECT f.answer, f.collection, f.created_at
+        FROM answer_feedback f
+        WHERE regexp_replace(lower(f.question), '[^a-z0-9]+', ' ', 'g') = %s
+        AND f.verdict = 'up'
+        AND NOT EXISTS (
+            SELECT 1 FROM answer_feedback d
+            WHERE regexp_replace(lower(d.question), '[^a-z0-9]+', ' ', 'g') = %s
+            AND d.verdict = 'down' AND d.created_at > f.created_at)
+        AND (f.collection IS NULL OR NOT EXISTS (
+            SELECT 1 FROM files i
+            WHERE i.collection_name = f.collection
+            AND i.updated_at > f.created_at))
+        ORDER BY f.created_at DESC LIMIT 1
+    """, (qn, qn))
+    if not rows:
+        return None
+    return {"answer": rows[0]["answer"], "collection": rows[0]["collection"],
+            "verified_at": rows[0]["created_at"]}
+
+
+def latest_verdict(question: str):
+    """'up' | 'down' | None — the newest verdict on this exact question."""
+    ensure_feedback_table()
+    import re
+    qn = re.sub(r"[^a-z0-9]+", " ", str(question).lower()).strip()
+    rows = fetchall("""
+        SELECT verdict FROM answer_feedback
+        WHERE regexp_replace(lower(question), '[^a-z0-9]+', ' ', 'g') = %s
+        ORDER BY created_at DESC LIMIT 1
+    """, (qn,))
+    return rows[0]["verdict"] if rows else None
+
+
 def feedback_stats():
     ensure_feedback_table()
     return fetchall("""

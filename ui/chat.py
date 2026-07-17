@@ -102,7 +102,8 @@ def render_chat_panel():
             log.clear()
         _refresh_dropdown()
 
-    async def do_send(text_override=None, forced_collections=None):
+    async def do_send(text_override=None, forced_collections=None,
+                      skip_cache=False):
         text = (text_override or msg.value or "").strip()
         if not text:
             return
@@ -125,7 +126,8 @@ def render_chat_panel():
 
         fn = partial(chat_turn, text, list(history), avail,
                      session_id=state["session_id"],
-                     explicit_collections=_explicit)
+                     explicit_collections=_explicit,
+                     skip_cache=skip_cache)
         try:
             resp = await run.io_bound(fn)
         except Exception as exc:
@@ -156,6 +158,14 @@ def render_chat_panel():
         else:
             render_answer(card, content, build_image_items(payload), show_ocr=True)
         with card:
+            if isinstance(resp, dict) and resp.get("method") == "verified_cache":
+                with ui.row().classes("items-center gap-2 mt-1"):
+                    ui.label(f"✓ verified answer · {resp.get('verified_at', '')}"
+                             ).classes("text-xs text-green-700 font-medium")
+                    async def _run_fresh(q=text):
+                        await do_send(text_override=q, skip_cache=True)
+                    ui.button("Run fresh", on_click=_run_fresh).props(
+                        "flat dense size=sm icon=refresh")
             _od = resp.get("od_hint") if isinstance(resp, dict) else None
             if _od and _od.get("collections"):
                 async def _search_od(h=_od):
@@ -182,19 +192,37 @@ def render_chat_panel():
                     ui.button("Remember this", on_click=_remember_answer).props(
                         "flat dense size=sm icon=bookmark_add")
 
-                    # M4a: feedback capture — consumption comes later, once
-                    # a real corpus of verdicts exists to design against.
+                    # M4a: feedback capture; buttons wear their history —
+                    # the newest verdict on this exact question colors its
+                    # thumb (green up / red down), so you can see at a
+                    # glance that a question is already judged.
+                    try:
+                        from core.feedback_store import latest_verdict
+                        _lv = latest_verdict(text)
+                    except Exception:
+                        _lv = None
+                    _up_btn = ui.button().props(
+                        "flat dense size=sm icon=thumb_up"
+                        + (" color=positive" if _lv == "up" else ""))
+                    _dn_btn = ui.button().props(
+                        "flat dense size=sm icon=thumb_down"
+                        + (" color=negative" if _lv == "down" else ""))
+
                     def _vote(verdict, q=text, a=content, r=resp):
                         from core.feedback_store import record_feedback
                         record_feedback(q, a, verdict,
                                         collection=r.get("collection"),
                                         method=r.get("method"),
                                         session_id=state["session_id"])
+                        _up_btn.props(
+                            "flat dense size=sm icon=thumb_up"
+                            + (" color=positive" if verdict == "up" else ""))
+                        _dn_btn.props(
+                            "flat dense size=sm icon=thumb_down"
+                            + (" color=negative" if verdict == "down" else ""))
                         ui.notify("Feedback saved", type="positive")
-                    ui.button(on_click=lambda: _vote("up")).props(
-                        "flat dense size=sm icon=thumb_up")
-                    ui.button(on_click=lambda: _vote("down")).props(
-                        "flat dense size=sm icon=thumb_down")
+                    _up_btn.on_click(lambda: _vote("up"))
+                    _dn_btn.on_click(lambda: _vote("down"))
             for s in (resp.get("related_sections") if isinstance(resp, dict) else []) or []:
                 label = (f"[{s.get('collection')}] {s.get('title')} · "
                          f"{s.get('match_type')} {float(s.get('confidence') or 0):.2f}")
