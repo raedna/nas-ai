@@ -112,12 +112,11 @@ def _time_difference_seconds(bo_a: Dict[str, Any], bo_b: Dict[str, Any]) -> Opti
 
     return round((dt_b - dt_a).total_seconds(), 6)
 
-
-def _category_for_tag(tag: str) -> str:
+def category_for_tag(tag: str) -> str:
     tag = str(tag or "").strip()
 
-    operational = {
-        "8", "9", "10", "34", "43", "122",
+    envelope = {
+        "8", "9", "10", "34", "43", "52", "122",
     }
 
     routing = {
@@ -125,35 +124,53 @@ def _category_for_tag(tag: str) -> str:
     }
 
     identifiers = {
-        "11", "17", "37", "41", "198", "526", "76",
+        "11", "17", "37", "41", "76", "198", "526",
     }
 
-    business = {
-        "35", "150", "39", "54", "55", "48", "22",
-        "38", "44", "31", "32", "14", "151", "6",
-        "15", "167", "106", "223",
+    instrument = {
+        "22", "48", "55", "65", "106", "167", "200",
+        "201", "202", "205", "206", "207", "223",
+    }
+
+    order_details = {
+        "15", "21", "38", "40", "44", "54", "59",
+        "99", "100", "110", "111", "126",
+    }
+
+    execution_state = {
+        "6", "14", "31", "32", "39", "150", "151",
     }
 
     timing = {
-        "52", "60", "75", "64",
+        "60", "75", "168", "432",
     }
 
-    party = {
-        "448", "447", "452", "453", "523", "803",
+    settlement = {
+        "63", "64", "120", "119", "155",
     }
 
-    if tag in timing:
-        return "Timing"
-    if tag in operational:
-        return "Operational"
+    parties = {
+        "447", "448", "452", "453", "523", "802", "803",
+    }
+
+    if tag in envelope:
+        return "Message Envelope"
     if tag in routing:
         return "Routing"
     if tag in identifiers:
-        return "Identifier"
-    if tag in business:
-        return "Business"
-    if tag in party:
-        return "Party"
+        return "Business Identifiers"
+    if tag in instrument:
+        return "Instrument"
+    if tag in order_details:
+        return "Order Details"
+    if tag in execution_state:
+        return "Execution State"
+    if tag in timing:
+        return "Timing"
+    if tag in settlement:
+        return "Settlement"
+    if tag in parties:
+        return "Parties"
 
     return "Other"
 
@@ -391,7 +408,7 @@ def compare_fix_messages(raw_a: str, raw_b: str) -> Dict[str, Any]:
             "tag": tag,
             "tag_name": tag_name,
             "occurrence": occurrence,
-            "category": _category_for_tag(tag),
+            "category": category_for_tag(tag),
             "value_a": row_a.get("value", ""),
             "value_name_a": row_a.get("value_name", ""),
             "display_a": _display_value(row_a),

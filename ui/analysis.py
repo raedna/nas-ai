@@ -11,6 +11,7 @@ from PDF.pdf_parser import parse_pdf
 import base64
 from fastapi import Request
 from nicegui import app
+from core.analysis.analyzers.fix.comparator import category_for_tag
 from core.analysis.ocr.rapidocr_adapter import ocr_image_with_rapidocr
 from core.analysis.ocr.pdf_rapidocr_adapter import ocr_pdf_with_rapidocr
 from ui.analysis_renderers import render_compare_result, render_sequence_result
@@ -401,21 +402,39 @@ def render_analysis_panel():
     </script>
     """)
 
-    with ui.row().classes("items-center q-gutter-sm q-px-md bg-white shadow-2").style(
-        "position: fixed; left: 260px; right: 0; top: 82px; min-height: 64px; z-index: 110;"
+    with ui.row().classes(
+        "items-center justify-center q-gutter-md"
+    ).style(
+        "margin-left: 260px; "
+        "width: calc(100% - 260px); "
+        "height: 74px; "
+        "padding: 0 24px;"
     ):
         ui.label("Analysis Controls").classes("text-md font-semibold")
+
         analyzer_select = ui.select(
-            options=["FIX Message"], value="FIX Message", label="Analyzer"
+            options=["FIX Message"],
+            value="FIX Message",
+            label="Analyzer",
         ).props("outlined dense").classes("w-44")
+
         analysis_mode = ui.select(
             ["Single Message", "Compare Messages", "Multi-Message Sequence"],
             value="Single Message",
             label="Mode",
         ).props("outlined dense").classes("w-56")
-        ui.button("Input", icon="upload", on_click=toggle_input_panel).props("outline")
+
+        ui.button(
+            "Input",
+            icon="upload",
+            on_click=toggle_input_panel,
+        ).props("outline")
+
         toolbar_actions_area = ui.row().classes("items-center q-gutter-sm")
-        toolbar_status_label = ui.label("Ready").classes("text-sm text-grey-7 q-ml-auto")
+
+        toolbar_status_label = ui.label(
+            "Ready"
+        ).classes("text-sm text-grey-7 q-ml-auto")
 
     # --- FIX UI REDESIGN WORKSPACE SKELETON ---
     with ui.row().classes("w-full no-wrap items-start"):
@@ -446,7 +465,7 @@ def render_analysis_panel():
             "max-width: calc(100% - 280px); "
             "min-width: 0; "
             "box-sizing: border-box; "
-            "padding-top: 76px; "
+            "padding-top: 16px; "
             "overflow-x: hidden;"
         ):
 
@@ -671,23 +690,188 @@ def render_analysis_panel():
 
         ui.label(insights.get("summary") or "").classes("text-sm text-grey-8")
 
-        warnings = insights.get("warnings") or []
         changes = insights.get("changes") or []
+        relationship_groups = insights.get("relationship_groups") or []
 
-        info_changes = [
-            change for change in changes
-            if change.get("severity") == "info"
+        relationship_changes = [
+            change
+            for change in changes
+            if change.get("category") == "relationship"
         ]
 
-        if warnings:
-            ui.label("Potential Issues").classes("text-md font-semibold text-red-7 q-mt-md")
-            for change in warnings:
-                ui.label(f"- {change.get('summary')}").classes("text-red-7")
+        sequence_changes = [
+            change
+            for change in changes
+            if change.get("category") != "relationship"
+        ]
 
-        if info_changes:
-            with ui.expansion("Informational Changes", value=False).classes("w-full q-mt-md"):
-                for change in info_changes:
-                    ui.label(f"- {change.get('summary')}").classes("text-grey-8")
+        def format_message_list(indexes):
+            clean_indexes = [
+                index for index in indexes
+                if index is not None
+            ]
+
+            labels = [
+                f"Message {index}"
+                for index in clean_indexes
+            ]
+
+            if not labels:
+                return "Unknown messages"
+
+            if len(labels) == 1:
+                return labels[0]
+
+            if len(labels) == 2:
+                return f"{labels[0]} and {labels[1]}"
+
+            return ", ".join(labels[:-1]) + f", and {labels[-1]}"
+
+        # ---------------------------------------------------------
+        # Relationship analysis
+        # ---------------------------------------------------------
+        ui.label("Relationship Analysis").classes(
+            "text-md font-semibold q-mt-md"
+        )
+
+        unrelated_groups = [
+            group
+            for group in relationship_groups
+            if len(group) == 1
+        ]
+
+        related_groups = [
+            group
+            for group in relationship_groups
+            if len(group) > 1
+        ]
+
+        if unrelated_groups:
+            ui.label("Unrelated Messages").classes(
+                "text-sm font-semibold text-red-7 q-mt-sm"
+            )
+
+            for group in unrelated_groups:
+                message_text = format_message_list(group)
+
+                ui.label(
+                    f"• {message_text} does not belong to the same "
+                    "order lifecycle as the other selected messages."
+                ).classes("text-red-7")
+
+        if related_groups:
+            ui.label("Related Groups").classes(
+                "text-sm font-semibold text-green-8 q-mt-sm"
+            )
+
+            for group_number, group in enumerate(related_groups, start=1):
+                message_text = format_message_list(group)
+
+                ui.label(
+                    f"• Group {group_number}: {message_text} belong to "
+                    "the same order lifecycle."
+                ).classes("text-green-8")
+
+        if not relationship_changes:
+            ui.label(
+                "No relationship classification was produced."
+            ).classes("text-grey-7")
+
+        # ---------------------------------------------------------
+        # Changes within related groups only
+        # ---------------------------------------------------------
+        if sequence_changes:
+            ui.label("Changes Within Related Groups").classes(
+                "text-md font-semibold q-mt-md"
+            )
+
+            rendered_change_ids = set()
+
+            for group_number, group in enumerate(related_groups, start=1):
+                group_indexes = set(group)
+
+                group_changes = [
+                    change
+                    for change in sequence_changes
+                    if change.get("from_message_index") in group_indexes
+                    and change.get("to_message_index") in group_indexes
+                ]
+
+                if not group_changes:
+                    continue
+
+                with ui.expansion(
+                    f"Group {group_number}: {format_message_list(group)}",
+                    value=True,
+                ).classes("w-full q-mt-sm bg-grey-1 rounded-borders"):
+
+                    warning_changes = [
+                        change
+                        for change in group_changes
+                        if change.get("severity") in {"warning", "critical"}
+                    ]
+
+                    info_changes = [
+                        change
+                        for change in group_changes
+                        if change.get("severity") == "info"
+                    ]
+
+                    if warning_changes:
+                        ui.label("Potential Issues").classes(
+                            "text-sm font-semibold text-red-7 q-mt-sm"
+                        )
+
+                        for change in warning_changes:
+                            ui.label(
+                                f"• {change.get('summary')}"
+                            ).classes("text-red-7")
+
+                            rendered_change_ids.add(id(change))
+
+                    if info_changes:
+                        ui.label("Informational Changes").classes(
+                            "text-sm font-semibold text-grey-8 q-mt-sm"
+                        )
+
+                        for change in info_changes:
+                            ui.label(
+                                f"• {change.get('summary')}"
+                            ).classes("text-grey-8")
+
+                            rendered_change_ids.add(id(change))
+
+            # Defensive fallback in case a sequence change cannot be
+            # matched back to one of the relationship groups.
+            unmatched_changes = [
+                change
+                for change in sequence_changes
+                if id(change) not in rendered_change_ids
+            ]
+
+            if unmatched_changes:
+                with ui.expansion(
+                    "Other Changes",
+                    value=False,
+                ).classes("w-full q-mt-sm"):
+
+                    for change in unmatched_changes:
+                        severity = change.get("severity")
+
+                        if severity in {"warning", "critical"}:
+                            change_class = "text-red-7"
+                        else:
+                            change_class = "text-grey-8"
+
+                        ui.label(
+                            f"• {change.get('summary')}"
+                        ).classes(change_class)
+
+        elif related_groups:
+            ui.label(
+                "No meaningful lifecycle changes were detected within "
+                "the related message groups."
+            ).classes("text-grey-7 q-mt-md")
 
     def render_related_saved_matches(result):
         messages = build_related_match_messages_from_result(result)
@@ -794,17 +978,278 @@ def render_analysis_panel():
                     if not tag_rows:
                         ui.label("No decoded tags found for this message.").classes("text-red")
                         return
-                    ui.table(
-                        columns=[
-                            {"name": "tag", "label": "Tag ID", "field": "tag", "align": "left", "sortable": True},
-                            {"name": "tag_name", "label": "Name", "field": "tag_name", "align": "left", "sortable": True},
-                            {"name": "value", "label": "Tag Value", "field": "value", "align": "left", "sortable": True},
-                            {"name": "value_name", "label": "Tag Value Name", "field": "value_name", "align": "left", "sortable": True},
-                        ],
-                        rows=tag_rows,
-                        row_key="_seq",
-                        pagination={"rowsPerPage": 0},
-                    ).classes("w-full")
+                    
+                    prepared_rows = []
+
+                    for index, row in enumerate(tag_rows):
+                        prepared_rows.append({
+                            **row,
+                            "_seq": row.get("_seq", index),
+                        })
+
+                    with ui.row().classes("w-full no-wrap items-start q-gutter-md").style(
+                        "min-width: 0;"
+                    ):
+                        # ---------------------------------------------------------
+                        # Loaded-message decoded tag table
+                        # ---------------------------------------------------------
+                        with ui.column().classes("min-w-0").style(
+                            "width: calc(80% - 8px);"
+                        ):
+                            with ui.element("div").classes(
+                                "w-full max-w-full overflow-x-auto analysis-table-scroll"
+                            ).style("min-width: 0;"):
+                                loaded_tag_table = ui.table(
+                                    columns=[
+                                        {
+                                            "name": "_seq",
+                                            "label": "#",
+                                            "field": "_seq",
+                                            "align": "left",
+                                            "sortable": True,
+                                        },
+                                        {
+                                            "name": "tag",
+                                            "label": "Tag ID",
+                                            "field": "tag",
+                                            "align": "left",
+                                            "sortable": True,
+                                        },
+                                        {
+                                            "name": "tag_name",
+                                            "label": "Tag Name",
+                                            "field": "tag_name",
+                                            "align": "left",
+                                            "sortable": True,
+                                        },
+                                        {
+                                            "name": "value",
+                                            "label": "Tag Value",
+                                            "field": "value",
+                                            "align": "left",
+                                            "sortable": True,
+                                        },
+                                        {
+                                            "name": "value_name",
+                                            "label": "Tag Value Name",
+                                            "field": "value_name",
+                                            "align": "left",
+                                            "sortable": True,
+                                        },
+                                    ],
+                                    rows=prepared_rows,
+                                    row_key="_seq",
+                                    selection="multiple",
+                                    pagination={
+                                        "rowsPerPage": 0,
+                                        "sortBy": "_seq",
+                                        "descending": False,
+                                    },
+                                ).classes("w-full")
+
+                                loaded_tag_table.add_slot("body", r"""
+                                <q-tr
+                                  :props="props"
+                                  @click="$parent.$emit('row-inspect', props.row)"
+                                >
+                                  <q-td auto-width>
+                                    <q-checkbox
+                                      v-model="props.selected"
+                                      dense
+                                      @click.stop
+                                    />
+                                  </q-td>
+
+                                  <q-td
+                                    v-for="col in props.cols"
+                                    :key="col.name"
+                                    :props="props"
+                                    style="white-space: nowrap; vertical-align: top;"
+                                  >
+                                    {{ col.value }}
+                                  </q-td>
+                                </q-tr>
+                                """)
+
+                        # ---------------------------------------------------------
+                        # Loaded-message Tag Inspector
+                        # ---------------------------------------------------------
+                        with ui.card().classes("tag-inspector q-pa-md").style(
+                            "width: calc(20% - 8px); "
+                            "min-width: 280px; "
+                            "position: sticky; "
+                            "top: 132px;"
+                        ):
+                            ui.label("Tag Inspector").classes("text-md font-semibold")
+
+                            ui.label(
+                                "Click a decoded row to inspect its dictionary details."
+                            ).classes("text-xs text-grey-7 q-mb-md")
+
+                            loaded_inspector_state = ui.badge(
+                                "No tag selected",
+                                color="grey",
+                            ).props("outline")
+
+                            loaded_inspector_tag = ui.label("Tag: —").classes("font-semibold")
+                            loaded_inspector_name = ui.label("Name: —")
+                            loaded_inspector_value = ui.label("Current Value: —")
+                            loaded_inspector_meaning = ui.label("Meaning: —")
+
+                            ui.separator().classes("q-my-sm")
+
+                            loaded_inspector_dictionary = ui.label(
+                                "Dictionary Status: —"
+                            ).classes("text-sm")
+
+                            loaded_inspector_enums = ui.label(
+                                "Enumerations: —"
+                            ).classes("text-sm")
+
+                            loaded_inspector_enum_valid = ui.label(
+                                "Enum Validation: —"
+                            ).classes("text-sm")
+
+                            loaded_inspector_ocr = ui.label(
+                                "OCR Processing: —"
+                            ).classes("text-sm")
+
+                            loaded_inspector_ocr_score = ui.label(
+                                "OCR Confidence: —"
+                            ).classes("text-sm")
+
+                            ui.separator().classes("q-my-sm")
+
+                            ui.label("Description").classes("text-sm font-semibold")
+
+                            loaded_inspector_description = ui.label(
+                                "Select a row to view its description."
+                            ).classes("text-sm text-grey-8 whitespace-pre-wrap")
+
+                            ui.separator().classes("q-my-sm")
+
+                            ui.label("Review Notes").classes("text-sm font-semibold")
+
+                            loaded_inspector_warnings = ui.label("None").classes(
+                                "text-sm text-grey-8 whitespace-pre-wrap"
+                            )
+
+                        def populate_loaded_tag_inspector(row):
+                            if not row:
+                                return
+
+                            tag_warning = str(row.get("tag_warning") or "").strip()
+                            enum_warning = str(row.get("enum_warning") or "").strip()
+                            ocr_review = str(row.get("ocr_repair_warning") or "").strip()
+                            enum_valid = row.get("enum_valid")
+                            tag_status = str(row.get("tag_status") or "").strip()
+                            ocr_inferred = row.get("ocr_inferred")
+
+                            has_validation_issue = bool(
+                                tag_warning
+                                or enum_warning
+                                or str(enum_valid).lower()
+                                in {"false", "review", "parse review", "ocr review"}
+                            )
+
+                            has_ocr_review = bool(ocr_review or ocr_inferred)
+
+                            is_unknown = tag_status.lower() in {
+                                "custom",
+                                "unknown",
+                                "missing",
+                                "not_found",
+                                "not found",
+                            }
+
+                            if has_validation_issue:
+                                loaded_inspector_state.set_text("Review required")
+                                loaded_inspector_state.props("color=negative outline")
+                            elif has_ocr_review:
+                                loaded_inspector_state.set_text("OCR review")
+                                loaded_inspector_state.props("color=warning outline")
+                            elif is_unknown:
+                                loaded_inspector_state.set_text("Custom / unknown")
+                                loaded_inspector_state.props("color=purple outline")
+                            else:
+                                loaded_inspector_state.set_text("Known / valid")
+                                loaded_inspector_state.props("color=positive outline")
+
+                            loaded_inspector_tag.set_text(
+                                f"Tag: {row.get('tag') or '—'}"
+                            )
+                            loaded_inspector_name.set_text(
+                                f"Name: {row.get('tag_name') or '—'}"
+                            )
+                            loaded_inspector_value.set_text(
+                                f"Current Value: {row.get('value') or '—'}"
+                            )
+                            loaded_inspector_meaning.set_text(
+                                f"Meaning: {row.get('value_name') or '—'}"
+                            )
+
+                            loaded_inspector_dictionary.set_text(
+                                f"Dictionary Status: {tag_status or '—'}"
+                            )
+
+                            loaded_inspector_enums.set_text(
+                                f"Enumerations: {'Yes' if row.get('has_enums') else 'No'}"
+                            )
+
+                            loaded_inspector_enum_valid.set_text(
+                                "Enum Validation: "
+                                + (
+                                    str(enum_valid)
+                                    if enum_valid not in (None, "")
+                                    else "—"
+                                )
+                            )
+
+                            loaded_inspector_ocr.set_text(
+                                "OCR Processing: "
+                                + (
+                                    ocr_review
+                                    or (
+                                        "Value inferred/repaired"
+                                        if ocr_inferred
+                                        else "No OCR repair recorded"
+                                    )
+                                )
+                            )
+
+                            loaded_inspector_ocr_score.set_text(
+                                "OCR Confidence: "
+                                + (
+                                    str(row.get("ocr_score"))
+                                    if row.get("ocr_score") not in (None, "")
+                                    else "—"
+                                )
+                            )
+
+                            loaded_inspector_description.set_text(
+                                row.get("description") or "No description available."
+                            )
+
+                            notes = [
+                                note
+                                for note in (tag_warning, enum_warning, ocr_review)
+                                if note
+                            ]
+
+                            loaded_inspector_warnings.set_text(
+                                "\n".join(notes) or "None"
+                            )
+
+                        def inspect_loaded_tag_row(event):
+                            row = event.args
+
+                            if isinstance(row, list) and row:
+                                row = row[0]
+
+                            if isinstance(row, dict):
+                                populate_loaded_tag_inspector(row)
+
+                        loaded_tag_table.on("row-inspect", inspect_loaded_tag_row)
 
             def compare_selected_messages():
                 selected = selected_rows()
@@ -877,6 +1322,11 @@ def render_analysis_panel():
                     pagination={"rowsPerPage": 0},
                 ).classes("w-full")
 
+                # Results belong below the loaded-message list,
+                # so opening one message does not hide/push away the list.
+                tag_result_area = ui.column().classes("w-full q-mt-md")
+                compare_result_area = ui.column().classes("w-full q-mt-md")
+
     def render_multi_message_comparison(messages):
         """Render a tag-by-tag comparison matrix for 3–10 analyzed FIX messages."""
         messages = list(messages or [])
@@ -885,6 +1335,15 @@ def render_analysis_panel():
             return
 
         messages = messages[:MAX_COMPARE_MESSAGES]
+
+        # Session/envelope fields that naturally differ between FIX messages
+        # and add noise to a business-level comparison.
+        excluded_comparison_tags = {
+            "9",   # BodyLength
+            "10",  # CheckSum
+            "34",  # MsgSeqNum
+            "52",  # SendingTime
+        }
 
         # Preserve tag order based on first appearance across the selected messages.
         tag_order = []
@@ -898,6 +1357,9 @@ def render_analysis_panel():
                 tag = str(row.get("tag") or "").split("#", 1)[0].strip()
 
                 if not tag:
+                    continue
+
+                if tag in excluded_comparison_tags:
                     continue
 
                 if tag not in tag_order:
@@ -928,6 +1390,7 @@ def render_analysis_panel():
                 "_seq": row_index,
                 "tag": int(tag) if tag.isdigit() else tag,
                 "tag_name": tag_metadata.get(tag, {}).get("tag_name") or "",
+                "category": category_for_tag(tag),
             }
 
             distinct_values = set()
@@ -970,6 +1433,13 @@ def render_analysis_panel():
                 "name": "tag_name",
                 "label": "Tag Name",
                 "field": "tag_name",
+                "align": "left",
+                "sortable": True,
+            },
+            {
+                "name": "category",
+                "label": "Category",
+                "field": "category",
                 "align": "left",
                 "sortable": True,
             },
@@ -1020,6 +1490,17 @@ def render_analysis_panel():
                 "Message columns follow the workspace order."
             ).classes("text-sm text-grey-7 q-pa-sm")
 
+            with ui.row().classes("items-center q-gutter-md q-px-sm q-pb-sm"):
+                ui.label("Legend:").classes("text-sm font-bold")
+
+                ui.label("Same").classes("text-sm text-grey-9")
+                ui.label("Changed").classes("text-sm text-orange-700")
+                ui.label("Missing in one or more").classes("text-sm text-red-600")
+
+                ui.label(
+                    "Excluded: BodyLength, CheckSum, MsgSeqNum and SendingTime"
+                ).classes("text-xs text-grey-6")
+
             with ui.element("div").classes(
                 "w-full max-w-full overflow-x-auto analysis-table-scroll"
             ).style("min-width: 0;"):
@@ -1038,8 +1519,8 @@ def render_analysis_panel():
                 <q-tr
                   :props="props"
                   :class="{
-                    'text-red-7': props.row.status === 'Changed',
-                    'text-orange-8': props.row.status === 'Missing in one or more'
+                    'text-orange-8': props.row.status === 'Changed',
+                    'text-red-7': props.row.status === 'Missing in one or more'
                   }"
                 >
                   <q-td
@@ -1465,7 +1946,7 @@ def render_analysis_panel():
                                             decoded_table.add_slot("body", r"""
                                             <q-tr
                                               :props="props"
-                                              @click="props.selected = !props.selected"
+                                              @click="$parent.$emit('row-inspect', props.row)"
                                               :class="(
                                                 props.row.enum_valid === false ||
                                                 props.row.enum_valid === 'Review' ||
@@ -1574,12 +2055,18 @@ def render_analysis_panel():
                         notes = [part for part in (tag_warning, enum_warning, ocr_review) if part]
                         inspector_warnings.set_text("\n".join(notes) or "None")
 
-                    def update_selected_tag_inspector():
-                        selected = list(decoded_table.selected or [])
-                        if selected:
-                            populate_tag_inspector(selected[0])
+                    def inspect_decoded_row(event):
+                        row = event.args
 
-                    decoded_table.on("selection", lambda _event: update_selected_tag_inspector())
+                        # NiceGUI may wrap custom-event arguments in a one-item list.
+                        if isinstance(row, list) and row:
+                            row = row[0]
+
+                        if isinstance(row, dict):
+                            populate_tag_inspector(row)
+
+
+                    decoded_table.on("row-inspect", inspect_decoded_row)
 
                 with ui.expansion(
                     "Business Object",

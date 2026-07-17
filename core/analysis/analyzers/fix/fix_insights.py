@@ -585,35 +585,226 @@ def analyze_message_pair(
 
     return changes
 
+def _message_relationship_tokens(message: Dict[str, Any]) -> set[str]:
+    """Return conservative identifiers that can link messages into one lifecycle."""
+    tokens: set[str] = set()
+
+    cl_ord_id = _clean(message.get("cl_ord_id"))
+    orig_cl_ord_id = _clean(message.get("orig_cl_ord_id"))
+    order_id = _clean(message.get("order_id"))
+    secondary_order_id = _clean(message.get("secondary_order_id"))
+
+    # OrigClOrdID links back to another message's ClOrdID.
+    if cl_ord_id:
+        tokens.add(f"cl_ord_id:{cl_ord_id}")
+
+    if orig_cl_ord_id:
+        tokens.add(f"cl_ord_id:{orig_cl_ord_id}")
+
+    if order_id:
+        tokens.add(f"order_id:{order_id}")
+
+    if secondary_order_id:
+        tokens.add(f"secondary_order_id:{secondary_order_id}")
+
+    return tokens
+
+
+def _build_relationship_groups(
+    messages: List[Dict[str, Any]],
+) -> List[List[Dict[str, Any]]]:
+    """Create connected message groups from shared order identifiers."""
+    groups: List[Dict[str, Any]] = []
+
+    for message in messages:
+        message_tokens = _message_relationship_tokens(message)
+
+        matching_indexes = [
+            index
+            for index, group in enumerate(groups)
+            if message_tokens
+            and group["tokens"].intersection(message_tokens)
+        ]
+
+        if not matching_indexes:
+            groups.append({
+                "tokens": set(message_tokens),
+                "messages": [message],
+            })
+            continue
+
+        primary_index = matching_indexes[0]
+        primary_group = groups[primary_index]
+        primary_group["messages"].append(message)
+        primary_group["tokens"].update(message_tokens)
+
+        # A message can bridge two previously separate groups.
+        for extra_index in reversed(matching_indexes[1:]):
+            extra_group = groups.pop(extra_index)
+            primary_group["messages"].extend(extra_group["messages"])
+            primary_group["tokens"].update(extra_group["tokens"])
+
+    message_order = {
+        id(message): position
+        for position, message in enumerate(messages)
+    }
+
+    normalized_groups = []
+
+    for group in groups:
+        ordered_messages = sorted(
+            group["messages"],
+            key=lambda message: message_order.get(id(message), 999999),
+        )
+        normalized_groups.append(ordered_messages)
+
+    normalized_groups.sort(
+        key=lambda group: min(
+            message_order.get(id(message), 999999)
+            for message in group
+        )
+    )
+
+    return normalized_groups
+
+
+def _relationship_findings(
+    groups: List[List[Dict[str, Any]]],
+    total_messages: int,
+) -> List[Dict[str, Any]]:
+    findings: List[Dict[str, Any]] = []
+
+    if total_messages <= 1:
+        return findings
+
+    for group in groups:
+        indexes = [
+            message.get("message_index")
+            for message in group
+            if message.get("message_index") is not None
+        ]
+
+        if len(group) == 1:
+            message_index = indexes[0] if indexes else None
+
+            other_indexes = [
+                other.get("message_index")
+                for other_group in groups
+                if other_group is not group
+                for other in other_group
+                if other.get("message_index") is not None
+            ]
+
+            other_text = ", ".join(
+                f"Message {index}" for index in other_indexes
+            ) or "the other workspace messages"
+
+            findings.append({
+                "from_message_index": message_index,
+                "to_message_index": None,
+                "field": "relationship",
+                "tag": None,
+                "label": "Message Relationship",
+                "category": "relationship",
+                "severity": "warning",
+                "before": None,
+                "after": None,
+                "summary": (
+                    f"Message {message_index} is not related to {other_text} "
+                    "based on the available order identifiers."
+                ),
+            })
+            continue
+
+        message_text = ", ".join(
+            f"Message {index}" for index in indexes
+        )
+
+        findings.append({
+            "from_message_index": indexes[0] if indexes else None,
+            "to_message_index": indexes[-1] if indexes else None,
+            "field": "relationship",
+            "tag": None,
+            "label": "Message Relationship",
+            "category": "relationship",
+            "severity": "info",
+            "before": None,
+            "after": None,
+            "summary": (
+                f"{message_text} are related and will be evaluated "
+                "as one message lifecycle."
+            ),
+        })
+
+    return findings
 
 def build_sequence_insights(messages: List[Dict[str, Any]]) -> Dict[str, Any]:
-    clean_messages = [msg for msg in messages if isinstance(msg, dict)]
+    clean_messages = [
+        message
+        for message in messages
+        if isinstance(message, dict)
+    ]
 
-    changes: List[Dict[str, Any]] = []
+    relationship_groups = _build_relationship_groups(clean_messages)
+    relationship_changes = _relationship_findings(
+        relationship_groups,
+        len(clean_messages),
+    )
 
-    for index in range(1, len(clean_messages)):
-        before = clean_messages[index - 1]
-        after = clean_messages[index]
-        changes.extend(analyze_message_pair(before, after))
+    sequence_changes: List[Dict[str, Any]] = []
+
+    # Compare only messages belonging to the same related group.
+    for group in relationship_groups:
+        if len(group) < 2:
+            continue
+
+        for index in range(1, len(group)):
+            before = group[index - 1]
+            after = group[index]
+            sequence_changes.extend(
+                analyze_message_pair(before, after)
+            )
+
+    # Relationship findings appear before lifecycle/value changes.
+    changes = relationship_changes + sequence_changes
 
     warnings = [
-        change for change in changes
+        change
+        for change in changes
         if change.get("severity") in {"warning", "critical"}
     ]
 
-    critical_count = sum(1 for change in changes if change.get("severity") == "critical")
-    warning_count = sum(1 for change in changes if change.get("severity") == "warning")
-    info_count = sum(1 for change in changes if change.get("severity") == "info")
+    critical_count = sum(
+        1 for change in changes
+        if change.get("severity") == "critical"
+    )
+    warning_count = sum(
+        1 for change in changes
+        if change.get("severity") == "warning"
+    )
+    info_count = sum(
+        1 for change in changes
+        if change.get("severity") == "info"
+    )
+
+    related_group_count = sum(
+        1 for group in relationship_groups
+        if len(group) > 1
+    )
+    unrelated_message_count = sum(
+        1 for group in relationship_groups
+        if len(group) == 1
+    )
 
     if not clean_messages:
         summary = "No FIX messages available for sequence insights."
-    elif not changes:
-        summary = f"Analyzed {len(clean_messages)} messages. No meaningful sequence changes detected."
     else:
         summary = (
-            f"Analyzed {len(clean_messages)} messages. "
-            f"Found {len(changes)} sequence insights "
-            f"({critical_count} critical, {warning_count} warnings, {info_count} info)."
+            f"Analyzed {len(clean_messages)} messages across "
+            f"{len(relationship_groups)} relationship group(s). "
+            f"Found {related_group_count} related group(s) and "
+            f"{unrelated_message_count} unrelated message(s). "
+            f"Generated {len(sequence_changes)} within-group sequence insight(s)."
         )
 
     return {
@@ -624,4 +815,14 @@ def build_sequence_insights(messages: List[Dict[str, Any]]) -> Dict[str, Any]:
         "critical_count": critical_count,
         "warning_count": warning_count,
         "info_count": info_count,
+        "relationship_group_count": len(relationship_groups),
+        "related_group_count": related_group_count,
+        "unrelated_message_count": unrelated_message_count,
+        "relationship_groups": [
+            [
+                message.get("message_index")
+                for message in group
+            ]
+            for group in relationship_groups
+        ],
     }
