@@ -931,3 +931,37 @@ Tomorrow's queue: retest trio -> commit -> BBG-06 intent diag -> HALO eval
 bucket -> RETR-05 (new exhibit: rerank ranked the FRA Waiting Period
 article THIRD despite pool position #1 — 'dates' collision inside the
 reranker, not just the pool).
+
+## RETR-05 (2026-07-17) — term-collision batch, pending final eval
+
+Three exhibits, three deterministic cures, zero prompt changes:
+- A (bad-dates hijack): RERANK SUBJECT GUARD — subjects are USER-SIGNALED
+  entities only (filename/code anchors + tokens the user CAPITALIZED). The
+  LLM still ranks Bad-Dates first every time; the rule corrects it. First
+  draft used pool-rarity ('acting' became a "subject" and demoted PP-03's
+  broadcaster) — rarity is not subjecthood; typography was the signal all
+  along. A prompt-nudge attempt fixed A but broke KB-07/KB-10 — reverted
+  same hour (prompt changes ripple; deterministic guards don't).
+- B (wrong entity): ANCHOR-MANDATORY coverage — a filename/code the
+  question names that is absent from the answering chunk forces the
+  low-coverage banner regardless of generic word-ratio.
+- C (exact-match miss): the identifier-hijack guard no longer falls through
+  to fuzzy retrieval — the named record answers, banner'd ("focus not in
+  record"). The record the question names beats fuzzy neighbors always.
+Also: split-phrase filters carry a group id — zero-repair kills the group
+whole (partial survival turned the FIX 5.0 SP2 honest zero into a 24-row
+dump). Diag (diag_retr05.py) 3/3 post-fix; smoke_kb 10/10; PP-03/NA-04
+retests + FINAL FULL EVAL pending (morning).
+
+## RETR-05 CLOSED (2026-07-17 am) — eval_run_20260717_005442 certified
+
+PP-03 restored both surfaces (subject guard sleeps on lowercase questions);
+NA-04 byte-identical to baseline (honest zero; split groups die whole);
+DL-04 keeps its record-answer upgrade; PR-01's anchor banner stands as an
+honesty correction; remaining diffs = phrasing wobble. Latency steady
+(chat 23.5s / ask 10.6s).
+
+THE ORIGINAL QUALITY BOARD IS EMPTY. Every named retrieval disease now has
+a deterministic cure with an eval receipt. Remaining work is new capability
+(M4b answer cache, HALO promotion queue, weak-answer widening, splitter,
+M3), platform (EMBED-01, MCP discussion), and cosmetics — not defects.

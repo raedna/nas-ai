@@ -592,12 +592,25 @@ def route_query(
             _words, _ = _cw_fn(_words, collection)
         except Exception:
             pass
-        if _words:
+        # RETR-05 exhibit B: ANCHOR tokens (filenames/codes the question
+        # names) are MANDATORY — an answer chunk that lacks the question's
+        # named entity wears the banner no matter how many generic words
+        # ('time', 'file', 'daily') it shares. A Jennison schedule answered
+        # a gsact.txt question with confidence because word-ratio coverage
+        # treats all words as equal; entities are not generic words.
+        import re as _re_anc
+        _anchors_cov = [m.lower() for m in _re_anc.findall(
+            r"\b[a-zA-Z0-9_\-]+\.[a-zA-Z0-9]{2,5}\b", question)]
+        _anchors_cov += [c.lower() for c in _re_anc.findall(
+            r"\b[A-Z][A-Z0-9_]{3,}\b", question)]
+        if _words or _anchors_cov:
             _hay = " ".join(str(payload.get(k) or "") for k in
                             ("nlp_text", "text", "primary_name", "description")).lower()
-            _cov = sum(1 for w in _words if w in _hay) / len(_words)
+            _anchor_missing = any(a not in _hay for a in _anchors_cov)
+            _cov = (sum(1 for w in _words if w in _hay) / len(_words)
+                    if _words else 1.0)
             _min_cov = load_system_config().get("answer_coverage_disclaimer_below", 0.5)
-            if _cov < _min_cov:
+            if _cov < _min_cov or _anchor_missing:
                 answer = LOW_COVERAGE_PREFIX + "\n\n" + str(answer)
     except Exception:
         pass
@@ -681,10 +694,13 @@ def run_query_with_method(
             _pts = get_by_identifier(collection, _fname)
             if _pts:
                 _payload = _pts[0].payload or {}
-                # Identifier-hijack guard: if the question's focus (e.g. "sFTP") isn't
-                # in this record, don't answer from it — fall through to retrieval.
-                if not _record_covers_question(question, _fname, _payload):
-                    continue
+                # Identifier-hijack guard, REVISED (RETR-05 exhibit C): when
+                # the question's focus (e.g. "arrival time") isn't in this
+                # record, falling through to fuzzy retrieval returned junk
+                # neighbors instead. The record the question NAMES is always
+                # the more honest answer — return it wearing the low-coverage
+                # banner so the missing focus is explicit.
+                _covers = _record_covers_question(question, _fname, _payload)
                 _payload["_question"] = question
                 _roles = _detect_requested_roles(question, {})
                 _answer = synthesize_answer(_payload, _roles, collection)
@@ -795,9 +811,14 @@ def run_query_with_method(
                                 "anchor_chunk_ids": _cl.get('anchor_chunk_ids', []),
                                 })
 
+                if not _covers:
+                    _answer = (LOW_COVERAGE_PREFIX + " "
+                               + str(_answer)) if not str(_answer).startswith(
+                        LOW_COVERAGE_PREFIX) else _answer
                 return {
                     "method": "identifier_lookup",
-                    "reason": f"filename identifier detected: {_fname}",
+                    "reason": f"filename identifier detected: {_fname}"
+                              + ("" if _covers else " (focus not in record)"),
                     "result": _answer,
                     "related_sections": _related_sections,
                 }

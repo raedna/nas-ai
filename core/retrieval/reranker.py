@@ -166,6 +166,55 @@ def llm_rerank(points: List, question: str) -> List:
             for i, p in enumerate(points):
                 if i not in seen:
                     reranked.append(p)
+
+            # RETR-05 subject guard (deterministic): distinctive question
+            # tokens = non-noise words that appear in FEW candidates
+            # (pool-IDF) — plus filename/code anchors, always. If the LLM's
+            # top pick contains NONE of them while another candidate does,
+            # the subject-bearing candidate takes the lead. 'FRA' appears in
+            # one candidate of 25; a ranking that puts Bad-Dates runbooks
+            # above it mistook topic-word density for relevance.
+            import re as _re_sg
+            try:
+                from core.query_helpers import load_doc_query_hints as _ldqh_sg
+                _noise_sg = set()
+                for _k_sg in ("discovery_noise_words", "question_words",
+                              "stopwords"):
+                    _noise_sg.update(_ldqh_sg().get(_k_sg, []))
+            except Exception:
+                _noise_sg = set()
+            # Subjects are USER-SIGNALED entities only: filename/code
+            # anchors and tokens the user CAPITALIZED ('FRA', 'SP2').
+            # Pool-rarity alone crowned 'acting' a subject and demoted the
+            # right article (PP-03) — rare is not the same as subject.
+            _q_toks_sg = [w.lower() for w in _re_sg.findall(
+                              r"\b[A-Z][A-Z0-9]{1,}\b", question)
+                          if w.lower() not in _noise_sg]
+            _anchors_sg = set(
+                m.lower() for m in _re_sg.findall(
+                    r"\b[a-zA-Z0-9_\-]+\.[a-zA-Z0-9]{2,5}\b", question))
+            _hay_sg = []
+            for _p_sg in reranked:
+                _pl_sg = _p_sg.payload or {}
+                _hay_sg.append((str(_pl_sg.get("primary_name") or "") + " "
+                                + str(_pl_sg.get("description") or "")
+                                + " " + str(_pl_sg.get("text") or "")).lower())
+            _n_sg = len(reranked)
+            _subjects_sg = set(_anchors_sg)
+            for _t_sg in set(_q_toks_sg):
+                _df_sg = sum(1 for h in _hay_sg if _t_sg in h)
+                if 0 < _df_sg <= max(2, _n_sg // 8):
+                    _subjects_sg.add(_t_sg)
+            if _subjects_sg:
+                def _score_sg(i):
+                    return sum(1 for t in _subjects_sg if t in _hay_sg[i])
+                _top_score = _score_sg(0)
+                _best_i = max(range(_n_sg), key=lambda i: (_score_sg(i), -i))
+                if _top_score == 0 and _score_sg(_best_i) > 0:
+                    print(f"RERANK subject guard: promoting "
+                          f"{(reranked[_best_i].payload or {}).get('primary_name')!r}"
+                          f" (subjects {sorted(_subjects_sg)})")
+                    reranked.insert(0, reranked.pop(_best_i))
             return reranked
 
     except Exception as e:

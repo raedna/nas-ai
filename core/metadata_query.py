@@ -434,7 +434,8 @@ def run_metadata_query(collection: str, question: str, intent_mode: str = None) 
                           f"{_v!r} -> {_words_cf}")
                     for _w_cf in _words_cf:
                         _split_f.append({"field": f["field"], "op": "contains",
-                                         "value": _w_cf})
+                                         "value": _w_cf,
+                                         "_split_group": _v})
                     continue
             _split_f.append(f)
         spec["filters"] = _split_f
@@ -568,6 +569,14 @@ def run_metadata_query(collection: str, question: str, intent_mode: str = None) 
                 spec["filters"] = _claims
         if spec["filters"] and _count_with(spec["filters"]) == 0:
             _keep = [f for f in spec["filters"] if _count_with([f]) > 0]
+            # Split-phrase parts are ONE claim: if any part of a group died,
+            # the whole group dies with it — keeping 'fix' after 'sp2'
+            # zeroed turned the FIX 5.0 SP2 no-answer trap into a 24-row
+            # dump (the phrase was the claim, not its words).
+            _dead_groups = {f.get("_split_group") for f in spec["filters"]
+                            if f.get("_split_group") and f not in _keep}
+            _keep = [f for f in _keep
+                     if f.get("_split_group") not in _dead_groups]
             _had_claims = any(not f.get("_injected") for f in spec["filters"])
             _kept_claims = any(not f.get("_injected") for f in _keep)
             if _had_claims and not _kept_claims:
