@@ -465,8 +465,23 @@ def run_metadata_query(collection: str, question: str, intent_mode: str = None) 
             _v_raw = str(f.get("value", "")).lower()
             _vtoks = {t for t in _re0.findall(r"[a-z0-9]{3,}", _v_raw)}
             _vcompact = _re0.sub(r"[^a-z0-9]", "", _v_raw)
+            # Numeric values ground NUMERICALLY: JSON floats render '30'
+            # as '30.0', which fails every string test against a question
+            # that says 'exposure 30'. If the value parses as a number,
+            # equality against any number token in the question grounds it
+            # ('30' == 30.0); short numbers (<3 chars) are invisible to the
+            # token regex, so scan raw number tokens here.
+            _num_grounded = False
+            try:
+                _v_num = float(_v_raw)
+                _num_grounded = any(
+                    float(t) == _v_num
+                    for t in _re0.findall(r"\d+(?:\.\d+)?", _q_low))
+            except ValueError:
+                pass
             _grounded = (
-                (_v_raw and _v_raw in _q_low)
+                _num_grounded
+                or (_v_raw and _v_raw in _q_low)
                 or bool(_vtoks & _qt)
                 or any(t in _vcompact for t in _qt)
             )

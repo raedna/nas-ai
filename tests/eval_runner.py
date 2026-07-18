@@ -88,6 +88,13 @@ QUESTIONS = [
     ("MI-02", "give me the tidal jobs for gsact.txt and gspos.txt", "both Goldman job names", "recon_assist_file"),
     ("MI-03", "compare FIX tag 38 and tag 152", "OrderQty vs CashOrderQty", "xml_test"),
     ("MI-04", "what are the moore filenames for goldman and jpm activity", "both mappings (known gate gap: no identifier tokens)", "recon_assist_file"),
+    # --- Category 8: Archive (halo_tickets on-demand + memory/learning) ---
+    ("AR-01", "are there tickets about FRA dates?", "44539 (phrase-split AND scopes to dates; 44946 optional — it's FRA-feeding, not dates; NEVER 61643 Viteos)", "halo_tickets"),
+    ("AR-02", "how many halo tickets are resolved", "2 via action_type=Resolved or status=Closed alias", "halo_tickets"),
+    ("AR-03", "who is handling the FRA issue internally at Moore?", "Guillaume (weak-answer widening reaches the archive automatically)", "halo_tickets"),
+    ("AR-04", "who resolved ticket 44539", "Mike Aghbabian (named ticket routes archive in)", "halo_tickets"),
+    ("AR-05", "how do I fix the FRA dates issue", "kb Waiting Period runbook headline; tickets stay withheld (hint only)", "kb_docs"),
+    ("AR-06", "what is ticket 44946", "UAT XML processor FRA ticket header + thread", "halo_tickets"),
 ]
 
 

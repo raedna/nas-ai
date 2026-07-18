@@ -874,11 +874,135 @@ def _identifier_tokens(question: str) -> list:
     return out
 
 
+_GATE_VALUES = {"vals": None, "ts": 0.0}
+
+
+def _gate_values() -> set:
+    """All SHORT distinct values of the type role and every labeled
+    description_fields column, across collections — the vocabulary of
+    'things a value-item can be' for the multi-item gate. Generic (no field
+    names in code) and cached (changes only at ingest)."""
+    import time as _t
+    if (_GATE_VALUES["vals"] is not None
+            and _t.time() - _GATE_VALUES["ts"] < 300):
+        return _GATE_VALUES["vals"]
+    vals = set()
+    try:
+        rows = fetchall("""
+            SELECT DISTINCT lower(payload->>'type') AS v FROM chunks
+            WHERE payload->>'type' IS NOT NULL
+              AND length(payload->>'type') BETWEEN 2 AND 30
+            UNION
+            SELECT DISTINCT lower(e.value) AS v
+            FROM chunks, jsonb_each_text(payload->'description_fields') e
+            WHERE jsonb_typeof(payload->'description_fields') = 'object'
+              AND length(e.value) BETWEEN 2 AND 30
+        """, ())
+        vals = {str(r["v"]).strip().lower() for r in rows if r["v"]}
+    except Exception:
+        pass
+    _GATE_VALUES["vals"] = vals
+    _GATE_VALUES["ts"] = _t.time()
+    return vals
+
+
+def _value_tokens(question: str) -> list:
+    """Question words that EXACTLY match a listed data value ('goldman',
+    'jpm' are type values in recon) — the heterogeneous half of the
+    multi-item gate (MI-04)."""
+    import re
+    vals = _gate_values()
+    if not vals:
+        return []
+    out = []
+    for w in re.findall(r"[a-z0-9]{3,}", (question or "").lower()):
+        if w in vals and w not in out:
+            out.append(w)
+    return out
+
+
+_DUAL_FORMAT = {
+    "type": "json_schema",
+    "json_schema": {
+        "name": "dual_intent",
+        "strict": True,
+        "schema": {
+            "type": "object",
+            "properties": {
+                "is_dual": {"type": "boolean"},
+                "questions": {"type": "array", "items": {"type": "string"},
+                              "minItems": 0, "maxItems": 2},
+            },
+            "required": ["is_dual", "questions"],
+            "additionalProperties": False,
+        },
+    },
+}
+
+
+def split_dual_intent(question: str) -> list:
+    """XC-03 class: ONE message, TWO different questions joined by a
+    conjunction ('what is tag 38 AND are there KB articles about...').
+    Deterministic gate: an ' and '-joined message where BOTH halves look
+    question-shaped (interrogative lead or an identifier token) — only then
+    is the LLM asked to split. Validation: exactly 2 sub-questions, each
+    built from the original's own words (no invention). Fail-safe: [].
+    Each sub-question is later routed INDEPENDENTLY (the halves may live
+    in different collections)."""
+    import re
+    q = str(question or "")
+    if not re.search(r"\band\b", q, re.IGNORECASE):
+        return []
+    _interrog = {"what", "which", "when", "where", "who", "why", "how",
+                 "are", "is", "do", "does", "can", "list", "show"}
+    _halves = re.split(r"\band\b", q, maxsplit=1, flags=re.IGNORECASE)
+    if len(_halves) != 2:
+        return []
+
+    def _questionish(h):
+        toks = re.findall(r"[a-z0-9]+", h.lower())
+        return (len(toks) >= 3
+                and (bool(set(toks) & _interrog)
+                     or bool(_identifier_tokens(h))))
+    if not (_questionish(_halves[0]) and _questionish(_halves[1])):
+        return []
+
+    system = (
+        "A user message contains TWO different questions joined by 'and'. "
+        "Split it into two complete, self-contained questions, fixing "
+        "grammar only — use ONLY words/subjects from the original message, "
+        "never invent new topics. If it is actually ONE question (a single "
+        "request with a compound condition), return is_dual=false. "
+        "Return only JSON: {is_dual, questions}.")
+    try:
+        r = call_local_llm_json(system, q, temperature=0.0, model=None,
+                                response_format=_DUAL_FORMAT)
+    except Exception:
+        return []
+    if not (isinstance(r, dict) and r.get("is_dual")
+            and isinstance(r.get("questions"), list)
+            and len(r["questions"]) == 2):
+        return []
+    _orig = set(re.findall(r"[a-z0-9]{3,}", q.lower()))
+    subs = []
+    for sq in r["questions"]:
+        sq = str(sq).strip()
+        _toks = set(re.findall(r"[a-z0-9]{3,}", sq.lower()))
+        # no invention: content words must come from the original
+        if not sq or not _toks or not (_toks <= _orig | _interrog):
+            return []
+        subs.append(sq)
+    return subs
+
+
 def _is_multi_item_candidate(question: str) -> bool:
-    """Deterministic gate: >=2 identifier tokens AND a list separator present.
+    """Deterministic gate: >=2 items AND a list separator. Items are
+    identifier-like tokens OR (MI-04) type-role VALUES from the data —
+    'goldman and jpm' splits the same way 'gsact.txt and gspos.txt' does.
     Only candidates pay for the LLM splitter call."""
     import re
-    if len(_identifier_tokens(question)) < 2:
+    _n_items = len(_identifier_tokens(question)) + len(_value_tokens(question))
+    if _n_items < 2:
         return False
     return bool(re.search(r"(,|&|\band\b|\bvs\.?\b|\bversus\b)", question or "", re.IGNORECASE))
 
@@ -891,7 +1015,7 @@ def split_multi_item_question(question: str) -> list:
     distinct tokens (prevents LLM invention). Fail-safe: no split."""
     if not _is_multi_item_candidate(question):
         return []
-    tokens = _identifier_tokens(question)
+    tokens = _identifier_tokens(question) + _value_tokens(question)
 
     system = (
         "You split a user question into standalone sub-questions, ONE per item, "
@@ -1589,6 +1713,33 @@ def chat_turn(question: str, history: list, available_collections: list,
     # per-item fan-out, merged per-item answer. Single-item questions skip this
     # entirely (gate fails before any LLM call).
     sub_questions = split_multi_item_question(standalone_question)
+    if not sub_questions:
+        # XC-03 dual-intent: two DIFFERENT questions in one message — each
+        # routed independently (they may live in different collections),
+        # answered per-part under its own heading.
+        _dual = split_dual_intent(standalone_question)
+        if _dual:
+            if DEBUG:
+                print(f"DEBUG dual-intent split: {_dual}")
+            _parts = []
+            for _dq in _dual:
+                _dcols = select_collections(_dq, effective_history,
+                                            available_collections)
+                if not _dcols:
+                    continue
+                _drun = run_parallel_queries(_dcols, _dq)
+                _dtxt = _result_to_text(_drun.get("result", ""))
+                _dsrc = _drun.get("collection")
+                _parts.append(f"**{_dq}**\n\n{_dtxt[:1200]}"
+                              + (f"\n\n*Source: {_dsrc}*" if _dsrc else ""))
+            if _parts:
+                return {
+                    "role": "assistant",
+                    "content": "\n\n---\n\n".join(_parts),
+                    "method": "dual_intent",
+                    "collection": None,
+                    "related_sections": [],
+                }
     _mark("multi_item_gate")
 
     # Step 2: select collections (1–3, ranked by relevance)
@@ -1650,7 +1801,24 @@ def chat_turn(question: str, history: list, available_collections: list,
             if DEBUG:
                 print(f"DEBUG routing widened after empty answer: "
                       f"{collections} -> {_retry_cols}")
+            _prev_run = query_run
             query_run = run_parallel_queries(_retry_cols, standalone_question)
+            # The retry must EARN the switch: it exists to find a BETTER
+            # answer. If the widened winner is also weak/empty, the original
+            # (curated) answer stands — an archive shrug must never displace
+            # a library shrug by ordering ('CTM is down' headlined a random
+            # FRA ticket because every candidate wore the banner).
+            _new_txt = _result_to_text(query_run.get("result", ""))
+            _prev_txt = _result_to_text(_prev_run.get("result", ""))
+            def _is_weakish(t):
+                return any(m in t for m in (
+                    "No direct match found", "No exact match found",
+                    "No answer found", "No record found"))
+            if _is_weakish(_new_txt) and _prev_txt.strip()                     and query_run.get("collection") != _prev_run.get("collection"):
+                if DEBUG:
+                    print("DEBUG widening reverted: retry winner is also "
+                          "weak — the original answer stands")
+                query_run = _prev_run
     _mark("retrieval")
     if DEBUG:
         print("DEBUG standalone_question:", standalone_question)
