@@ -1479,6 +1479,51 @@ def render_analysis_panel():
             if row.get("status") != "Same"
         )
 
+        category_order = [
+            "Business Identifiers",
+            "Execution State",
+            "Routing",
+            "Instrument",
+            "Order Details",
+            "Parties",
+            "Settlement",
+            "Timing",
+            "Message Envelope",
+            "Other",
+        ]
+
+        expanded_categories = {
+            "Business Identifiers",
+            "Execution State",
+            "Routing",
+            "Instrument",
+            "Order Details",
+        }
+
+        rows_by_category = {}
+
+        for row in comparison_rows:
+            category = row.get("category") or "Other"
+            rows_by_category.setdefault(category, []).append(row)
+
+        ordered_categories = [
+            category
+            for category in category_order
+            if category in rows_by_category
+        ]
+
+        ordered_categories.extend(
+            category
+            for category in rows_by_category
+            if category not in ordered_categories
+        )
+
+        category_columns = [
+            column
+            for column in columns
+            if column.get("name") != "category"
+        ]
+
         with ui.expansion(
             f"Multi-Message Comparison ({changed_count} differing tags)",
             value=True,
@@ -1494,45 +1539,77 @@ def render_analysis_panel():
                 ui.label("Legend:").classes("text-sm font-bold")
 
                 ui.label("Same").classes("text-sm text-grey-9")
-                ui.label("Changed").classes("text-sm text-orange-700")
-                ui.label("Missing in one or more").classes("text-sm text-red-600")
+                ui.label("Changed").classes("text-sm text-orange-8")
+                ui.label("Missing in one or more").classes("text-sm text-red-7")
 
                 ui.label(
                     "Excluded: BodyLength, CheckSum, MsgSeqNum and SendingTime"
                 ).classes("text-xs text-grey-6")
 
-            with ui.element("div").classes(
-                "w-full max-w-full overflow-x-auto analysis-table-scroll"
-            ).style("min-width: 0;"):
-                comparison_table = ui.table(
-                    columns=columns,
-                    rows=comparison_rows,
-                    row_key="_seq",
-                    pagination={
-                        "rowsPerPage": 0,
-                        "sortBy": "_seq",
-                        "descending": False,
-                    },
-                ).classes("w-full")
+            for category in ordered_categories:
+                category_rows = rows_by_category[category]
 
-                comparison_table.add_slot("body", r"""
-                <q-tr
-                  :props="props"
-                  :class="{
-                    'text-orange-8': props.row.status === 'Changed',
-                    'text-red-7': props.row.status === 'Missing in one or more'
-                  }"
-                >
-                  <q-td
-                    v-for="col in props.cols"
-                    :key="col.name"
-                    :props="props"
-                    style="white-space: nowrap; vertical-align: top;"
-                  >
-                    {{ col.value }}
-                  </q-td>
-                </q-tr>
-                """)
+                category_changed_count = sum(
+                    1
+                    for row in category_rows
+                    if row.get("status") != "Same"
+                )
+
+                if category_changed_count == 0:
+                    category_summary = (
+                        f"{category} · {len(category_rows)} tags · no differences"
+                    )
+                elif category_changed_count == 1:
+                    category_summary = (
+                        f"{category} · {len(category_rows)} tags · 1 difference"
+                    )
+                else:
+                    category_summary = (
+                        f"{category} · {len(category_rows)} tags · "
+                        f"{category_changed_count} differences"
+                    )
+
+                with ui.expansion(
+                    category_summary,
+                    value=category in expanded_categories,
+                    icon="folder",
+                ).classes(
+                    "w-full q-mx-sm q-mb-sm bg-white rounded-borders"
+                ):
+
+                    with ui.element("div").classes(
+                        "w-full max-w-full overflow-x-auto analysis-table-scroll"
+                    ).style("min-width: 0;"):
+
+                        category_table = ui.table(
+                            columns=category_columns,
+                            rows=category_rows,
+                            row_key="_seq",
+                            pagination={
+                                "rowsPerPage": 0,
+                                "sortBy": "_seq",
+                                "descending": False,
+                            },
+                        ).classes("w-full")
+
+                        category_table.add_slot("body", r"""
+                        <q-tr
+                          :props="props"
+                          :class="{
+                            'text-orange-8': props.row.status === 'Changed',
+                            'text-red-7': props.row.status === 'Missing in one or more'
+                          }"
+                        >
+                          <q-td
+                            v-for="col in props.cols"
+                            :key="col.name"
+                            :props="props"
+                            style="white-space: nowrap; vertical-align: top;"
+                          >
+                            {{ col.value }}
+                          </q-td>
+                        </q-tr>
+                        """)
 
     def render_sequence_evidence(result):
         ui.label("Sequence Summary").classes("text-lg font-semibold")
