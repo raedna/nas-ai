@@ -1280,6 +1280,79 @@ def render_analysis_panel():
                     return
                 add_messages_to_workspace(selected, source_label="loaded message")
 
+            def save_selected_messages():
+                selected = selected_rows()
+
+                if not selected:
+                    ui.notify(
+                        "Select at least one loaded message first.",
+                        color="warning",
+                    )
+                    return
+
+                save_note = (loaded_save_note_input.value or "").strip()
+
+                if not save_note:
+                    ui.notify(
+                        "Save note is required before saving selected messages.",
+                        color="warning",
+                    )
+                    return
+
+                selected_messages = [
+                    {
+                        **message,
+                        "message_index": index,
+                    }
+                    for index, message in enumerate(selected, start=1)
+                ]
+
+                if len(selected_messages) == 1:
+                    analysis_mode = "Single Message"
+                elif len(selected_messages) == 2:
+                    analysis_mode = "Pair Comparison"
+                else:
+                    analysis_mode = "Multi-Message Selection"
+
+                save_result = {
+                    "input_type": "fix_sequence",
+                    "messages": selected_messages,
+                    "summary": (
+                        f"Saved selection containing "
+                        f"{len(selected_messages)} loaded FIX message"
+                        f"{'s' if len(selected_messages) != 1 else ''}."
+                    ),
+                    "warnings": [],
+                    "group_count": 0,
+                }
+
+                session_id, created = save_fix_analysis_result(
+                    save_result,
+                    analysis_mode=analysis_mode,
+                    source_type="ui",
+                    source_name="Loaded Messages",
+                    save_note=save_note,
+                )
+
+                if created:
+                    ui.notify(
+                        f"Saved selected messages as session {session_id}.",
+                        color="positive",
+                    )
+                else:
+                    ui.notify(
+                        f"Selected messages already exist as session {session_id}. "
+                        "Save skipped, note updated.",
+                        color="info",
+                    )
+
+                refresh_saved_analyses()
+
+            loaded_save_note_input = ui.input(
+                label="Save note",
+                placeholder="Describe why these selected messages are being saved...",
+            ).props("outlined dense").classes("w-full q-px-sm")
+
             with ui.row().classes("q-gutter-sm q-pa-sm"):
                 ui.button(
                     "View Selected Message Tags",
@@ -1293,6 +1366,10 @@ def render_analysis_panel():
                     "Add Selected to Workspace",
                     on_click=add_selected_to_workspace,
                 ).props("outline color=secondary")
+                ui.button(
+                    "Save Selected Messages",
+                    on_click=save_selected_messages,
+                ).props("outline color=positive")
 
             with ui.element("div").classes(
                 "w-full max-w-full overflow-x-auto analysis-table-scroll"
@@ -1479,51 +1556,6 @@ def render_analysis_panel():
             if row.get("status") != "Same"
         )
 
-        category_order = [
-            "Business Identifiers",
-            "Execution State",
-            "Routing",
-            "Instrument",
-            "Order Details",
-            "Parties",
-            "Settlement",
-            "Timing",
-            "Message Envelope",
-            "Other",
-        ]
-
-        expanded_categories = {
-            "Business Identifiers",
-            "Execution State",
-            "Routing",
-            "Instrument",
-            "Order Details",
-        }
-
-        rows_by_category = {}
-
-        for row in comparison_rows:
-            category = row.get("category") or "Other"
-            rows_by_category.setdefault(category, []).append(row)
-
-        ordered_categories = [
-            category
-            for category in category_order
-            if category in rows_by_category
-        ]
-
-        ordered_categories.extend(
-            category
-            for category in rows_by_category
-            if category not in ordered_categories
-        )
-
-        category_columns = [
-            column
-            for column in columns
-            if column.get("name") != "category"
-        ]
-
         with ui.expansion(
             f"Multi-Message Comparison ({changed_count} differing tags)",
             value=True,
@@ -1546,118 +1578,157 @@ def render_analysis_panel():
                     "Excluded: BodyLength, CheckSum, MsgSeqNum and SendingTime"
                 ).classes("text-xs text-grey-6")
 
-            for category in ordered_categories:
-                category_rows = rows_by_category[category]
+            with ui.element("div").classes(
+                "w-full max-w-full overflow-x-auto analysis-table-scroll"
+            ).style("min-width: 0;"):
+                comparison_table = ui.table(
+                    columns=columns,
+                    rows=comparison_rows,
+                    row_key="_seq",
+                    pagination={
+                        "rowsPerPage": 0,
+                        "sortBy": "_seq",
+                        "descending": False,
+                    },
+                ).classes("w-full")
 
-                category_changed_count = sum(
-                    1
-                    for row in category_rows
-                    if row.get("status") != "Same"
-                )
-
-                if category_changed_count == 0:
-                    category_summary = (
-                        f"{category} · {len(category_rows)} tags · no differences"
-                    )
-                elif category_changed_count == 1:
-                    category_summary = (
-                        f"{category} · {len(category_rows)} tags · 1 difference"
-                    )
-                else:
-                    category_summary = (
-                        f"{category} · {len(category_rows)} tags · "
-                        f"{category_changed_count} differences"
-                    )
-
-                with ui.expansion(
-                    category_summary,
-                    value=category in expanded_categories,
-                    icon="folder",
-                ).classes(
-                    "w-full q-mx-sm q-mb-sm bg-white rounded-borders"
-                ):
-
-                    with ui.element("div").classes(
-                        "w-full max-w-full overflow-x-auto analysis-table-scroll"
-                    ).style("min-width: 0;"):
-
-                        category_table = ui.table(
-                            columns=category_columns,
-                            rows=category_rows,
-                            row_key="_seq",
-                            pagination={
-                                "rowsPerPage": 0,
-                                "sortBy": "_seq",
-                                "descending": False,
-                            },
-                        ).classes("w-full")
-
-                        category_table.add_slot("body", r"""
-                        <q-tr
-                          :props="props"
-                          :class="{
-                            'text-orange-8': props.row.status === 'Changed',
-                            'text-red-7': props.row.status === 'Missing in one or more'
-                          }"
-                        >
-                          <q-td
-                            v-for="col in props.cols"
-                            :key="col.name"
-                            :props="props"
-                            style="white-space: nowrap; vertical-align: top;"
-                          >
-                            {{ col.value }}
-                          </q-td>
-                        </q-tr>
-                        """)
+                comparison_table.add_slot("body", r"""
+                <q-tr
+                  :props="props"
+                  :class="{
+                    'text-orange-8': props.row.status === 'Changed',
+                    'text-red-7': props.row.status === 'Missing in one or more'
+                  }"
+                >
+                  <q-td
+                    v-for="col in props.cols"
+                    :key="col.name"
+                    :props="props"
+                    style="white-space: nowrap; vertical-align: top;"
+                  >
+                    {{ col.value }}
+                  </q-td>
+                </q-tr>
+                """)
 
     def render_sequence_evidence(result):
+        messages = result.get("messages") or []
+
+        render_loaded_messages(
+            messages,
+            title="Loaded Messages",
+            expanded=True,
+        )
+
+        render_multi_message_comparison(messages)
+
         ui.label("Sequence Summary").classes("text-lg font-semibold")
-        ui.markdown(str(result.get("summary") or "No sequence summary generated.")).classes(
+        ui.markdown(
+            str(result.get("summary") or "No sequence summary generated.")
+        ).classes(
             "w-full q-pa-md bg-grey-1 rounded-borders"
         )
 
         groups = result.get("groups") or []
         if groups:
-            ui.label("Related Groups").classes("text-lg font-semibold q-mt-md")
+            ui.label("Related Groups").classes(
+                "text-lg font-semibold q-mt-md"
+            )
+
             group_rows = []
+
             for group in groups:
                 exec_ids = group.get("exec_ids") or []
                 exec_id_display = ", ".join(exec_ids[:5])
+
                 if len(exec_ids) > 5:
                     exec_id_display += f", ... +{len(exec_ids) - 5} more"
+
                 group_rows.append({
                     "group_label": group.get("group_label"),
                     "message_count": group.get("message_count"),
-                    "message_indexes": ", ".join(str(x) for x in group.get("message_indexes") or []),
-                    "cl_ord_ids": ", ".join(group.get("cl_ord_ids") or []),
-                    "order_ids": ", ".join(group.get("order_ids") or []),
-                    "secondary_order_ids": ", ".join(group.get("secondary_order_ids") or []),
+                    "message_indexes": ", ".join(
+                        str(x)
+                        for x in group.get("message_indexes") or []
+                    ),
+                    "cl_ord_ids": ", ".join(
+                        group.get("cl_ord_ids") or []
+                    ),
+                    "order_ids": ", ".join(
+                        group.get("order_ids") or []
+                    ),
+                    "secondary_order_ids": ", ".join(
+                        group.get("secondary_order_ids") or []
+                    ),
                     "exec_ids": exec_id_display,
                 })
-            with ui.element("div").classes("w-full overflow-auto analysis-table-scroll"):
+
+            with ui.element("div").classes(
+                "w-full overflow-auto analysis-table-scroll"
+            ):
                 ui.table(
                     columns=[
-                        {"name": "group_label", "label": "Group", "field": "group_label", "align": "left", "sortable": True},
-                        {"name": "message_count", "label": "Messages", "field": "message_count", "align": "left", "sortable": True},
-                        {"name": "message_indexes", "label": "Message #", "field": "message_indexes", "align": "left"},
-                        {"name": "cl_ord_ids", "label": "ClOrdID(s)", "field": "cl_ord_ids", "align": "left"},
-                        {"name": "order_ids", "label": "OrderID(s)", "field": "order_ids", "align": "left"},
-                        {"name": "secondary_order_ids", "label": "SecondaryOrderID(s)", "field": "secondary_order_ids", "align": "left"},
-                        {"name": "exec_ids", "label": "ExecID(s)", "field": "exec_ids", "align": "left"},
+                        {
+                            "name": "group_label",
+                            "label": "Group",
+                            "field": "group_label",
+                            "align": "left",
+                            "sortable": True,
+                        },
+                        {
+                            "name": "message_count",
+                            "label": "Messages",
+                            "field": "message_count",
+                            "align": "left",
+                            "sortable": True,
+                        },
+                        {
+                            "name": "message_indexes",
+                            "label": "Message #",
+                            "field": "message_indexes",
+                            "align": "left",
+                        },
+                        {
+                            "name": "cl_ord_ids",
+                            "label": "ClOrdID(s)",
+                            "field": "cl_ord_ids",
+                            "align": "left",
+                        },
+                        {
+                            "name": "order_ids",
+                            "label": "OrderID(s)",
+                            "field": "order_ids",
+                            "align": "left",
+                        },
+                        {
+                            "name": "secondary_order_ids",
+                            "label": "SecondaryOrderID(s)",
+                            "field": "secondary_order_ids",
+                            "align": "left",
+                        },
+                        {
+                            "name": "exec_ids",
+                            "label": "ExecID(s)",
+                            "field": "exec_ids",
+                            "align": "left",
+                        },
                     ],
-                    rows=group_rows, row_key="group_label", pagination={"rowsPerPage": 0},
+                    rows=group_rows,
+                    row_key="group_label",
+                    pagination={"rowsPerPage": 0},
                 ).classes("w-full")
 
-        messages = result.get("messages") or []
-        render_multi_message_comparison(messages)
-        render_loaded_messages(messages, title="Loaded Messages", expanded=False)
-
         input_timeline_area.clear()
+
         timeline_summary = result.get("timeline_summary") or ""
+
         if timeline_summary:
             with input_timeline_area:
-                with ui.expansion("Raw Timeline / Parsed Messages", value=False, icon="schedule").classes(
+                with ui.expansion(
+                    "Raw Timeline / Parsed Messages",
+                    value=False,
+                    icon="schedule",
+                ).classes(
                     "w-full bg-grey-1 rounded-borders"
                 ):
                     ui.code(timeline_summary).classes(
@@ -1665,8 +1736,10 @@ def render_analysis_panel():
                     )
 
     def run_analysis():
-        toolbar_status_label.set_text("Analyzing...")
         result_area.clear()
+        reporting_area.clear()
+        input_timeline_area.clear()
+        toolbar_status_label.set_text("Complete")
 
         if analyzer_select.value != "FIX Message":
             ui.notify("Analyzer not implemented yet.", type="warning")
@@ -1765,12 +1838,14 @@ def render_analysis_panel():
                 current_message.setdefault("message_index", 1)
                 current_message.setdefault("source_type", "live_analysis")
 
+                live_analysis_messages.clear()
                 live_analysis_messages.append(current_message)
 
             result_area.clear()
+            reporting_area.clear()
+            input_timeline_area.clear()
             toolbar_status_label.set_text("Complete")
 
-            reporting_area.clear()
             with reporting_area:
                 ui.label("Summary").classes("text-lg font-semibold")
                 ui.markdown(_format_summary_with_pipes(result.get("summary"))).classes(
@@ -2642,12 +2717,15 @@ def render_analysis_panel():
                     ui.notify("Could not read selected session id.", color="negative")
                     return
 
+                new_note = (saved_note_edit_input.value or "").strip()
+
                 update_fix_analysis_session_note(
                     session_id,
-                    save_note_input.value or "",
+                    new_note,
                 )
 
                 ui.notify(f"Updated save note for session {session_id}.", color="positive")
+                saved_note_edit_input.value = ""
                 refresh_saved_analyses()
 
             def confirm_delete_selected_session():
@@ -2681,6 +2759,11 @@ def render_analysis_panel():
                         ui.button("Delete", on_click=do_delete).props("color=negative")
 
                 dialog.open()
+
+            saved_note_edit_input = ui.input(
+                label="New save note",
+                placeholder="Enter the replacement note for the selected saved analysis...",
+            ).props("outlined dense clearable").classes("w-full q-mb-sm")
 
             with ui.row().classes("q-gutter-sm"):
                 ui.button("Open Selected Saved Analysis", on_click=open_selected_session).props("outline")
