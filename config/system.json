@@ -53,5 +53,11 @@
       "open": "New"
     }
   },
-  "about_guard_margin": 0.03
+  "about_guard_margin": 0.03,
+  "bge_veto": {
+    "enabled": true,
+    "invisible_below": 0.01,
+    "winner_min": 0.03,
+    "_doc": "Evidence-check veto on the LLM reranker (2026-07-28 shadow calibration): fire only when the LLM's chosen doc scores below invisible_below on the BGE cross-encoder AND a doc in the LLM's own top-3 scores >= winner_min. Consensus of two independent judges; thresholds are sanity checks, not the whole case."
+  }
 }

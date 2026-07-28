@@ -105,6 +105,64 @@ def bge_rerank(points: List, question: str) -> List:
         logging.getLogger(__name__).warning(f"BGE rerank failed: {e}")
         return points
 
+def _bge_veto(reranked: List, question: str) -> List:
+    """Evidence-check veto (config system.json bge_veto). The LLM reranker
+    stays the primary judge; the BGE cross-encoder — knowledge-free, so it
+    cannot share the LLM's wrong beliefs (CTM is not Charles River) — checks
+    the winner's lexical-semantic evidence. Fire ONLY on consensus:
+      (a) the LLM's chosen entry scores below invisible_below, AND
+      (b) an entry in the LLM's OWN top-3 scores >= winner_min.
+    Calibration (2026-07-28 shadow card): wrong picks scored 0.001-0.004;
+    right-but-disputed picks 0.119+; true winners >= 0.032; AR-03's
+    must-not-fire false winner hit 0.028 OUTSIDE v1's top-3 — hence the
+    consensus condition, without which thresholds alone cannot separate
+    0.028-wrong from 0.032-right. Any failure -> veto skipped."""
+    try:
+        import json as _json
+        from core.paths import SYSTEM_CONFIG_PATH
+        with open(SYSTEM_CONFIG_PATH, "r", encoding="utf-8") as _f:
+            _cfg = (_json.load(_f).get("bge_veto") or {})
+        if not _cfg.get("enabled"):
+            return reranked
+        _inv = float(_cfg.get("invisible_below", 0.01))
+        _win = float(_cfg.get("winner_min", 0.03))
+        model = get_bge_reranker()
+        if model is None or len(reranked) < 2:
+            return reranked
+
+        # deduped entries in reranked order; remember each entry's first
+        # (best) chunk index
+        _first_idx, _order = {}, []
+        for _i, _p in enumerate(reranked):
+            _pl = _p.payload or {}
+            _nm = str(_pl.get("primary_name") or _pl.get("identifier") or "")
+            if _nm and _nm not in _first_idx:
+                _first_idx[_nm] = _i
+                _order.append((_nm, f"{_nm}\n"
+                               + str(_pl.get("text")
+                                     or _pl.get("description") or "")[:512]))
+        if len(_order) < 2:
+            return reranked
+        _scores = {nm: float(sc) for (nm, _), sc in zip(
+            _order, model.predict(
+                [(question, passage) for _, passage in _order]))}
+        _top_nm = _order[0][0]
+        _top_sc = _scores.get(_top_nm, 0.0)
+        if _top_sc >= _inv:
+            return reranked
+        # candidate winners: the LLM's own top-3 distinct entries
+        _short = [nm for nm, _ in _order[:3] if nm != _top_nm]
+        _best_nm = max(_short, key=lambda n: _scores.get(n, 0.0),
+                       default=None)
+        if _best_nm and _scores.get(_best_nm, 0.0) >= _win:
+            print(f"RERANK bge veto: {_top_nm!r} ({_top_sc:.3f}) -> "
+                  f"{_best_nm!r} ({_scores[_best_nm]:.3f})")
+            reranked.insert(0, reranked.pop(_first_idx[_best_nm]))
+    except Exception as _e:
+        print(f"RERANK bge veto skipped: {type(_e).__name__}: {_e}")
+    return reranked
+
+
 def llm_rerank(points: List, question: str) -> List:
     """
     Rerank candidates using LLaMA 8B prompt reasoning.
@@ -117,7 +175,13 @@ def llm_rerank(points: List, question: str) -> List:
     try:
         from core.local_llm_client import call_local_llm_json
 
-        # Build candidate list with full text
+        # Build candidate list with full text.
+        # (Tried and reverted: presenting ingestion-time ABOUT lines as
+        # candidate content — alone or alongside the fragment. The 14B
+        # reranker has an entity-vs-action bias ('X is down' rewards
+        # restart-shaped docs over docs about X); raw fragments counteract
+        # it with literal entity strings, polished abouts feed it. See
+        # diag_retr05 runs, 2026-07-28.)
         candidates = []
         for i, p in enumerate(points):
             payload = p.payload or {}
@@ -152,6 +216,7 @@ def llm_rerank(points: List, question: str) -> List:
         print(f"LLM RERANK query: {question}")
         print(f"LLM RERANK candidates: {[p.payload.get('primary_name') for p in points]}")
         print(f"LLM RERANK result: {result}")
+
 
         if isinstance(result, dict) and "ranking" in result:
             ranking = result["ranking"]
@@ -217,6 +282,8 @@ def llm_rerank(points: List, question: str) -> List:
                           f"{(reranked[_best_i].payload or {}).get('primary_name')!r}"
                           f" (subjects {sorted(_subjects_sg)})")
                     reranked.insert(0, reranked.pop(_best_i))
+
+            reranked = _bge_veto(reranked, question)
             return reranked
 
     except Exception as e:

@@ -36,6 +36,9 @@ _SYSTEM_KEYS = {
     "file_path", "text", "embedded_image_paths", "embedded_image_ocr_map",
     "description_fields", "enum_values", "_question", "_version_history",
     "_latest_version",
+    # ingestion-time 'about' scan annotations — audit/rerank metadata,
+    # never filterable fields
+    "about", "keywords", "related",
 }
 
 
