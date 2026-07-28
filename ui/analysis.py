@@ -2032,7 +2032,10 @@ def render_analysis_panel():
                         sequence_parties,
                         include_message_index=True,
                     )
-                    insights = build_sequence_insights(result.get("messages") or [])
+                    insights = build_sequence_insights(
+                        result.get("messages") or [],
+                        result.get("groups") or [],
+                    )
                     with reporting_area:
                         render_sequence_insights(insights)
                         render_related_saved_matches(result)

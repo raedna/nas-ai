@@ -738,14 +738,27 @@ def _relationship_findings(
 
     return findings
 
-def build_sequence_insights(messages: List[Dict[str, Any]]) -> Dict[str, Any]:
+def build_sequence_insights(
+    messages: List[Dict[str, Any]],
+    groups: List[Dict[str, Any]] | None = None,
+) -> Dict[str, Any]:
     clean_messages = [
         message
         for message in messages
         if isinstance(message, dict)
     ]
 
-    relationship_groups = _build_relationship_groups(clean_messages)
+    if groups is not None:
+        relationship_groups = [
+            [
+                message
+                for message in (group.get("messages") or [])
+                if isinstance(message, dict)
+            ]
+            for group in groups
+        ]
+    else:
+        relationship_groups = _build_relationship_groups(clean_messages)
     relationship_changes = _relationship_findings(
         relationship_groups,
         len(clean_messages),

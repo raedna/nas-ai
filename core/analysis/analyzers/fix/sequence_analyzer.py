@@ -205,11 +205,27 @@ def _message_identifier_tokens(msg: Dict[str, Any]) -> List[str]:
         ("secondary_order_id", "secondary_order_id"),
     ]:
         value = str(msg.get(field) or "").strip()
-        if value:
-            tokens.append(f"{prefix}:{value}")
+
+        if not value:
+            continue
+
+        if value.upper() in INVALID_IDENTIFIER_VALUES:
+            continue
+
+        tokens.append(f"{prefix}:{value}")
 
     return tokens
 
+INVALID_IDENTIFIER_VALUES = {
+    "",
+    "-",
+    "0",
+    "NONE",
+    "NULL",
+    "N/A",
+    "NONREF",
+    "UNKNOWN",
+}
 
 def _build_message_groups(messages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """
@@ -290,7 +306,14 @@ def _build_message_groups(messages: List[Dict[str, Any]]) -> List[Dict[str, Any]
             ("exec_id", "exec_ids"),
         ]:
             value = str(msg.get(source_field) or "").strip()
-            if value and value not in group[target_field]:
+
+            if not value:
+                continue
+
+            if value.upper() in INVALID_IDENTIFIER_VALUES:
+                continue
+
+            if value not in group[target_field]:
                 group[target_field].append(value)
 
     for group in groups:
