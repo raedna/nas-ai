@@ -3,7 +3,11 @@ import json
 from nicegui import ui
 from core.analysis.analyzers.fix.comparator import compare_fix_messages
 
-def render_compare_result(result: dict):
+def render_compare_details(
+    result: dict,
+    *,
+    show_summary: bool = True,
+):
     relationship = result.get("relationship") or {}
     counts = result.get("difference_counts_by_category") or {}
     difference_rows = result.get("difference_rows") or []
@@ -21,13 +25,16 @@ def render_compare_result(result: dict):
         for index, row in enumerate(comparison_rows)
     ]
 
-    ui.label("Comparison Summary").classes("text-lg font-bold")
+    if show_summary:
+        ui.label("Comparison Summary").classes("text-lg font-bold")
 
-    summary_text = str(result.get("summary") or "").strip()
+        summary_text = str(result.get("summary") or "").strip()
 
-    ui.markdown(summary_text or "No summary generated.").classes(
-        "p-3 bg-gray-100 rounded w-full"
-    )
+        ui.markdown(
+            summary_text or "No summary generated."
+        ).classes(
+            "p-3 bg-gray-100 rounded w-full"
+        )
 
     with ui.card().classes("w-full mt-4"):
         ui.label("Relationship").classes("text-md font-bold")
@@ -152,6 +159,23 @@ def render_compare_result(result: dict):
           </q-td>
         </q-tr>
         """)
+
+def render_compare_result(result: dict):
+    """Render a normal pair-comparison result in the main analysis output."""
+    print(">>> render_compare_result")
+    render_compare_details(
+        result,
+        show_summary=True,
+    )
+
+
+def render_embedded_compare_result(result: dict):
+    """Render a compact pair comparison inside another UI panel."""
+    print(">>> render_embedded_compare_result")
+    render_compare_details(
+        result,
+        show_summary=False,
+    )
 
 def render_sequence_result(result: dict):
     ui.separator()

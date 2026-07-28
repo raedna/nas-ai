@@ -14,7 +14,11 @@ from nicegui import app
 from core.analysis.analyzers.fix.comparator import category_for_tag
 from core.analysis.ocr.rapidocr_adapter import ocr_image_with_rapidocr
 from core.analysis.ocr.pdf_rapidocr_adapter import ocr_pdf_with_rapidocr
-from ui.analysis_renderers import render_compare_result, render_sequence_result
+from ui.analysis_renderers import (
+    render_compare_result,
+    render_embedded_compare_result,
+    render_sequence_result,
+)
 from core.analysis.analyzers.fix.sequence_analyzer import analyze_fix_sequence
 from core.analysis.storage.fix_repository import (
     save_fix_analysis_result,
@@ -296,6 +300,68 @@ def render_analysis_panel():
     </style>
     """)
 
+    def render_parties_section(parties, include_message_index=False):
+        parties = parties or []
+
+        if not parties:
+            return
+
+        columns = []
+
+        if include_message_index:
+            columns.append(
+                {
+                    "name": "message_index",
+                    "label": "Message #",
+                    "field": "message_index",
+                    "align": "left",
+                }
+            )
+
+        columns.extend(
+            [
+                {
+                    "name": "party_id",
+                    "label": "Party ID",
+                    "field": "party_id",
+                    "align": "left",
+                },
+                {
+                    "name": "party_id_source",
+                    "label": "Source",
+                    "field": "party_id_source",
+                    "align": "left",
+                },
+                {
+                    "name": "party_role",
+                    "label": "Role",
+                    "field": "party_role",
+                    "align": "left",
+                },
+                {
+                    "name": "party_role_name",
+                    "label": "Role Meaning",
+                    "field": "party_role_name",
+                    "align": "left",
+                },
+            ]
+        )
+
+        with ui.expansion(
+            f"Parties ({len(parties)})",
+            value=False,
+            icon="groups",
+        ).classes("w-full q-mt-md bg-grey-1 rounded-borders"):
+            with ui.element("div").classes(
+                "w-full max-h-80 overflow-auto border rounded"
+            ):
+                ui.table(
+                    columns=columns,
+                    rows=parties,
+                    row_key="party_row_key",
+                    pagination=False,
+                ).classes("w-full")
+
     async def handle_analysis_upload(e, target_box):
         tmp_path = None
         upload_status_label.set_text("Reading file and running OCR...")
@@ -380,11 +446,36 @@ def render_analysis_panel():
             });
             const result = await response.json();
             if (!result.ok || !result.text) throw new Error(result.error || 'No OCR text extracted');
-            const selector = activePasteBoxId.endsWith('-b')
-              ? 'textarea.analysis-fix-compare-input' : 'textarea.analysis-fix-input';
-            const textarea = document.querySelector(selector);
+            const containerSelector = activePasteBoxId.endsWith('-b')
+              ? '.analysis-fix-compare-input'
+              : '.analysis-fix-input';
+
+            const container = document.querySelector(containerSelector);
+
+            if (!container) {
+              throw new Error(`Could not find target component: ${containerSelector}`);
+            }
+
+            const textarea =
+              container.matches('textarea')
+                ? container
+                : container.querySelector('textarea');
+
+            if (!textarea) {
+              throw new Error(`Could not find textarea inside: ${containerSelector}`);
+            }
+
+            if (!textarea) {
+                throw new Error(`Could not find target input: ${selector}`);
+            }
             if (!textarea) throw new Error('Could not find target input');
-            textarea.value = result.text;
+            const valueSetter = Object.getOwnPropertyDescriptor(
+              HTMLTextAreaElement.prototype,
+              'value'
+            ).set;
+
+            valueSetter.call(textarea, result.text);
+
             textarea.dispatchEvent(new Event('input', {bubbles: true}));
             textarea.dispatchEvent(new Event('change', {bubbles: true}));
             box.innerText = 'OCR text inserted. Review it before analysis.';
@@ -566,6 +657,8 @@ def render_analysis_panel():
     with working_area:
         workspace_output_area = ui.column().classes("w-full")
         technical_result_area = ui.column().classes("w-full q-mt-md")
+        # Workspace comparisons render here without deleting Technical Evidence.
+        workspace_compare_result_area = ui.column().classes("w-full q-mt-lg")
 
     result_area = technical_result_area
 
@@ -950,9 +1043,6 @@ def render_analysis_panel():
                 "Select rows to inspect, compare, or add to the shared Investigation Workspace."
             ).classes("text-sm text-grey-7 q-pa-sm")
 
-            tag_result_area = ui.column().classes("w-full q-mt-md")
-            compare_result_area = ui.column().classes("w-full q-mt-md")
-
             def selected_rows():
                 return list(message_table.selected or [])
 
@@ -1263,7 +1353,6 @@ def render_analysis_panel():
                     ui.notify("One of the selected loaded messages has no raw FIX text.", color="negative")
                     return
 
-                add_messages_to_workspace(selected, source_label="loaded message")
                 comparison = compare_fix_messages(raw_first, raw_second)
                 compare_result_area.clear()
                 with compare_result_area:
@@ -1271,7 +1360,8 @@ def render_analysis_panel():
                         f"Comparison: Loaded Message {selected[0].get('message_index')} "
                         f"vs {selected[1].get('message_index')}"
                     ).classes("text-lg font-semibold q-mt-md")
-                    render_compare_result(comparison)
+                    debug_print(">>> Loaded Messages compare callback")
+                    render_embedded_compare_result(comparison)
 
             def add_selected_to_workspace():
                 selected = selected_rows()
@@ -1399,12 +1489,16 @@ def render_analysis_panel():
                     pagination={"rowsPerPage": 0},
                 ).classes("w-full")
 
-                # Results belong below the loaded-message list,
-                # so opening one message does not hide/push away the list.
-                tag_result_area = ui.column().classes("w-full q-mt-md")
-                compare_result_area = ui.column().classes("w-full q-mt-md")
+            # Results belong below the loaded-message list,
+            # so opening one message does not hide/push away the list.
+            tag_result_area = ui.column().classes("w-full q-mt-md")
+            compare_result_area = ui.column().classes("w-full q-mt-md")
 
-    def render_multi_message_comparison(messages):
+    def render_multi_message_comparison(
+        messages,
+        title="Multi-Message Comparison",
+        description=None,
+    ):
         """Render a tag-by-tag comparison matrix for 3–10 analyzed FIX messages."""
         messages = list(messages or [])
 
@@ -1557,15 +1651,23 @@ def render_analysis_panel():
         )
 
         with ui.expansion(
-            f"Multi-Message Comparison ({changed_count} differing tags)",
+            f"{title} ({changed_count} differing tags)",
             value=True,
             icon="difference",
         ).classes("w-full q-mt-md bg-grey-1 rounded-borders"):
 
-            ui.label(
-                f"Comparing {len(messages)} workspace messages. "
-                "Message columns follow the workspace order."
-            ).classes("text-sm text-grey-7 q-pa-sm")
+            if description is None:
+                description = (
+                    f"Comparing {len(messages)} workspace messages. "
+                    "Message columns follow the workspace order."
+                )
+
+            ui.label(description).classes("text-sm text-grey-7 q-pa-sm")
+
+            show_differences_only = ui.checkbox(
+                "Show differences only",
+                value=False,
+            ).classes("q-px-sm")
 
             with ui.row().classes("items-center q-gutter-md q-px-sm q-pb-sm"):
                 ui.label("Legend:").classes("text-sm font-bold")
@@ -1583,7 +1685,14 @@ def render_analysis_panel():
             ).style("min-width: 0;"):
                 comparison_table = ui.table(
                     columns=columns,
-                    rows=comparison_rows,
+                    rows=[
+                        row
+                        for row in comparison_rows
+                        if (
+                            not show_differences_only.value
+                            or row["status"] != "Same"
+                        )
+                    ],
                     row_key="_seq",
                     pagination={
                         "rowsPerPage": 0,
@@ -1620,7 +1729,14 @@ def render_analysis_panel():
             expanded=True,
         )
 
-        render_multi_message_comparison(messages)
+        render_multi_message_comparison(
+            messages,
+            title="Loaded Session Comparison",
+            description=(
+                f"Comparing {len(messages)} loaded session messages. "
+                "Message columns follow the saved session order."
+            ),
+        )
 
         ui.label("Sequence Summary").classes("text-lg font-semibold")
         ui.markdown(
@@ -1865,6 +1981,57 @@ def render_analysis_panel():
 
                 if result.get("input_type") == "fix_sequence":
                     render_sequence_evidence(result)
+
+                    sequence_parties = []
+
+                    for position, message in enumerate(
+                        result.get("messages") or [],
+                        start=1,
+                    ):
+                        message_index = message.get("message_index") or position
+                        business_object = message.get("business_object") or {}
+                        message_parties = business_object.get("parties") or []
+
+                        for party_position, party in enumerate(
+                            message_parties,
+                            start=1,
+                        ):
+                            party_row = dict(party)
+                            party_row["message_index"] = message_index
+                            party_row["party_row_key"] = (
+                                f"{message_index}:"
+                                f"{party_position}:"
+                                f"{party_row.get('party_id', '')}:"
+                                f"{party_row.get('party_role', '')}"
+                            )
+                            sequence_parties.append(party_row)
+
+                        debug_print(
+                        "=== SEQUENCE PARTIES DEBUG ===",
+                        "messages:",
+                        len(result.get("messages") or []),
+                        "parties:",
+                        len(sequence_parties),
+                        [
+                            {
+                                "message_index": message.get("message_index"),
+                                "business_object_keys": list(
+                                    (message.get("business_object") or {}).keys()
+                                ),
+                                "party_count": len(
+                                    (
+                                        message.get("business_object") or {}
+                                    ).get("parties") or []
+                                ),
+                            }
+                            for message in (result.get("messages") or [])
+                        ],
+                    )
+
+                    render_parties_section(
+                        sequence_parties,
+                        include_message_index=True,
+                    )
                     insights = build_sequence_insights(result.get("messages") or [])
                     with reporting_area:
                         render_sequence_insights(insights)
@@ -1926,299 +2093,300 @@ def render_analysis_panel():
                 render_loaded_messages(live_analysis_messages, title="Loaded Messages", expanded=True)
 
                 business_object = result.get("business_object", {}) or {}
-
                 parties = business_object.get("parties") or []
 
-                if parties:
-                    with ui.expansion(
-                        f"Parties ({len(parties)})",
-                        value=False,
-                        icon="groups",
-                    ).classes("w-full q-mt-md bg-grey-1 rounded-borders"):
-                        with ui.element("div").classes("w-full max-h-80 overflow-auto border rounded"):
-                            ui.table(
-                                columns=[
-                                    {"name": "party_id", "label": "Party ID", "field": "party_id", "align": "left"},
-                                    {"name": "party_id_source", "label": "Source", "field": "party_id_source", "align": "left"},
-                                    {"name": "party_role", "label": "Role", "field": "party_role", "align": "left"},
-                                    {"name": "party_role_name", "label": "Role Meaning", "field": "party_role_name", "align": "left"},
-                                ],
-                                rows=parties,
-                                row_key="party_id",
-                                pagination=False,
-                            ).classes("w-full")
+                single_message_parties = []
 
-                ui.label("Decoded Values").classes("text-lg font-bold mt-4")
+                for party_position, party in enumerate(parties, start=1):
+                    party_row = dict(party)
+                    party_row["party_row_key"] = (
+                        f"1:"
+                        f"{party_position}:"
+                        f"{party_row.get('party_id', '')}:"
+                        f"{party_row.get('party_role', '')}"
+                    )
+                    single_message_parties.append(party_row)
 
-                rows = result.get("decoded_rows") or []
+                render_parties_section(single_message_parties)
 
-                def decoded_row_class(row):
-                    tag_warning = str(row.get("tag_warning") or "").strip()
-                    enum_warning = str(row.get("enum_warning") or "").strip()
-                    tag_status = str(row.get("tag_status") or "").strip().lower()
-                    tag_name = str(row.get("tag_name") or "").strip()
+                with ui.expansion(
+                    "Decoded Values",
+                    value=True,
+                    icon="table_view",
+                ).classes(
+                    "w-full q-mt-md bg-grey-1 rounded-borders"
+                ):
 
-                    if tag_warning or enum_warning:
-                        return "decoded-row-warning"
+                    rows = result.get("decoded_rows") or []
 
-                    if tag_status in ("custom", "unknown", "missing", "not_found", "not found"):
-                        return "decoded-row-custom"
-
-                    if tag_name:
-                        return "decoded-row-known"
-
-                    return "decoded-row-custom"
-
-
-                rows = [
-                    {
-                        **row,
-                        "tag": int(str(row.get("tag", "")).split("#")[0])
-                        if str(row.get("tag", "")).split("#")[0].isdigit()
-                        else row.get("tag", ""),
-                        "_seq": index,
-                        "_row_class": decoded_row_class(row),
-                        "_tag_sort": int(str(row.get("tag", "999999")).split("#")[0])
-                        if str(row.get("tag", "")).split("#")[0].isdigit()
-                        else 999999,
-                    }
-                    for index, row in enumerate(rows)
-                ]
-
-                review_rows = [
-                    row for row in rows
-                    if str(row.get("enum_valid", "")).lower() in {"false", "review", "parse review", "ocr review"}
-                    or row.get("enum_warning")
-                    or row.get("tag_warning")
-                ]
-
-                review_tags = []
-                for row in review_rows:
-                    tag = str(row.get("tag", "")).strip()
-                    if tag and tag not in review_tags:
-                        review_tags.append(tag)
-
-                if review_tags:
-                    ui.label(
-                        "Check values for tags "
-                        + ", ".join(review_tags)
-                        + " in the Decoded Values table. Their values do not match listed dictionary values or need review."
-                    ).classes("text-red-600 font-bold mt-4")
-
-                ui.add_head_html("""
-                <style>
-                .technical-analysis-pane .q-table__middle,
-                .decoded-values-scroll .q-table__middle {
-                    max-height: calc(100vh - 430px);
-                    overflow: auto;
-                }
-
-                .technical-analysis-pane .q-table__middle thead tr th,
-                .decoded-values-scroll .q-table__middle thead tr th {
-                    position: sticky;
-                    top: 0;
-                    z-index: 6;
-                    background: white;
-                }
-
-                .technical-analysis-pane .q-table__container,
-                .decoded-values-scroll .q-table__container {
-                    min-width: 100%;
-                }
-
-                .technical-analysis-pane .q-table__middle table,
-                .decoded-values-scroll .q-table__middle table {
-                    min-width: max-content;
-                }
-
-                .business-report-pane {
-                    overflow: visible;
-                }
-
-                .tag-inspector {
-                    max-height: calc(100vh - 210px);
-                    overflow-y: auto;
-                }
-
-                @media (max-width: 1200px) {
-                    .business-report-pane,
-                    .tag-inspector,
-                    .decoded-table-column {
-                        width: 100% !important;
-                        min-width: 0 !important;
-                        position: static !important;
-                    }
-                }
-                </style>
-                """)
-
-                ui.label(
-                    "Default order follows the message sequence. Click column headers to sort."
-                ).classes("text-sm text-gray-500")
-
-                reset_decoded_sort_button = ui.button("Reset sorting").props("outline size=sm")
-
-                with ui.row().classes("w-full no-wrap items-start q-gutter-md"):
-                    with ui.column().classes("decoded-table-column").style(
-                        "width: calc(80% - 8px); min-width: 0;"
-                    ):
-                        with ui.element("div").classes("w-full border rounded decoded-values-scroll"):
-                                            decoded_table = ui.table(
-                                                columns=[
-                                                    {"name": "_seq", "label": "#", "field": "_seq", "align": "left", "sortable": True},
-                                                    {"name": "tag", "label": "Tag ID", "field": "_tag_sort", "align": "left", "sortable": True},
-                                                    {"name": "tag_name", "label": "Tag Name", "field": "tag_name", "align": "left", "sortable": True},
-                                                    {"name": "value", "label": "Tag Value", "field": "value", "align": "left", "sortable": True},
-                                                    {"name": "value_name", "label": "Tag Value Name", "field": "value_name", "align": "left", "sortable": True},
-                                                ],
-                                                rows=rows,
-                                                row_key="_seq",
-                                                selection="single",
-                                                pagination={
-                                                    "sortBy": "_seq",
-                                                    "descending": False,
-                                                    "rowsPerPage": 0,
-                                                },
-                                            ).classes("w-full")
-
-                                            def reset_decoded_sorting():
-                                                decoded_table.rows = sorted(
-                                                    rows,
-                                                    key=lambda row: row.get("_seq", 0),
-                                                )
-                                                decoded_table.pagination = {
-                                                    "sortBy": "_seq",
-                                                    "descending": False,
-                                                    "rowsPerPage": 0,
-                                                }
-                                                decoded_table.update()
-
-                                            reset_decoded_sort_button.on_click(reset_decoded_sorting)
-
-                                            decoded_table.add_slot("body", r"""
-                                            <q-tr
-                                              :props="props"
-                                              @click="$parent.$emit('row-inspect', props.row)"
-                                              :class="(
-                                                props.row.enum_valid === false ||
-                                                props.row.enum_valid === 'Review' ||
-                                                props.row.enum_valid === 'Parse Review' ||
-                                                props.row.enum_valid === 'OCR Review' ||
-                                                props.row.enum_warning ||
-                                                props.row.tag_warning ||
-                                                props.row.ocr_repair_warning
-                                              ) ? 'text-red' : ''"
-                                            >
-                                              <q-td auto-width>
-                                                <q-checkbox
-                                                  v-model="props.selected"
-                                                  dense
-                                                  @click.stop
-                                                />
-                                              </q-td>
-                                              <q-td
-                                                v-for="col in props.cols"
-                                                :key="col.name"
-                                                :props="props"
-                                                style="white-space: nowrap; vertical-align: top;"
-                                              >
-                                                {{ col.name === 'tag' ? props.row.tag : col.value }}
-                                              </q-td>
-                                            </q-tr>
-                                            """)
-
-                    with ui.card().classes("tag-inspector q-pa-md").style(
-                        "width: calc(20% - 8px); min-width: 280px; position: sticky; top: 132px;"
-                    ):
-                        ui.label("Tag Inspector").classes("text-md font-semibold")
-                        ui.label("Select a decoded row to inspect its dictionary details.").classes(
-                            "text-xs text-grey-7 q-mb-md"
-                        )
-                        inspector_state = ui.badge("No tag selected", color="grey").props("outline")
-                        inspector_tag = ui.label("Tag: —").classes("font-semibold")
-                        inspector_name = ui.label("Name: —")
-                        inspector_value = ui.label("Current Value: —")
-                        inspector_meaning = ui.label("Meaning: —")
-                        ui.separator().classes("q-my-sm")
-                        inspector_dictionary = ui.label("Dictionary Status: —").classes("text-sm")
-                        inspector_enums = ui.label("Enumerations: —").classes("text-sm")
-                        inspector_enum_valid = ui.label("Enum Validation: —").classes("text-sm")
-                        inspector_ocr = ui.label("OCR Processing: —").classes("text-sm")
-                        inspector_ocr_score = ui.label("OCR Confidence: —").classes("text-sm")
-                        ui.separator().classes("q-my-sm")
-                        ui.label("Description").classes("text-sm font-semibold")
-                        inspector_description = ui.label("Select a row to view its description.").classes(
-                            "text-sm text-grey-8 whitespace-pre-wrap"
-                        )
-                        ui.separator().classes("q-my-sm")
-                        ui.label("Review Notes").classes("text-sm font-semibold")
-                        inspector_warnings = ui.label("None").classes(
-                            "text-sm text-grey-8 whitespace-pre-wrap"
-                        )
-
-                    def populate_tag_inspector(row):
-                        if not row:
-                            return
-
+                    def decoded_row_class(row):
+    
                         tag_warning = str(row.get("tag_warning") or "").strip()
                         enum_warning = str(row.get("enum_warning") or "").strip()
-                        ocr_review = str(row.get("ocr_repair_warning") or "").strip()
-                        enum_valid = row.get("enum_valid")
-                        tag_status = str(row.get("tag_status") or "").strip()
-                        ocr_inferred = row.get("ocr_inferred")
+                        tag_status = str(row.get("tag_status") or "").strip().lower()
+                        tag_name = str(row.get("tag_name") or "").strip()
 
-                        has_validation_issue = bool(
-                            tag_warning
-                            or enum_warning
-                            or str(enum_valid).lower() in {"false", "review", "parse review", "ocr review"}
-                        )
-                        has_ocr_review = bool(ocr_review or ocr_inferred)
-                        is_unknown = tag_status.lower() in {"custom", "unknown", "missing", "not_found", "not found"}
+                        if tag_warning or enum_warning:
+                            return "decoded-row-warning"
 
-                        if has_validation_issue:
-                            inspector_state.set_text("Review required")
-                            inspector_state.props("color=negative outline")
-                        elif has_ocr_review:
-                            inspector_state.set_text("OCR review")
-                            inspector_state.props("color=warning outline")
-                        elif is_unknown:
-                            inspector_state.set_text("Custom / unknown")
-                            inspector_state.props("color=purple outline")
-                        else:
-                            inspector_state.set_text("Known / valid")
-                            inspector_state.props("color=positive outline")
+                        if tag_status in ("custom", "unknown", "missing", "not_found", "not found"):
+                            return "decoded-row-custom"
 
-                        inspector_tag.set_text(f"Tag: {row.get('tag') or '—'}")
-                        inspector_name.set_text(f"Name: {row.get('tag_name') or '—'}")
-                        inspector_value.set_text(f"Current Value: {row.get('value') or '—'}")
-                        inspector_meaning.set_text(f"Meaning: {row.get('value_name') or '—'}")
-                        inspector_dictionary.set_text(f"Dictionary Status: {tag_status or '—'}")
-                        inspector_enums.set_text(f"Enumerations: {'Yes' if row.get('has_enums') else 'No'}")
-                        inspector_enum_valid.set_text(f"Enum Validation: {enum_valid if enum_valid not in (None, '') else '—'}")
-                        inspector_ocr.set_text(
-                            "OCR Processing: "
-                            + (ocr_review or ("Value inferred/repaired" if ocr_inferred else "No OCR repair recorded"))
-                        )
-                        inspector_ocr_score.set_text(
-                            f"OCR Confidence: {row.get('ocr_score') if row.get('ocr_score') not in (None, '') else '—'}"
-                        )
-                        inspector_description.set_text(row.get("description") or "No description available.")
+                        if tag_name:
+                            return "decoded-row-known"
 
-                        notes = [part for part in (tag_warning, enum_warning, ocr_review) if part]
-                        inspector_warnings.set_text("\n".join(notes) or "None")
-
-                    def inspect_decoded_row(event):
-                        row = event.args
-
-                        # NiceGUI may wrap custom-event arguments in a one-item list.
-                        if isinstance(row, list) and row:
-                            row = row[0]
-
-                        if isinstance(row, dict):
-                            populate_tag_inspector(row)
+                        return "decoded-row-custom"
 
 
-                    decoded_table.on("row-inspect", inspect_decoded_row)
+                    rows = [
+                        {
+                            **row,
+                            "tag": int(str(row.get("tag", "")).split("#")[0])
+                            if str(row.get("tag", "")).split("#")[0].isdigit()
+                            else row.get("tag", ""),
+                            "_seq": index,
+                            "_row_class": decoded_row_class(row),
+                            "_tag_sort": int(str(row.get("tag", "999999")).split("#")[0])
+                            if str(row.get("tag", "")).split("#")[0].isdigit()
+                            else 999999,
+                        }
+                        for index, row in enumerate(rows)
+                    ]
+
+                    review_rows = [
+                        row for row in rows
+                        if str(row.get("enum_valid", "")).lower() in {"false", "review", "parse review", "ocr review"}
+                        or row.get("enum_warning")
+                        or row.get("tag_warning")
+                    ]
+
+                    review_tags = []
+                    for row in review_rows:
+                        tag = str(row.get("tag", "")).strip()
+                        if tag and tag not in review_tags:
+                            review_tags.append(tag)
+
+                    if review_tags:
+                        ui.label(
+                            "Check values for tags "
+                            + ", ".join(review_tags)
+                            + " in the Decoded Values table. Their values do not match listed dictionary values or need review."
+                        ).classes("text-red-600 font-bold mt-4")
+
+                    ui.add_head_html("""
+                    <style>
+                    .technical-analysis-pane .q-table__middle,
+                    .decoded-values-scroll .q-table__middle {
+                        max-height: calc(100vh - 430px);
+                        overflow: auto;
+                    }
+
+                    .technical-analysis-pane .q-table__middle thead tr th,
+                    .decoded-values-scroll .q-table__middle thead tr th {
+                        position: sticky;
+                        top: 0;
+                        z-index: 6;
+                        background: white;
+                    }
+
+                    .technical-analysis-pane .q-table__container,
+                    .decoded-values-scroll .q-table__container {
+                        min-width: 100%;
+                    }
+
+                    .technical-analysis-pane .q-table__middle table,
+                    .decoded-values-scroll .q-table__middle table {
+                        min-width: max-content;
+                    }
+
+                    .business-report-pane {
+                        overflow: visible;
+                    }
+
+                    .tag-inspector {
+                        max-height: calc(100vh - 210px);
+                        overflow-y: auto;
+                    }
+
+                    @media (max-width: 1200px) {
+                        .business-report-pane,
+                        .tag-inspector,
+                        .decoded-table-column {
+                            width: 100% !important;
+                            min-width: 0 !important;
+                            position: static !important;
+                        }
+                    }
+                    </style>
+                    """)
+
+                    ui.label(
+                        "Default order follows the message sequence. Click column headers to sort."
+                    ).classes("text-sm text-gray-500")
+
+                    reset_decoded_sort_button = ui.button("Reset sorting").props("outline size=sm")
+
+                    with ui.row().classes("w-full no-wrap items-start q-gutter-md"):
+                        with ui.column().classes("decoded-table-column").style(
+                            "width: calc(80% - 8px); min-width: 0;"
+                        ):
+                            with ui.element("div").classes("w-full border rounded decoded-values-scroll"):
+                                                decoded_table = ui.table(
+                                                    columns=[
+                                                        {"name": "_seq", "label": "#", "field": "_seq", "align": "left", "sortable": True},
+                                                        {"name": "tag", "label": "Tag ID", "field": "_tag_sort", "align": "left", "sortable": True},
+                                                        {"name": "tag_name", "label": "Tag Name", "field": "tag_name", "align": "left", "sortable": True},
+                                                        {"name": "value", "label": "Tag Value", "field": "value", "align": "left", "sortable": True},
+                                                        {"name": "value_name", "label": "Tag Value Name", "field": "value_name", "align": "left", "sortable": True},
+                                                    ],
+                                                    rows=rows,
+                                                    row_key="_seq",
+                                                    selection="single",
+                                                    pagination={
+                                                        "sortBy": "_seq",
+                                                        "descending": False,
+                                                        "rowsPerPage": 0,
+                                                    },
+                                                ).classes("w-full")
+
+                                                def reset_decoded_sorting():
+                                                    decoded_table.rows = sorted(
+                                                        rows,
+                                                        key=lambda row: row.get("_seq", 0),
+                                                    )
+                                                    decoded_table.pagination = {
+                                                        "sortBy": "_seq",
+                                                        "descending": False,
+                                                        "rowsPerPage": 0,
+                                                    }
+                                                    decoded_table.update()
+
+                                                reset_decoded_sort_button.on_click(reset_decoded_sorting)
+
+                                                decoded_table.add_slot("body", r"""
+                                                <q-tr
+                                                  :props="props"
+                                                  @click="$parent.$emit('row-inspect', props.row)"
+                                                  :class="(
+                                                    props.row.enum_valid === false ||
+                                                    props.row.enum_valid === 'Review' ||
+                                                    props.row.enum_valid === 'Parse Review' ||
+                                                    props.row.enum_valid === 'OCR Review' ||
+                                                    props.row.enum_warning ||
+                                                    props.row.tag_warning ||
+                                                    props.row.ocr_repair_warning
+                                                  ) ? 'text-red' : ''"
+                                                >
+                                                  <q-td auto-width>
+                                                    <q-checkbox
+                                                      v-model="props.selected"
+                                                      dense
+                                                      @click.stop
+                                                    />
+                                                  </q-td>
+                                                  <q-td
+                                                    v-for="col in props.cols"
+                                                    :key="col.name"
+                                                    :props="props"
+                                                    style="white-space: nowrap; vertical-align: top;"
+                                                  >
+                                                    {{ col.name === 'tag' ? props.row.tag : col.value }}
+                                                  </q-td>
+                                                </q-tr>
+                                                """)
+
+                        with ui.card().classes("tag-inspector q-pa-md").style(
+                            "width: calc(20% - 8px); min-width: 280px; position: sticky; top: 132px;"
+                        ):
+                            ui.label("Tag Inspector").classes("text-md font-semibold")
+                            ui.label("Select a decoded row to inspect its dictionary details.").classes(
+                                "text-xs text-grey-7 q-mb-md"
+                            )
+                            inspector_state = ui.badge("No tag selected", color="grey").props("outline")
+                            inspector_tag = ui.label("Tag: —").classes("font-semibold")
+                            inspector_name = ui.label("Name: —")
+                            inspector_value = ui.label("Current Value: —")
+                            inspector_meaning = ui.label("Meaning: —")
+                            ui.separator().classes("q-my-sm")
+                            inspector_dictionary = ui.label("Dictionary Status: —").classes("text-sm")
+                            inspector_enums = ui.label("Enumerations: —").classes("text-sm")
+                            inspector_enum_valid = ui.label("Enum Validation: —").classes("text-sm")
+                            inspector_ocr = ui.label("OCR Processing: —").classes("text-sm")
+                            inspector_ocr_score = ui.label("OCR Confidence: —").classes("text-sm")
+                            ui.separator().classes("q-my-sm")
+                            ui.label("Description").classes("text-sm font-semibold")
+                            inspector_description = ui.label("Select a row to view its description.").classes(
+                                "text-sm text-grey-8 whitespace-pre-wrap"
+                            )
+                            ui.separator().classes("q-my-sm")
+                            ui.label("Review Notes").classes("text-sm font-semibold")
+                            inspector_warnings = ui.label("None").classes(
+                                "text-sm text-grey-8 whitespace-pre-wrap"
+                            )
+
+                        def populate_tag_inspector(row):
+                            if not row:
+                                return
+
+                            tag_warning = str(row.get("tag_warning") or "").strip()
+                            enum_warning = str(row.get("enum_warning") or "").strip()
+                            ocr_review = str(row.get("ocr_repair_warning") or "").strip()
+                            enum_valid = row.get("enum_valid")
+                            tag_status = str(row.get("tag_status") or "").strip()
+                            ocr_inferred = row.get("ocr_inferred")
+
+                            has_validation_issue = bool(
+                                tag_warning
+                                or enum_warning
+                                or str(enum_valid).lower() in {"false", "review", "parse review", "ocr review"}
+                            )
+                            has_ocr_review = bool(ocr_review or ocr_inferred)
+                            is_unknown = tag_status.lower() in {"custom", "unknown", "missing", "not_found", "not found"}
+
+                            if has_validation_issue:
+                                inspector_state.set_text("Review required")
+                                inspector_state.props("color=negative outline")
+                            elif has_ocr_review:
+                                inspector_state.set_text("OCR review")
+                                inspector_state.props("color=warning outline")
+                            elif is_unknown:
+                                inspector_state.set_text("Custom / unknown")
+                                inspector_state.props("color=purple outline")
+                            else:
+                                inspector_state.set_text("Known / valid")
+                                inspector_state.props("color=positive outline")
+
+                            inspector_tag.set_text(f"Tag: {row.get('tag') or '—'}")
+                            inspector_name.set_text(f"Name: {row.get('tag_name') or '—'}")
+                            inspector_value.set_text(f"Current Value: {row.get('value') or '—'}")
+                            inspector_meaning.set_text(f"Meaning: {row.get('value_name') or '—'}")
+                            inspector_dictionary.set_text(f"Dictionary Status: {tag_status or '—'}")
+                            inspector_enums.set_text(f"Enumerations: {'Yes' if row.get('has_enums') else 'No'}")
+                            inspector_enum_valid.set_text(f"Enum Validation: {enum_valid if enum_valid not in (None, '') else '—'}")
+                            inspector_ocr.set_text(
+                                "OCR Processing: "
+                                + (ocr_review or ("Value inferred/repaired" if ocr_inferred else "No OCR repair recorded"))
+                            )
+                            inspector_ocr_score.set_text(
+                                f"OCR Confidence: {row.get('ocr_score') if row.get('ocr_score') not in (None, '') else '—'}"
+                            )
+                            inspector_description.set_text(row.get("description") or "No description available.")
+
+                            notes = [part for part in (tag_warning, enum_warning, ocr_review) if part]
+                            inspector_warnings.set_text("\n".join(notes) or "None")
+
+                        def inspect_decoded_row(event):
+                            row = event.args
+
+                            # NiceGUI may wrap custom-event arguments in a one-item list.
+                            if isinstance(row, list) and row:
+                                row = row[0]
+
+                            if isinstance(row, dict):
+                                populate_tag_inspector(row)
+
+
+                        decoded_table.on("row-inspect", inspect_decoded_row)
 
                 with ui.expansion(
                     "Business Object",
@@ -2851,8 +3019,12 @@ def render_analysis_panel():
                 return
 
             comparison = compare_fix_messages(raw_messages[0], raw_messages[1])
-            technical_result_area.clear()
-            with technical_result_area:
+            workspace_compare_result_area.clear()
+
+            with workspace_compare_result_area:
+                ui.separator().classes("q-my-lg")
+                ui.label("Workspace Pair Compare").classes("text-xl font-semibold")
+
                 render_compare_result(comparison)
             toolbar_status_label.set_text("Workspace pair compared")
             ui.notify("Compared the 2 workspace messages.", color="positive")
@@ -2890,8 +3062,13 @@ def render_analysis_panel():
                 render_sequence_insights(insights)
                 render_related_saved_matches(sequence_result)
 
-            technical_result_area.clear()
-            with technical_result_area:
+            workspace_compare_result_area.clear()
+
+            with workspace_compare_result_area:
+                ui.separator().classes("q-my-lg")
+                ui.label("Workspace Multi-Message Compare").classes(
+                    "text-xl font-semibold"
+                )
                 render_sequence_evidence(sequence_result)
 
             toolbar_status_label.set_text("Workspace multi-compare complete")
