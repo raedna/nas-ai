@@ -27,39 +27,52 @@ def ensure_feedback_table():
             created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
         )
     """, ())
+    # Source-anchored votes: the vote judges the ANSWER, and the answer came
+    # from a specific entry. Legacy rows (NULL) keep collection-level effect.
+    execute("ALTER TABLE answer_feedback "
+            "ADD COLUMN IF NOT EXISTS source_entry TEXT", ())
     _READY = True
 
 
 def record_feedback(question: str, answer: str, verdict: str,
                     collection: str = None, method: str = None,
-                    session_id=None) -> None:
+                    session_id=None, source_entry: str = None) -> None:
     ensure_feedback_table()
     execute("""
         INSERT INTO answer_feedback
-            (session_id, question, answer, collection, method, verdict)
-        VALUES (%s, %s, %s, %s, %s, %s)
+            (session_id, question, answer, collection, method, verdict,
+             source_entry)
+        VALUES (%s, %s, %s, %s, %s, %s, %s)
     """, (session_id, str(question)[:1000], str(answer)[:3000],
-          collection, method, verdict))
-    print(f"[FEEDBACK] {verdict}: {str(question)[:60]}")
+          collection, method, verdict,
+          (str(source_entry)[:500] if source_entry else None)))
+    print(f"[FEEDBACK] {verdict}: {str(question)[:60]} "
+          f"(source: {source_entry})")
 
 
 def feedback_prior(question: str):
-    """Net verdict per collection for THIS question (normalized exact match).
-    M4 v1 consumption: +1 per up, -1 per down. Exact matching transfers no
-    feedback to questions it was not given on; similarity matching waits for
-    a corpus to calibrate against."""
+    """Net verdicts for THIS question (normalized exact match), keyed by
+    collection -> {source_entry_or_None: net}. A vote judges the ANSWER it
+    was given on: source-anchored votes count only while the collection is
+    again answering from that same entry (a thumbs-down on the wrong doc
+    must not keep penalizing the collection after the pipeline learns to
+    answer from the right one). Legacy rows (source NULL) keep the old
+    collection-level effect. Similarity matching waits for a corpus."""
     ensure_feedback_table()
     import re
     qn = re.sub(r"[^a-z0-9]+", " ", str(question).lower()).strip()
     rows = fetchall("""
-        SELECT collection,
+        SELECT collection, source_entry,
                SUM(CASE verdict WHEN 'up' THEN 1 ELSE -1 END) AS net
         FROM answer_feedback
         WHERE regexp_replace(lower(question), '[^a-z0-9]+', ' ', 'g') = %s
         AND collection IS NOT NULL
-        GROUP BY collection
+        GROUP BY collection, source_entry
     """, (qn,))
-    return {r["collection"]: int(r["net"]) for r in rows}
+    out = {}
+    for r in rows:
+        out.setdefault(r["collection"], {})[r["source_entry"]] = int(r["net"])
+    return out
 
 
 def list_feedback(limit: int = 100):

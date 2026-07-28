@@ -40,6 +40,10 @@ def render_ingestion_panel():
     with ui.row().classes("w-full items-center gap-2"):
         coll = ui.select(names, label="Collection", with_input=True).props("outlined dense").classes("w-64")
         force = ui.checkbox("Force re-ingest")
+        about_scan = ui.checkbox("About scan after ingest", value=True).tooltip(
+            "Background LLM scan storing what each entry is about "
+            "(about/keywords) — read by the retrieval subject guard. "
+            "Collections with about_scan=off in collections.json always skip.")
 
         def _refresh_tab():
             coll.set_options([r["name"] for r in collection_stats()])
@@ -53,6 +57,10 @@ def render_ingestion_panel():
         ui.button("Path Check", on_click=lambda: do_path_check()).props("outline")
         ui.button("Scan Directory", on_click=lambda: do_scan()).props("outline")
         ui.button("Run Ingestion", on_click=lambda: do_run()).props("unelevated")
+        ui.button("Run About Scan", on_click=lambda: do_about_scan()).props(
+            "outline").tooltip("On-demand about/keywords scan for the selected "
+                               "collection (background; resumable — already-"
+                               "annotated entries skip)")
     scan_box = ui.column().classes("w-full")
     result_box = ui.column().classes("w-full mt-2")
 
@@ -118,7 +126,8 @@ def render_ingestion_panel():
             ui.spinner(size="lg")
             ui.label(f"Ingesting {coll.value}…").classes("text-sm text-gray-500")
         try:
-            res = await run.io_bound(partial(run_ingest, coll.value, force.value))
+            res = await run.io_bound(partial(run_ingest, coll.value, force.value,
+                                             about_scan.value))
         except Exception as exc:
             result_box.clear()
             with result_box:
@@ -177,6 +186,16 @@ def render_ingestion_panel():
             if file_rows:
                 ui.label("Per-file Results").classes("text-md font-medium mt-3")
                 ui.table(columns=_FILE_COLUMNS, rows=file_rows, row_key="path").classes("w-full").props("dense")
+        refresh_status()
+
+    def do_about_scan():
+        if not coll.value:
+            ui.notify("Pick a collection", type="warning")
+            return
+        from core.ui_data import run_about_scan
+        run_about_scan(coll.value)
+        ui.notify(f"About scan launched for {coll.value} — track it in "
+                  "Background Tasks", type="positive")
         refresh_status()
 
     def do_stop():

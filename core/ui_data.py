@@ -92,9 +92,10 @@ def delete_collection(name, drop_config=True):
             save_collections_config(cfg)
 
 
-def run_ingest(name, force=False):
+def run_ingest(name, force=False, about_scan=True):
     """Ingest a collection by name, then launch the background cross-link/concept
-    rebuild. Returns the ingestion result dict (+ optional _bg_error)."""
+    rebuild (and, if enabled, the about/keywords scan). Returns the ingestion
+    result dict (+ optional _bg_error)."""
     from core.ingest_collection import ingest_collection
     cfg = get_collection_config(name)
     result = ingest_collection(collection_name=name, collection_cfg=cfg, force_reingest=force)
@@ -104,7 +105,20 @@ def run_ingest(name, force=False):
     except Exception as e:
         result = dict(result or {})
         result["_bg_error"] = str(e)
+    if about_scan:
+        try:
+            from core.background_runner import launch_about_scan
+            launch_about_scan(name)
+        except Exception as e:
+            result = dict(result or {})
+            result["_bg_error"] = (result.get("_bg_error") or "") + f" about_scan: {e}"
     return result
+
+
+def run_about_scan(name):
+    """Launch the on-demand about/keywords scan for a collection."""
+    from core.background_runner import launch_about_scan
+    launch_about_scan(name)
 
 
 def ingest_single_file(collection_name, file_path):

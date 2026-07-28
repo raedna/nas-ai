@@ -646,6 +646,20 @@ def run_parallel_queries(collections: list, question: str, single_item: bool = F
     if DEBUG and _fb_net:
         print(f"DEBUG feedback prior: {_fb_net}")
 
+    def _fb_for(col):
+        """Vote effect for this candidate NOW: legacy (collection-level)
+        votes always count; source-anchored votes count only when the
+        candidate's current answer comes from that same entry."""
+        _m = _fb_net.get(col)
+        if not _m:
+            return 0
+        _pl = (results.get(col, {}).get("answer_payload") or {})
+        _src = str(_pl.get("primary_name") or _pl.get("identifier") or "")
+        _n = _m.get(None, 0)
+        if _src and _src in _m:
+            _n += _m[_src]
+        return _n
+
     def _weak_answer(r):
         """1 if the answer wears a weakness marker (low-coverage banner /
         closest-match stub) — such answers lose TIES to confident ones.
@@ -685,7 +699,7 @@ def run_parallel_queries(collections: list, question: str, single_item: bool = F
             _tvar = _qtoks | {t[:-1] for t in _qtoks if t.endswith("s") and len(t) > 3}
             _thits = sum(1 for t in _tvar if t in _tc)
             return (mrank, 3 - min(_thits, 3), 2, _weak_answer(r),
-                    -_fb_net.get(col, 0), idx)
+                    -_fb_for(col), idx)
         # Groundedness is graded: an EQUALS filter on a real field whose value
         # matches a question token (identifier_namespace = tag) outranks a
         # 'contains' on free text (nlp_text contains FIX tag) — equality is a
@@ -706,7 +720,7 @@ def run_parallel_queries(collections: list, question: str, single_item: bool = F
                      for v in _ct_vals for t in _qtoks):
                 grounded = 1
         return (mrank, 0 if name_hit else 1, grounded, _weak_answer(r),
-                -_fb_net.get(col, 0), idx)
+                -_fb_for(col), idx)
 
     _candidates = [(col, i) for i, col in enumerate(collections)
                    if not _is_empty_answer(results.get(col, {}).get("result", ""))]
@@ -2156,5 +2170,11 @@ def chat_turn(question: str, history: list, available_collections: list,
         "related_sections": related_sections,
         "answer_kind": answer_kind,
         "raw_answer": primary_answer,
+        # Which entry answered — recorded with thumbs votes so feedback
+        # judges the ANSWER, not the collection (source-anchored prior).
+        "source_entry": str(((query_run.get("answer_payload") or {})
+                             .get("primary_name")
+                             or (query_run.get("answer_payload") or {})
+                             .get("identifier") or "")) or None,
         "answer_payload": query_run.get("answer_payload") if query_run.get("answer_payload") and (query_run.get("answer_payload") or {}).get("embedded_image_paths") else (merged_image_payload or None)
     }

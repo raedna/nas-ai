@@ -167,13 +167,19 @@ def llm_rerank(points: List, question: str) -> List:
                 if i not in seen:
                     reranked.append(p)
 
-            # RETR-05 subject guard (deterministic): distinctive question
-            # tokens = non-noise words that appear in FEW candidates
-            # (pool-IDF) — plus filename/code anchors, always. If the LLM's
-            # top pick contains NONE of them while another candidate does,
-            # the subject-bearing candidate takes the lead. 'FRA' appears in
-            # one candidate of 25; a ranking that puts Bad-Dates runbooks
-            # above it mistook topic-word density for relevance.
+            # RETR-05 subject guard (deterministic): subjects are
+            # USER-SIGNALED entities only — filename/code anchors and tokens
+            # the user CAPITALIZED ('FRA', 'SP2') — gated by pool-rarity.
+            # Verdict history: pool-IDF subjects ('acting') failed PP-03;
+            # about-vector promotion (semantic nearness over ingestion-time
+            # 'about' lines) fixed CTM/FRA exhibits but LOST the eval —
+            # NA-03/PP-07/PR-07 promoted near-but-wrong docs, and pure
+            # about-space rankings put the right docs 6th or lower
+            # (diag_about_sim). Embedding similarity measures nearness;
+            # near-but-wrong is more dangerous than far-and-wrong. The
+            # reranker LLM reads content and is the better relevance judge;
+            # deterministic overrides need lexical certainty, not geometry.
+            # (Annotations + about_vectors remain — audit/routing signal.)
             import re as _re_sg
             try:
                 from core.query_helpers import load_doc_query_hints as _ldqh_sg
@@ -183,10 +189,6 @@ def llm_rerank(points: List, question: str) -> List:
                     _noise_sg.update(_ldqh_sg().get(_k_sg, []))
             except Exception:
                 _noise_sg = set()
-            # Subjects are USER-SIGNALED entities only: filename/code
-            # anchors and tokens the user CAPITALIZED ('FRA', 'SP2').
-            # Pool-rarity alone crowned 'acting' a subject and demoted the
-            # right article (PP-03) — rare is not the same as subject.
             _q_toks_sg = [w.lower() for w in _re_sg.findall(
                               r"\b[A-Z][A-Z0-9]{1,}\b", question)
                           if w.lower() not in _noise_sg]

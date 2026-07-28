@@ -47,5 +47,11 @@
     "credentials_file": "/Users/raednasr/RaedsMacM1/nas-ai/halo_creds/halo_creds.json",
     "tickets_dir": "/Users/raednasr/RaedsMacM1/nas-ai/halo_tickets"
   },
-  "value_aliases": {"halo_tickets": {"resolved": "Closed", "open": "New"}}
+  "value_aliases": {
+    "halo_tickets": {
+      "resolved": "Closed",
+      "open": "New"
+    }
+  },
+  "about_guard_margin": 0.03
 }

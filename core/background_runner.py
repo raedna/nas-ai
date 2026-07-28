@@ -110,6 +110,49 @@ def launch_cross_link_discovery(collection_name):
     print(f"[BACKGROUND] Launched cross-link discovery for {collection_name}")
 
 
+def _run_about_scan_task(collection_name, task_id):
+    try:
+        from core.keyword_extractor import scan_collection
+        res = scan_collection(collection_name, task_id=task_id,
+                              is_cancelled=_is_cancelled)
+        execute(
+            "UPDATE background_tasks SET status='done', finished_at=NOW() WHERE id=%s AND status='running'",
+            (task_id,)
+        )
+        print(f"[BACKGROUND] About scan complete for {collection_name}: {res}")
+    except Exception as e:
+        execute(
+            "UPDATE background_tasks SET status='failed', finished_at=NOW() WHERE id=%s AND status='running'",
+            (task_id,)
+        )
+        print(f"[BACKGROUND] About scan failed for {collection_name}: {e}")
+
+
+def launch_about_scan(collection_name):
+    """Launch background about/keywords scan (on-demand or post-ingest).
+    Same task table + kill switch as cross-link discovery."""
+    from core.keyword_extractor import about_scan_mode
+    if about_scan_mode(collection_name) == "off":
+        print(f"[BACKGROUND] About scan skipped for {collection_name} (about_scan=off)")
+        return
+    execute(
+        "INSERT INTO background_tasks (task_name, collection, status) VALUES (%s, %s, 'running')",
+        ('about_scan', collection_name)
+    )
+    rows = fetchall(
+        "SELECT id FROM background_tasks WHERE collection=%s AND status='running' AND task_name='about_scan' ORDER BY id DESC LIMIT 1",
+        (collection_name,)
+    )
+    task_id = rows[0]['id'] if rows else None
+    thread = threading.Thread(
+        target=_run_about_scan_task,
+        args=(collection_name, task_id),
+        daemon=True
+    )
+    thread.start()
+    print(f"[BACKGROUND] Launched about scan for {collection_name}")
+
+
 def is_cross_link_running():
     """Check if any cross-link discovery is currently running."""
     rows = fetchall(

@@ -1,0 +1,772 @@
+[
+ {
+  "id": "DL-01",
+  "question": "what is FIX tag 22",
+  "expected": "SecurityIDSource definition",
+  "ask": {
+   "collection": "xml_test",
+   "method": "structured_namespace_lookup",
+   "answer": "Tag 22 is SecurityIDSource.\n\nDescription: Identifies class or source of the SecurityID (48) value. Required if SecurityID is specified.",
+   "seconds": 3.8
+  },
+  "chat": {
+   "collections_queried": null,
+   "collection": "xml_test",
+   "method": "verified_cache",
+   "answer_kind": null,
+   "answer": "Here is what I found:\n\nTag 22: SecurityIDSource\n\nDescription: Identifies class or source of the SecurityID (48) value. Required if SecurityID is specified.\n\nThis field is used to specify the type or origin of the SecurityID when it is provided.",
+   "seconds": 0.0
+  }
+ },
+ {
+  "id": "DL-02",
+  "question": "what is gsact.txt",
+  "expected": "Goldman RECON mapping record",
+  "ask": {
+   "collection": "recon_assist_file",
+   "method": "identifier_lookup",
+   "answer": "Moore file name gsact.txt \u2014 Tidal Job Name: 019_W_RECON_GOLDMAN_PRIO_PULL.\n\nActive: YES\n\nPrime Broker: Goldman\n\nDate Column to Check: Column 1\n\nRecon Tool Data Source: Transaction\n\nRecon Tool File Format: GS Cash Activity\n\nIncluded in Email Alert: YES\n\nMove Script (K:/Recon/FTP): GSCopy_srpb.bat\n\nAlso known as: SRPB_4000_1200105898_DATA_Custody_Tra_286534_156520.xls\n\nType: Goldman",
+   "seconds": 0.4
+  },
+  "chat": {
+   "collections_queried": [
+    "recon_assist_file",
+    "obsidian",
+    "memory"
+   ],
+   "collection": "recon_assist_file",
+   "method": "retrieval",
+   "answer_kind": "structured",
+   "answer": "Here is what I found:\n\nMoore file name: gsact.txt \u2014 Tidal Job Name: 019_W_RECON_GOLDMAN_PRIO_PULL.\n\nActive: YES\n\nPrime Broker: Goldman\n\nDate Column to Check: Column 1\n\nRecon Tool Data Source: Transaction\n\nRecon Tool File Format: GS Cash Activity\n\nIncluded in Email Alert: YES\n\nMove Script (K:/Recon/FTP): GSCopy_srpb.bat\n\nAlso known as: SRPB_4000_1200105898_DATA_Custody_Tra_286534_156520.xls\n\nType: Goldman\n\nThis file, gsact.txt, is related to a priority pull job for Goldman and is part of the GS Cash Activity format used in their reconciliation process.\n\n---\n**From memory:**\n\nthe gsact.txt file comes in at 5 AM Eastern time\n\n(User note, 2026-07-13 22:42)\n\ndate column for gsact.txt to check has changed to column 5\n\n(User note, 2026-07-13 23:08)",
+   "seconds": 28.1
+  }
+ },
+ {
+  "id": "DL-03",
+  "question": "what is tag 35 in FIX",
+  "expected": "MsgType definition",
+  "ask": {
+   "collection": "xml_test",
+   "method": "structured_namespace_lookup",
+   "answer": "Tag 35 is MsgType.\n\nDescription: Defines message type ALWAYS THIRD FIELD IN MESSAGE. (Always unencrypted)\nNote: A \"U\" as the first character in the MsgType field (i.e. U, U2, etc) indicates that the message format is privately defined between the sender and receiver.",
+   "seconds": 2.3
+  },
+  "chat": {
+   "collections_queried": [
+    "obsidian",
+    "kb_docs",
+    "xml_test"
+   ],
+   "collection": "xml_test",
+   "method": "retrieval",
+   "answer_kind": "structured",
+   "answer": "Here is what I found:\n\nTag 35: MsgType\n\nDescription: Defines message type ALWAYS THIRD FIELD IN MESSAGE. (Always unencrypted)\nNote: A \"U\" as the first character in the MsgType field (i.e. U, U2, etc) indicates that the message format is privately defined between the sender and receiver.",
+   "seconds": 8.4
+  }
+ },
+ {
+  "id": "DL-04",
+  "question": "jpm_activity.xlsx details",
+  "expected": "JPM mapping record (verify filename)",
+  "ask": {
+   "collection": "recon_assist_file",
+   "method": "identifier_lookup",
+   "answer": "No direct match found for this question \u2014 closest result shown: Moore file name jpm_activity.xlsx \u2014 Tidal Job Name: 090_W_RECON_JPM_PB_PULL.\n\nActive: YES\n\nPrime Broker: JPM\n\nDate Column to Check: Trade Date\n\nRecon Tool Data Source: Transaction\n\nRecon Tool File Format: JPM Trade Activity\n\nIncluded in Email Alert: YES\n\nMove Script (K:/Recon/FTP): JPMCopy.bat\n\nAlso known as: mcm_trade_activity.$y4$m4$d4.xlsx\n\nType: JPM",
+   "seconds": 0.4
+  },
+  "chat": {
+   "collections_queried": [
+    "obsidian",
+    "recon_assist_file",
+    "kb_docs"
+   ],
+   "collection": "recon_assist_file",
+   "method": "retrieval",
+   "answer_kind": "structured",
+   "answer": "Here is what I found:\n\nNo direct match found for your query, but the closest result related to \"jpm_activity.xlsx\" is shown below:\n\n- **File Name**: jpm_activity.xlsx  \n- **Tidal Job Name**: 090_W_RECON_JPM_PB_PULL  \n- **Active**: YES  \n- **Prime Broker**: JPM  \n- **Date Column to Check**: Trade Date  \n- **Recon Tool Data Source**: Transaction  \n- **Recon Tool File Format**: JPM Trade Activity  \n- **Included in Email Alert**: YES  \n- **Move Script (K:/Recon/FTP)**: JPMCopy.bat  \n- **Also known as**: mcm_trade_activity.$y4$m4$d4.xlsx  \n- **Type**: JPM  \n\nThis information is based on the retrieved data provided. If you need more details, please let me know!",
+   "seconds": 17.9
+  }
+ },
+ {
+  "id": "DL-05",
+  "question": "what is the PB filename for gsact.txt",
+  "expected": "SRPB_4000_..._Custody_Tra alias",
+  "ask": {
+   "collection": "recon_assist_file",
+   "method": "identifier_lookup",
+   "answer": "Moore file name gsact.txt \u2014 Tidal Job Name: 019_W_RECON_GOLDMAN_PRIO_PULL.\n\nActive: YES\n\nPrime Broker: Goldman\n\nDate Column to Check: Column 1\n\nRecon Tool Data Source: Transaction\n\nRecon Tool File Format: GS Cash Activity\n\nIncluded in Email Alert: YES\n\nMove Script (K:/Recon/FTP): GSCopy_srpb.bat\n\nAlso known as: SRPB_4000_1200105898_DATA_Custody_Tra_286534_156520.xls\n\nType: Goldman",
+   "seconds": 0.4
+  },
+  "chat": {
+   "collections_queried": [
+    "recon_assist_file",
+    "memory",
+    "obsidian"
+   ],
+   "collection": "recon_assist_file",
+   "method": "retrieval",
+   "answer_kind": "structured",
+   "answer": "Moore file name gsact.txt \u2014 Tidal Job Name: 019_W_RECON_GOLDMAN_PRIO_PULL.\n\nActive: YES\n\nPrime Broker: Goldman\n\nDate Column to Check: Column 1\n\nRecon Tool Data Source: Transaction\n\nRecon Tool File Format: GS Cash Activity\n\nIncluded in Email Alert: YES\n\nMove Script (K:/Recon/FTP): GSCopy_srpb.bat\n\nAlso known as: SRPB_4000_1200105898_DATA_Custody_Tra_286534_156520.xls\n\nType: Goldman",
+   "seconds": 30.1
+  }
+ },
+ {
+  "id": "DL-06",
+  "question": "what is the Whirlpool galaxy",
+  "expected": "M51/NGC5194 catalog entry",
+  "ask": {
+   "collection": "astro_catalog",
+   "method": "semantic",
+   "answer": "Source: Entity record\n\nWhirlpool galaxy",
+   "seconds": 14.2
+  },
+  "chat": {
+   "collections_queried": [
+    "astro_catalog",
+    "obsidian"
+   ],
+   "collection": "astro_catalog",
+   "method": "retrieval",
+   "answer_kind": "doc",
+   "answer": "The Whirlpool galaxy is mentioned in the entity record. However, specific details about it are not provided within the retrieved data. The document does not contain further descriptions or characteristics of the Whirlpool galaxy.",
+   "seconds": 11.3
+  }
+ },
+ {
+  "id": "DL-07",
+  "question": "ARD_OPERATING_EXP_PER_ASM_ASK",
+  "expected": "BBG field A0356 definition",
+  "ask": {
+   "collection": "bbg_fields",
+   "method": "semantic",
+   "answer": "Id A0356 is ARD_OPERATING_EXP_PER_ASM_ASK.\n\nCategory: Fundamentals/Bloomberg Fundamentals/Standard Labels ARD/Industry Specific/Airlines\n\nDataType: Double\n\nDescription: ARD Operating Expense Per ASM (Ask)\n\nType: Fundamentals/Bloomberg Fundamentals/Standard Labels ARD/Industry Specific/Airlines",
+   "seconds": 3.8
+  },
+  "chat": {
+   "collections_queried": [
+    "bbg_fields",
+    "xml_test"
+   ],
+   "collection": "bbg_fields",
+   "method": "retrieval",
+   "answer_kind": "structured",
+   "answer": "Here is what I found:\n\nId A0356 is ARD_OPERATING_EXP_PER_ASM_ASK.\n\nCategory: Fundamentals/Bloomberg Fundamentals/Standard Labels ARD/Industry Specific/Airlines\n\nDataType: Double\n\nDescription: ARD Operating Expense Per ASM (Ask)\n\nType: Fundamentals/Bloomberg Fundamentals/Standard Labels ARD/Industry Specific/Airlines",
+   "seconds": 9.1
+  }
+ },
+ {
+  "id": "DL-08",
+  "question": "message broadcaster down",
+  "expected": "Broadcaster Down / Alert Checklist KB article",
+  "ask": {
+   "collection": "kb_docs",
+   "method": "semantic",
+   "answer": "Source: Kb Docs\n\nMessage Broadcaster Down\n\nStep 1: Initial Status Check\r\nVerify the status of the Message Broadcaster in Web Admin and open the Support mailbox simultaneously.\r\nIf the broadcaster is Active on us1-crd078081 (primary) or us1-crd088081 (backup), notify the MCM CRIMS Support \u2013 External chat that the alert has been received and the broadcaster is currently active. Also note that you will continue to monitor it's status. \r\nIf the status is Not Running, notify the MCM CRIMS Support chat immediately and proceed to investigate further.\r\nMessage Broadcaster not running screenshot here\r\n\r\nStep 2: Consistent Communication\r\nMaintain regular communication with the external Moore chat, providing updates every few minutes if the broadcaster remains down, if the root cause is still being investigated, or what actions are being taken\r\n\r\nScenarios for Investigation:\r\n\r\nScenario 1: CTM Blocking\r\nIf you find blocking in the Support mailbox, identify whether the SPIDs with a Blocker value of 0 are CTM related or not (captured below). If they are proceed with the following:\r\nAccess the prod database using the CRDADMIN login and terminate the blocking SPIDs.\r\nEscalate to the following team members if you do not have prod CRDADMIN credentials:\r\nUS: Andrew, Anuja\r\nDubai: Raed, Mike, Mark (Moore)\r\n\r\n\r\nScenario 2: Non-CTM Blocking\r\nIf the command is not a CTM command, escalate to Andrew and/or Moore contacts (Maher or Prasad) for confirmation on what the process is before killing it.\r\nCommands that should not be killed without explicit approval include (but are not limited to):\r\nTRIG_TS_ORDER_FIRM_POSITION\r\nTS_ORDER_AU\r\nFn_Append_Allocation_Fields\r\nBroadcast Queries\r\nAdd new examples here\r\n\r\n\r\nScenario 3: No Blocking but Long-Running Transactions\r\nNavigate to Web Admin > Monitor and the Support mailbox to identify any existing long-running transactions.\r\nIf the transaction is broadcast query related, it should be killed.\r\nBroadcast queries can be killed in the case of long-running transactions vs. a blocking because as a long running transaction, the process has not committed yet.\r\nIf unrelated, escalate to Andrew, Maher, or Prasad to get confirmation if the process can be terminated.\r\n\r\n\r\nScenario 4: No Blocking, No Long-Running Transactions\r\nReview the Message Logs and Server Logs for any errors.\r\nIf errors are found, resolve appropriately (examples include restarting services, reboot middle tier, or adjust broadcast queries with Maher).\r\nIf no errors are found, initiate a failover to the backup middle tier.\r\nInclude steps here\r\nNeed to include a screenshot of server logs with errors\n\nWhat is Message Broadcaster\r\nMoore has the Message broadcaster which passes information to their external Process Server. This external process server expects a specific schema. That schema not being present means it will ignore the extraneous messages. Meaning if the Broadcaster isn\u2019t configured properly the messages won\u2019t be consumed at all and will not throw an error.\r\n\r\nAlert: Msg Broadcaster Down or Inactive\r\nIf you receive the alert below indicating that the message broadcaster is down, and you find that the Message Broadcaster is inactive, please follow the steps outlined below to address the issue.\r\n\r\nWhy Are We Getting These Alerts\r\nMsg Broadcaster alert is configured based on the heartbeat being stale by a minute. Ongoing major system activity has been shown to impact the heartbeat just as much as the broadcaster itself choking on CTM or its own queries. General system slowness has been also reported.",
+   "seconds": 25.9
+  },
+  "chat": {
+   "collections_queried": [
+    "kb_docs",
+    "obsidian"
+   ],
+   "collection": "kb_docs",
+   "method": "retrieval",
+   "answer_kind": "doc",
+   "answer": "To address the Message Broadcaster down issue:\n\n1. Verify the status in Web Admin and open Support mailbox simultaneously. If Not Running, notify MCM CRIMS Support chat immediately (quoted: \"If the status is Not Running, notify the MCM CRIMS Support chat immediately and proceed to investigate further.\").\n\n2. Follow the investigation scenarios provided:\n   - For CTM Blocking, terminate blocking SPIDs with appropriate credentials or escalate to US/Dubai contacts.\n   - For Non-CTM Blocking, escalate to Andrew/Moore contacts for confirmation before killing commands.\n   - For Long-Running Transactions, kill broadcast queries if related; escalate otherwise.\n   - If no issues are found in logs, initiate a failover to the backup middle tier.",
+   "seconds": 23.1
+  }
+ },
+ {
+  "id": "DL-09",
+  "question": "how to merge a ticket in HaloITSM",
+  "expected": "Merge ticket KB article",
+  "ask": {
+   "collection": "kb_docs",
+   "method": "semantic",
+   "answer": "Source: Kb Docs\n\nHow to Merge a Ticket in HaloITSM\n\nIdentify the Tickets you wish to Merge From and Into.For the Tickets you wish to Merge INTO another ticket, checkbox them.Hover your Mouse over the Edit Icon and navigate to the Merge Button, Click that.Once you've selected the merge button you will find this merge ticket(s) screen. Locate the ticket by its ID or Summary Title that you wish to merge the chosen ticket(s) into. (Be sure to adjust the filters as necessary). Click on the chosen ticket and then confirm selection.The system will close the tickets you merged and leave a note on the ticket they were merged into, including adding all of the history of the original ticket.\n\nWhen you want to Merge a ticket into another one.",
+   "seconds": 24.8
+  },
+  "chat": {
+   "collections_queried": [
+    "kb_docs",
+    "obsidian",
+    "halo_tickets"
+   ],
+   "collection": "kb_docs",
+   "method": "retrieval",
+   "answer_kind": "doc",
+   "answer": "To merge a ticket in HaloITSM:\n1. Identify the Tickets you wish to Merge From and Into.\n2. Checkbox the tickets you wish to Merge INTO another ticket.\n3. \"Hover your Mouse over the Edit Icon and navigate to the Merge Button, Click that.\"\n4. On the merge ticket(s) screen, \"Locate the ticket by its ID or Summary Title that you wish to merge the chosen ticket(s) into.\" Adjust filters as necessary, click on the chosen ticket, then confirm selection.\nThe system will close the tickets you merged and leave a note on the ticket they were merged into, including adding all of the history of the original ticket.",
+   "seconds": 21.2
+  }
+ },
+ {
+  "id": "DL-10",
+  "question": "NGC 2064",
+  "expected": "catalog entry (type, coordinates)",
+  "ask": {
+   "collection": "astro_catalog",
+   "method": "lexical_short",
+   "answer": "No direct match found for this question \u2014 closest result shown:\n\nSource: Entity record\n\nPLANETARY NEBULA",
+   "seconds": 16.1
+  },
+  "chat": {
+   "collections_queried": [
+    "astro_catalog",
+    "obsidian",
+    "astro_test"
+   ],
+   "collection": "astro_test",
+   "method": "retrieval",
+   "answer_kind": "structured",
+   "answer": "Here is what I found:\n\nastro_file light_ngc2064_180_0s_bin1_533mc_gain100_20250126_000755_0_0c_0003 is ngc2064.\n\nDescription: Camera: zwo asi533mc pro | Mount: zwo am5 | Exposure: 180.0 sec | Resolution: 3008x3008 | Observed: 2025-01-25T20:04:54.340285",
+   "seconds": 19.0
+  }
+ },
+ {
+  "id": "PP-01",
+  "question": "that goldman activity file, whats the tidal job for it",
+  "expected": "gsact.txt -> 019_W_RECON_GOLDMAN_PRIO_PULL",
+  "ask": {
+   "collection": "recon_assist_file",
+   "method": "semantic",
+   "answer": "No exact match found for 'that goldman activity file, whats the tidal job for it'. Closest results:\n- gsact.txt: 019_W_RECON_GOLDMAN_PRIO_PULL\n- gsact_fx.txt: 020_W_RECON_GOLDMAN_PB_PULL\n- gsact_sd.txt: 019_W_RECON_GOLDMAN_PRIO_PULL\n- gsd_act.txt: 020_W_RECON_GOLDMAN_PB_PULL\n- gsdcm_cash.txt: 020_W_RECON_GOLDMAN_PB_PULL",
+   "seconds": 4.0
+  },
+  "chat": {
+   "collections_queried": [
+    "kb_docs",
+    "obsidian",
+    "recon_assist_file"
+   ],
+   "collection": "obsidian",
+   "method": "retrieval",
+   "answer_kind": "doc",
+   "answer": "For the Goldman activity file, the relevant TIDAL Jobs are:\n\n\"Goldman (different files use different Tidal jobs, batch and Script files) | 020_W_RECON_GOLDMAN_PB_PULL 019_W_RECON_GOLDMAN_PRIO_PULL\"\n\nQuote: \"The TIDAL Jobs responsible for pulling files are:\" followed by the table listing the specific jobs for each prime broker including Goldman.\n\n---\n**From memory:**\n\nthe gsact.txt file comes in at 5 AM Eastern time\n\n(User note, 2026-07-13 22:42)\n\ndate column for gsact.txt to check has changed to column 5\n\n(User note, 2026-07-13 23:08)",
+   "seconds": 40.1
+  }
+ },
+ {
+  "id": "PP-02",
+  "question": "whats teh fix tag for order quantity",
+  "expected": "OrderQty tag 38",
+  "ask": {
+   "collection": "xml_test",
+   "method": "semantic",
+   "answer": "Tag 38 is OrderQty.\n\nDescription: Quantity ordered. This represents the number of shares for equities or par, face or nominal value for FI instruments.\n(Prior to FIX 4.2 this field was of type int)",
+   "seconds": 2.8
+  },
+  "chat": {
+   "collections_queried": [
+    "xml_test",
+    "kb_docs",
+    "obsidian"
+   ],
+   "collection": "xml_test",
+   "method": "retrieval",
+   "answer_kind": "structured",
+   "answer": "Here is what I found:\n\nThe fix tag for order quantity is Tag 38: OrderQty.\n\nDescription: Quantity ordered. This represents the number of shares for equities or par, face or nominal value for FI instruments.\n(Prior to FIX 4.2 this field was of type int)",
+   "seconds": 9.5
+  }
+ },
+ {
+  "id": "PP-03",
+  "question": "brodcaster acting up agian",
+  "expected": "broadcaster troubleshooting",
+  "ask": {
+   "collection": "kb_docs",
+   "method": "semantic",
+   "answer": "Source: Kb Docs\n\nMessage Broadcaster Down\n\nStep 1: Initial Status Check\r\nVerify the status of the Message Broadcaster in Web Admin and open the Support mailbox simultaneously.\r\nIf the broadcaster is Active on us1-crd078081 (primary) or us1-crd088081 (backup), notify the MCM CRIMS Support \u2013 External chat that the alert has been received and the broadcaster is currently active. Also note that you will continue to monitor it's status. \r\nIf the status is Not Running, notify the MCM CRIMS Support chat immediately and proceed to investigate further.\r\nMessage Broadcaster not running screenshot here\r\n\r\nStep 2: Consistent Communication\r\nMaintain regular communication with the external Moore chat, providing updates every few minutes if the broadcaster remains down, if the root cause is still being investigated, or what actions are being taken\r\n\r\nScenarios for Investigation:\r\n\r\nScenario 1: CTM Blocking\r\nIf you find blocking in the Support mailbox, identify whether the SPIDs with a Blocker value of 0 are CTM related or not (captured below). If they are proceed with the following:\r\nAccess the prod database using the CRDADMIN login and terminate the blocking SPIDs.\r\nEscalate to the following team members if you do not have prod CRDADMIN credentials:\r\nUS: Andrew, Anuja\r\nDubai: Raed, Mike, Mark (Moore)\r\n\r\n\r\nScenario 2: Non-CTM Blocking\r\nIf the command is not a CTM command, escalate to Andrew and/or Moore contacts (Maher or Prasad) for confirmation on what the process is before killing it.\r\nCommands that should not be killed without explicit approval include (but are not limited to):\r\nTRIG_TS_ORDER_FIRM_POSITION\r\nTS_ORDER_AU\r\nFn_Append_Allocation_Fields\r\nBroadcast Queries\r\nAdd new examples here\r\n\r\n\r\nScenario 3: No Blocking but Long-Running Transactions\r\nNavigate to Web Admin > Monitor and the Support mailbox to identify any existing long-running transactions.\r\nIf the transaction is broadcast query related, it should be killed.\r\nBroadcast queries can be killed in the case of long-running transactions vs. a blocking because as a long running transaction, the process has not committed yet.\r\nIf unrelated, escalate to Andrew, Maher, or Prasad to get confirmation if the process can be terminated.\r\n\r\n\r\nScenario 4: No Blocking, No Long-Running Transactions\r\nReview the Message Logs and Server Logs for any errors.\r\nIf errors are found, resolve appropriately (examples include restarting services, reboot middle tier, or adjust broadcast queries with Maher).\r\nIf no errors are found, initiate a failover to the backup middle tier.\r\nInclude steps here\r\nNeed to include a screenshot of server logs with errors\n\nWhat is Message Broadcaster\r\nMoore has the Message broadcaster which passes information to their external Process Server. This external process server expects a specific schema. That schema not being present means it will ignore the extraneous messages. Meaning if the Broadcaster isn\u2019t configured properly the messages won\u2019t be consumed at all and will not throw an error.\r\n\r\nAlert: Msg Broadcaster Down or Inactive\r\nIf you receive the alert below indicating that the message broadcaster is down, and you find that the Message Broadcaster is inactive, please follow the steps outlined below to address the issue.\r\n\r\nWhy Are We Getting These Alerts\r\nMsg Broadcaster alert is configured based on the heartbeat being stale by a minute. Ongoing major system activity has been shown to impact the heartbeat just as much as the broadcaster itself choking on CTM or its own queries. General system slowness has been also reported.",
+   "seconds": 24.3
+  },
+  "chat": {
+   "collections_queried": [
+    "kb_docs",
+    "astro_catalog",
+    "obsidian"
+   ],
+   "collection": "kb_docs",
+   "method": "retrieval",
+   "answer_kind": "doc",
+   "answer": "To address the issue of the Message Broadcaster acting up:\n\n1. Verify the status in Web Admin and open the Support mailbox simultaneously. If it's Not Running, notify MCM CRIMS Support chat immediately (as per \"Step 1: Initial Status Check\").\n\n2. Maintain regular communication with the external Moore chat, providing updates every few minutes if necessary (\"Step 2: Consistent Communication\").\n\n3. Follow the investigation scenarios provided in the document, starting with checking for blocking SPIDs or long-running transactions.\n\n4. If no errors are found after reviewing logs and there's no blocking or long-running transactions, initiate a failover to the backup middle tier (as per \"Scenario 4: No Blocking, No Long-Running Transactions\").",
+   "seconds": 27.0
+  }
+ },
+ {
+  "id": "PP-04",
+  "question": "CR wont let me cancel a fix trade",
+  "expected": "Cancel FIX Trades in CRD When Blocked",
+  "ask": {
+   "collection": "kb_docs",
+   "method": "semantic",
+   "answer": "Source: Kb Docs\n\nHow to Cancel FIX Trades in CRD When Cancel Action Is Blocked\n\nCAUTION: This email originated from outside of the organization. Do not click links or open attachments unless you recognize the sender, and know the content is safe. Hi The below order has flowed into CR from a bad vcon, please cancel, it won\u2019t let us: Thanks Chris *** Moore Europe Legal Disclaimer and Other Information*** Moore Europe comprises of Moore Europe Capital Management, LLP and MECM, Limited; these are investment management firms, who buy and sell equities and other financial instruments. Please do not provide us any inside information or material nonpublic information. We may buy or sell financial instruments based on the information you provide. We intend our securities and futures trading to remain unrestricted, and we do not agree to restrict our activities in any way. Please do not send us any information you are obliged to keep confidential, are not authorised to disclose to us, or are not authorised to have, whether any such restriction is imposed by law, agreement, government or company policy. This applies to information you obtain from any source. We are under no obligation to keep any information we receive from you confidential unless we sign a confidentiality agreement in advance. We ask that you provide to us only information that fully complies with these requirements and restrictions and that does not constitute inside information or material nonpublic information. . Moore Europe Capital Management, LLP - One Curzon Street, London, W1J 5HA, is registered as a limited liability partnership in England and Wales (No: OC322533) with its registered office at 27 Old Gloucester Street, London, United Kingdom, WC1N 3AX and is authorised and regulated by the Financial Conduct Authority. MECM, Limited - One Curzon Street, London, W1J 5HA, is registered as a private limited company in England and Wales (No: 03144922) with its registered office at 27 Old Gloucester Street, London, United Kingdom, WC1N 3AX. Disclaimer Link: To see Legal Disclaimer and other important information, click the link below or copy and paste the link into your browser's address line. https://d.moorecap.com/ukdisclaimer.html\n\nCRD will not allow a cancellation if there are active or pending FIX messages associated with the order. \r\nIn these scenarios, the cancellation must be processed using FIX Override.\r\n\r\n\r\nCRD also requires that the Exec Broker on the placement level matches the original broker used for the fill (e.g., BBGFIT for VCON orders).\r\nIf the Exec Broker is incorrect (for example, set to GSIL instead of BBGFIT), CRD will disable the FIX Override button, preventing the user from cancelling the order.\r\n\r\n\r\n\r\nPlease follow the steps below\r\n1. Check the Exec Broker StatusBefore proceeding:\r\nIf the Exec Broker on the placement level is correct \u2192 You may proceed directly with FIX Override (Step 3).\r\nIf the Exec Broker on the placement level is incorrect or empty \u2192 CRD disables FIX Override. The Exec Broker on the placement level must be corrected to the original broker the order was filled with before the cancellation can be performed (Step 2).\r\n2. Re-enable the FIX Override ButtonIf the Override buttons are greyed out, Update the Exec Broker at the placement level:\r\nOpen the order.\r\nLocate the OP__EXEC_BROKER\r\nSet the Exec Broker to the original broker associated with the fill.\r\nSave\r\n\r\nFor example, for VCON-originated orders, set Exec Broker to BBGFIT\r\nUpdating this value typically re-enables the FIX Override button.\r\n\r\n\r\n3. Apply FIX OverrideOnce the button is active:\r\nClick the Override button\r\nEnter your user initials and the click \"Proceed with FIX Override\"\r\nProceed with the Cancel action by changing the status on the order to CNCL via dropdown\r\nSave\n\nClients may request assistance cancelling a trade that has come into CRD from FIX when they are unable to cancel it themselves and get an error prompt (as shown in the example screenshots).\r\n\r\nExample request:\r\n\r\n\r\n\r\nError after cancel attempt by changing from status column (set to \"cncl\" status) from the blotter and not the Custom Button \"MCM Cancel Acctg\":",
+   "seconds": 24.6
+  },
+  "chat": {
+   "collections_queried": [
+    "kb_docs",
+    "obsidian",
+    "xml_test"
+   ],
+   "collection": "kb_docs",
+   "method": "retrieval",
+   "answer_kind": "doc",
+   "answer": "CRD will not allow you to cancel a FIX trade if there are active or pending FIX messages associated with it. To proceed, follow these steps:\n\n1. Ensure the Exec Broker on the placement level matches the original broker used for the fill (e.g., BBGFIT for VCON orders). If incorrect or empty, update it accordingly.\n   \n   \"CRD also requires that the Exec Broker on the placement level matches the original broker used for the fill (e.g., BBGFIT for VCON orders).\"\n   \n2. Once the correct Exec Broker is set, apply FIX Override:\n   \n   \"Click the Override button...Proceed with the Cancel action by changing the status on the order to CNCL via dropdown.\"",
+   "seconds": 28.2
+  }
+ },
+ {
+  "id": "PP-05",
+  "question": "the us1 proc server thing for recon",
+  "expected": "4.2 Checking Files on us1-proc02 / KB 2.2",
+  "ask": {
+   "collection": "obsidian",
+   "method": "semantic",
+   "answer": "Source: Obsidian Notes\n\n4.1 Checking the Tidal Recon Job\n\n# Summary Action\n\nCategory: Moore\n\nTidal Jobs errors are observed. Next step is to check the files on the us1-proc02 machine here: [[7. us1-proc02 Login]]\n\nRefer to the below for details on this step.\n\n# Detailed Action\n\nThe TIDAL Jobs responsible for pulling files are:\n\n| **Prime Broker** | **TIDAL Job Name** |\n| -------------------------------------------------------------------------- | ---------------------------------------------------------------- |\n| CITI | 010_W_RECON_CITI_PB_PULL |\n| Goldman (different files use different Tidal jobs, batch and Script files) | 020_W_RECON_GOLDMAN_PB_PULL 019_W_RECON_GOLDMAN_PRIO_PULL |\n| JPM | 090_W_RECON_JPM_PB_PULL |\n| Morgan | 070_W_RECON_MORGAN_PB_PULL |\n| Chase | 050_W_RECON_CHASE_PB_PULL |\n| BOA | 005_W_RECON_BOA_PB_PULL |\n\nThe tidal jobs that pull the files are the first thing to check. They are all under the Group \u201cRECON_DAILY_BATCH > PB_RECON_FILE_RETRIEVAL\u201d .\n\n[Embedded image OCR from: Recon Tidal jobs.png]\n\nIn Tidal, we first select the PB retrieval job that is suspect from the email alert.\n\n1. Note the job Status: Check if job has completed normally, abnormally, or not run at all.\n\n1. Note that an abnormal completion indicates an error that needs to be investigated\n\n2. Normal completion does not rule out file issues. If a job completes normally, investigation into missing / bad date files is still needed as per the alert email.\n\n2. Right-click on the job, select \u201cDetails\u201d and select the \u201cOutput\u201d tab. This tab will show what the job has done. Example outputs: (in the below Run 3 is the latest, Run 2 is the previous and Run 1 is the first.\n\n[Embedded image OCR from: Recon Tidal Job output downloaded files.png]\n\n[Embedded image OCR from: Recon Tidal Job output tab content.png]\n\n[Embedded image OCR from: Recon Tidal job Output tab content1.png]\n\n3. 1. Not all errors can be accurate so Tidal job output errors need to also be confirmed by checking actual events on the US2-PROC2 server. This is explained in the [[4.2 Checking Files on us1-proc02]] Section.\n\nRelated notes:\n- 7. us1-proc02 Login\n- Recon Tidal jobs.png\n- Recon Tidal Job output downloaded files.png\n- Recon Tidal Job output tab content.png\n- Recon Tidal job Output tab content1.png",
+   "seconds": 5.8
+  },
+  "chat": {
+   "collections_queried": [
+    "obsidian",
+    "kb_docs",
+    "recon_assist_file"
+   ],
+   "collection": "kb_docs",
+   "method": "retrieval",
+   "answer_kind": "doc",
+   "answer": "To check for the US1 proc server thing for recon:\n\n\"Log into us1-proc02, as NYCProc. Go to C:\\Primebroker\\ and open the folder that corresponds to the Prime Broker you are checking files for.\"\n\n\"If they are not there [in the Prime broker folder], open the Incoming folder and check if the files with the corresponding Prime Broker names are there.\"\n\n\"Dates of the prior business day (Today's Date minus 1) are expected to be found.\" \n\nFollow steps 3-8 if files aren't found or have incorrect dates, then proceed as outlined in the document.",
+   "seconds": 49.6
+  }
+ },
+ {
+  "id": "PP-06",
+  "question": "goldman prio pull job",
+  "expected": "019_W_RECON_GOLDMAN_PRIO_PULL record",
+  "ask": {
+   "collection": "recon_assist_file",
+   "method": "semantic",
+   "answer": "Moore file name gsact.txt \u2014 Tidal Job Name: 019_W_RECON_GOLDMAN_PRIO_PULL.\n\nActive: YES\n\nPrime Broker: Goldman\n\nDate Column to Check: Column 1\n\nRecon Tool Data Source: Transaction\n\nRecon Tool File Format: GS Cash Activity\n\nIncluded in Email Alert: YES\n\nMove Script (K:/Recon/FTP): GSCopy_srpb.bat\n\nAlso known as: SRPB_4000_1200105898_DATA_Custody_Tra_286534_156520.xls\n\nType: Goldman",
+   "seconds": 2.6
+  },
+  "chat": {
+   "collections_queried": [
+    "recon_assist_file",
+    "obsidian"
+   ],
+   "collection": "recon_assist_file",
+   "method": "retrieval",
+   "answer_kind": "structured",
+   "answer": "Here is what I found:\n\nMoore file name: gsact.txt \u2014 Tidal Job Name: 019_W_RECON_GOLDMAN_PRIO_PULL.\n\nActive: YES\n\nPrime Broker: Goldman\n\nDate Column to Check: Column 1\n\nRecon Tool Data Source: Transaction\n\nRecon Tool File Format: GS Cash Activity\n\nIncluded in Email Alert: YES\n\nMove Script (K:/Recon/FTP): GSCopy_srpb.bat\n\nAlso known as: SRPB_4000_1200105898_DATA_Custody_Tra_286534_156520.xls\n\nType: Goldman\n\nThis information is based on the retrieved data provided. If you need further assistance, feel free to ask!",
+   "seconds": 21.1
+  }
+ },
+ {
+  "id": "PP-07",
+  "question": "jennison morning stuff failing",
+  "expected": "Jennison Morning Batch escalation/runbook",
+  "ask": {
+   "collection": "kb_docs",
+   "method": "semantic",
+   "answer": "Source: Kb Docs\n\nJennison Daily Task - Market Data and YB Morning Checks\n\nJob Scheduling During FI Holidays Please note that jobs will not run during the following FI Holidays : Columbus Day Veterans Day \u2013 Monday, November 11th Troubleshooting: If you notice a job is not running, you can check whether its start condition has been met. By tracing the start condition, you can eventually identify the job with a scheduled calendar that may be affecting its execution. See ticket: 45757\n\nMKTData Job Monitoring Procedure\r\n1. Job Start Time\r\nCheck if the MKTData job started at 1:30 AM ET.\r\n2. Job Completion Time\r\nIf the job completes within 10 minutes of starting, this is considered a failure. Please escalate to Tristan via Teams and a call immediately.\r\nIf the job is running, it should complete within 45 minutes or more.\r\n3. Newprice File Check\r\nOnce the job starts running, verify that the Newprice file has dropped at 1:30 AM.\r\nFile Path: \\\\jallc.lan\\data\\marketdata\\prod\\yieldbook\\data \r\nIf the Newprice file is not present, please escalate to Tristan via Teams and a call.\r\n\r\n\r\n\r\n4. File Content Validation\r\nOpen the Newprice file and confirm that it contains today's date.\r\nFor Monday runs, the file should reflect the date from two days prior (Saturday's date), which is expected.\r\n\r\n\r\n5. Post-Completion ActionsOnce the MKTData job completes:\r\nThe Newpriceoutz file will be archived in the Archive folder.\r\nThe rdc_fi_yb_analytics_load_check job will begin running, which typically takes around 5 minutes to complete.\n\nSummary of the process: \r\n \r\nAutoSys Job\r\nmktdata_fi_analytics_yieldbook_execute\r\n \r\nJob start time is 1:30 am eastern. Generates a file called \u201cnewprice\u201d (no extension) in \\\\jallc.lan\\data\\marketdata\\prod\\yieldbook\\data and sends it to YieldBook for processingProcessing takes about 45 minutes and should complete around 2:15am easternYieldBook will return a file called newpriceoutz.1.yyyymmdd which will get staged for Eagle / RDC to process \r\nrdc_fi_yb_analytics_load_check\r\nJob is triggered once the market data job has completedThis will load the staged data to RDC \r\nSupport Needed\r\nWe would like for you to verify a couple of things to ensure that the process is running as expected. \r\nAt 1:30am check the file that is saved to the market data folder. Open the file in notepad, and check two things: i. The 10 digit date in the first row matches current day \u201c20250910\u201d\r\n ii. The settle date in the far right column also has the same date \u201c20250910\u201d\r\n\r\nIn the even that the settle date (2nd row) has a different date, please email Joe Brown and Jared Sussman to confirm if the dates are correct. See ticket for reference: 55374\r\nFor the First BD of the month we will see the file rever back to the first day of the month. See ticket for reference: 57259\r\n\r\n \r\nVerify that the yield book response file is generated sometime around 2:15am. The list of securities between the request file and response file should be very close. Make sure that the market data job completes successfullyMake sure that the rdc job completes successfully \r\n**** Note. Market data job takes roughly 45 minutes. If it takes 10 minutes that\u2019s a fail. \r\n \r\nIf the jobs file or the files do not include the correct dates, please call me at 214-208-0774.",
+   "seconds": 29.3
+  },
+  "chat": {
+   "collections_queried": [
+    "kb_docs",
+    "obsidian"
+   ],
+   "collection": "kb_docs",
+   "method": "retrieval",
+   "answer_kind": "doc",
+   "answer": "According to the MKTData Job Monitoring Procedure:\n\n\"If the job completes within 10 minutes of starting, this is considered a failure. Please escalate to Tristan via Teams and a call immediately.\"\n\nAdditionally:\n\"Check if the MKTData job started at 1:30 AM ET.\"\n\"Once the job starts running, verify that the Newprice file has dropped at 1:30 AM.\" \n\"If the Newprice file is not present, please escalate to Tristan via Teams and a call.\"",
+   "seconds": 22.8
+  }
+ },
+ {
+  "id": "PP-08",
+  "question": "that lock file error on recon jobs",
+  "expected": "2.5 Clearing Lock Files",
+  "ask": {
+   "collection": "kb_docs",
+   "method": "semantic",
+   "answer": "Source: Kb Docs\n\n2.5 TIDAL Recon - Bad Dates - Clearing Lock Files\n\nSteps to clear the lock file:\r\n\r\nOpen PasswordState, and navigate to the Recon folder found in the menu on the left. Log into us1-proc02, as NYCProc. Open K Recon folder, shortcut found in desktop, go to FTP \u2192 Clear Lockfiles, and run the ClearLockfile.bat of the Prime Broker we are facing the issue for:\r\nOpen image-20220627-101130.pngIn case there was no ClearLockfile.bat of the prime broker we are facing the issue for, follow the below steps:\r\nOpen the PB_PULL job to see what .bat file is it running. Ex: we had the job 010_W_RECON_CITI_PB_PULL and it was running CitiCopy.bat. \r\nOpen image-20220627-082354.pngGo to us1-proc02 server, open K Recon shortcut folder found in desktop, go to FTP, right click on the .bat file, and select edit. \r\nOpen image-20220627-094850.pngSelect the first plink statement and stop at dropoff (as highlighted below) then copy it:\r\nOpen image-20220627-095106.pngOpen command window, paste the copied plink statement, and hit enter:\r\nOpen image-20220627-095351.pngType in the below commands:\r\nbash\r\ncd workdir\r\nrm -rf *\r\nls (to check if the workdir directory is empty, it should be empty)\r\nRerun PB_PULL Tidal job.\n\nSometimes, when rerunning the failed PB_PULL job, the job may fail due to the below error, shown in tidal job output:\r\n\r\nOpen image-20220627-080841.pngA lock file is generated in the download directory of the Prime Broker upon running the PB_PULL job for the first time. When rerunning the PB_PULL job for the second time (or more), the lockfile will block the download process. In this case, we have to clear the lockfile and rerun the job again.",
+   "seconds": 27.9
+  },
+  "chat": {
+   "collections_queried": [
+    "obsidian",
+    "kb_docs",
+    "recon_assist_file"
+   ],
+   "collection": "obsidian",
+   "method": "retrieval",
+   "answer_kind": "doc",
+   "answer": "To resolve the lock file error on recon jobs:\n\n\"Log in to us1-proc02 as NYCProc, open K Recon folder, go to FTP \u2192 Clear Lockfiles, and run the ClearLockfile.bat of the Prime Broker we are facing the issue for.\"\n\nIf there is no ClearLockfile.bat available:\n- Open the PB_PULL job to identify the .bat file it's running.\n- Open the K Recon shortcut folder, find the corresponding .bat file, right-click and select edit.\n- Copy the first plink statement up to dropoff.\n- Paste this into a command window and hit enter.\n- Execute these commands:\n  - **bashcd workdir**\n  - **```rm -rf * ```**\n  - **```ls```** (to confirm the directory is empty)\n- Rerun the PB_PULL Tidal job.",
+   "seconds": 29.5
+  }
+ },
+ {
+  "id": "PR-01",
+  "question": "how can I check if gsact.txt is on the sftp",
+  "expected": "4.3.1 Checking sFTP / KB 2.3 (procedure, not mapping)",
+  "ask": {
+   "collection": "obsidian",
+   "method": "semantic",
+   "answer": "No direct match found for this question \u2014 closest result shown:\n\nSource: Obsidian Notes\n\n4.3.1 Checking sFTP for Activity\n\nLanding on this page means:\n\nCategory: Moore\n\n- PB folders do not contain correct files AND/OR\n\n- PB Incoming folders do not have correct files\n\n- Require checking files on the FTP server to identify what is available, at what time were files available, and have they been downloaded or not.\n\n# Checking Files in sFTP:\n\n1. Identify the batch file for the missing/bad files in question.\n\n1. In the Tidal Job details, under the Override tab, note the batch file referenced. in the example below we will check the CitiCopy.bat file.\n\n[Embedded image OCR from: Pasted image 20251229203435.png]\n\n2. A simpler way to determine the batch file per file is to check the [RECON File Mappings](https://moorecap.atlassian.net/wiki/spaces/MAS/pages/1047658497 \"https://moorecap.atlassian.net/wiki/spaces/MAS/pages/1047658497\") Excel Sheet. Columns D and E contain the batch file and script name used to pull this file, and Tidal job names by file.\n\n[Embedded image OCR from: Pasted image 20251229203456.png]\n\n3. As of today, the path to where the Batch files are is:\n\n[Embedded image OCR from: Pasted image 20251229203512.png]\n\n2. [[7. us1-proc02 Login|Login to us1-proc02]]\n\n3. Navigate to the path above\n\n4. Right-click the relevant batch file (PB.bat) and edit in notepad(++). Two things to note:\n\n[Embedded image OCR from: Pasted image 20251229204229.png]\n\n1. 1. The name of the script (.sh) file that contains the steps to pull files from sFTP site (./bin/GetDcCh.sh in the example above)\n\n2. Copy the part of the line from the beginning until just after the word dropoff. All quotes before the word dropoff need to included, but not any quotes after the word dropoff.\n\n1. Some batch files have a path before the plink, and that should be copied as well.\n\n[Embedded image OCR from: Pasted image 20251229204300.png]\n\n5. paste the copied plink from step 4b. into a CMD window prompt:\n\n[Embedded image OCR from: example .sh file and copy.png]\n\n[Embedded image OCR from: Pasted image 20251229204335.png]\n\n6. Find the FTP command path and the login credentials. The net quick steps are:\n\n1. Type \"bash\u201d then hit enter, then (sometimes the cmd opens in bash mode)\n\n2. Type \u201ccd bin\u201d > that takes us into the bin directory where the .sh files are found\n\n3. Type both or the second item from the 2 points below:\n\n1. ls > lists the files in the current directory (bin in our case) to confirm the .sh file required os in the current directory (can be skipped for familiar users), or\n\n2. ```cat filename.sh``` (in our example, ```cat GetDcCh.sh```) > this will\n\n1. Relevant .sh file is listed in the [[3. RECON File Mappings|Recon File Mapping]] Sheet in Column I.\n\n2. list the content of the .sh file that contains the the FTP command location and\n\n3. the login credentials for the PB FTP site in question.\n\n4. It also shows the path inside the FTP where the files will be dropped by the PB and is usually mentioned just after the ```username@domain>:/ ``` part (eg. inbound, incoming, or direct on the FTP without any subfolder like the case is in our example from Citi.\n\n[Embedded image OCR from: Pasted image 20251229205723.png]\n\n[Embedded image OCR from: Recon sFTP login creds from sh file.png]\n\n7. From current cmd line, enter the path of the sftp command followed by the value observed in the file. The cursor should change from \u201cbash $:\u201d to sftp> along with a message confirming connection established\n\n[Embedded image OCR from: Pasted image 20251230004645.png]\n\n8. 1. Navigate to the folder where the PBs will drop the file. Not required for the example above from Citi, but for GS for example, the folder is outgoing: sftp> cd outgoing, followed by enter.\n\n9. Searching for the file with bad dates for PBs occurs here using the ls command. Type \u201cls -ltr filename\u201d followed by enter, or \u201cls -ltr \"first few characters from filename\u201d\" followed by enter, and this will show us matching files, size and time they were added on the sftp server.\n\n1. Time value can be used to determine if the file was on the sftp server before the pull job was executed in Tidal.\n\n1. for example of the file timestamp of the file in question is 6:35 and the Tidal job run timestamps is 6:40, this most likely suggests that the file should have been pulled when the Tidal job ran.\n\n2. If the Tidal job runtime timestamp is before the file timestamp on sftp, this likely means that the pull job at runtime did not pull the file in question.\n\n10. Action following investigation:\n\n1. If File was on sftp before the runtime of the Tidal PB Pull job, then we need to confirm why the file was not pulled after rechecking the files in the PB and incoming folders do not reflect the file in the sftp server.\n\n2. If the file was on sftp after the runtime of the Tidal PB Pull job, then we need to take the following actions:\n\n1. Rerun the Tidal PB Pull job that is responsible for pulling the files in question. If this fails, then\n\n2. Manually download the file from sftp and move it to the appropriate folders for the Recon.\n\nRelated notes:\n- Pasted image 20251229203435.png\n- Pasted image 20251229203456.png\n- Pasted image 20251229203512.png\n- 7. us1-proc02 Login\n- Pasted image 20251229204229.png",
+   "seconds": 5.5
+  },
+  "chat": {
+   "collections_queried": [
+    "kb_docs",
+    "obsidian",
+    "recon_assist_file"
+   ],
+   "collection": "recon_assist_file",
+   "method": "retrieval",
+   "answer_kind": "structured",
+   "answer": "Here is what I found:\n\nThe file you're looking for, \"gsact.txt,\" is part of the Tidal Job Name: 019_W_RECON_GOLDMAN_PRIO_PULL. It's active and related to a Prime Broker: Goldman. To check if it's on the SFTP, you should look in the directory specified by the Move Script (K:/Recon/FTP): GSCopy_srpb.bat.\n\nRemember, this information is based on the provided data, which doesn't explicitly state how to directly verify the file presence on an SFTP server. You might need to use your SFTP client to connect and check the K:/Recon/FTP directory for \"gsact.txt.\"\n\n---\n**From memory:**\n\ndate column for gsact.txt to check has changed to column 5\n\n(User note, 2026-07-13 23:08)",
+   "seconds": 45.0
+  }
+ },
+ {
+  "id": "PR-02",
+  "question": "recon file missing, what do I do",
+  "expected": "Bad Dates workflow steps 1-4",
+  "ask": {
+   "collection": "kb_docs",
+   "method": "semantic",
+   "answer": "Source: Kb Docs\n\n2.0 - TIDAL Recon - Bad Dates\n\nEveryday at 6:52 am EST, we receive an email from ReconMonitorScript@moorecap.com. This email will tell us if there are any missing files or files with bad dates. \r\n\r\nWhen the ticket is received, if no alerts are present, we close it.\r\n\r\nThe file name listed in the table below is expected to be present and does not require any action.\r\n\r\n\r\nAlert Types:\r\n\r\nMissing Files: This alert is most likely because the brokers didn\u2019t send their files. In this case, Patrick Pingaro will reach out to the brokers and ask them to drop their files. we can rerun the tidal job corresponding to that broker (pulling FTP).Open f8.PNGFiles With Bad Dates: This alert is most likely due to Tidal Jobs pulling a file from a previous day. This also means that the primebrokers didn\u2019t send their files for the day.\r\nBelow is an example of the ticket having several files with bad dates:\r\n\r\n\r\n\r\nOpen f7.PNG",
+   "seconds": 27.1
+  },
+  "chat": {
+   "collections_queried": [
+    "obsidian",
+    "kb_docs",
+    "recon_assist_file"
+   ],
+   "collection": "obsidian",
+   "method": "retrieval",
+   "answer_kind": "doc",
+   "answer": "If your recon file is missing, first check the relevant TIDAL job status under \"RECON_DAILY_BATCH > PB_RECON_FILE_RETRIEVAL\" group. Note the job Status: \"Check if job has completed normally, abnormally, or not run at all.\" (Source: Obsidian Notes)\n\nFor a normal completion, investigate further into missing/bad date files as per the alert email. For an abnormal completion, investigate the error indicated in the Tidal job output details on the \"Output\" tab. Additionally, confirm any errors by checking actual events on the US2-PROC2 server as detailed in [[4.2 Checking Files on us1-proc02]].",
+   "seconds": 25.0
+  }
+ },
+ {
+  "id": "PR-03",
+  "question": "how to rerun a tidal recon job",
+  "expected": "4.1 Checking the Tidal Recon Job",
+  "ask": {
+   "collection": "obsidian",
+   "method": "semantic",
+   "answer": "Source: Obsidian Notes\n\n4.1 Checking the Tidal Recon Job\n\n# Summary Action\n\nCategory: Moore\n\nTidal Jobs errors are observed. Next step is to check the files on the us1-proc02 machine here: [[7. us1-proc02 Login]]\n\nRefer to the below for details on this step.\n\n# Detailed Action\n\nThe TIDAL Jobs responsible for pulling files are:\n\n| **Prime Broker** | **TIDAL Job Name** |\n| -------------------------------------------------------------------------- | ---------------------------------------------------------------- |\n| CITI | 010_W_RECON_CITI_PB_PULL |\n| Goldman (different files use different Tidal jobs, batch and Script files) | 020_W_RECON_GOLDMAN_PB_PULL 019_W_RECON_GOLDMAN_PRIO_PULL |\n| JPM | 090_W_RECON_JPM_PB_PULL |\n| Morgan | 070_W_RECON_MORGAN_PB_PULL |\n| Chase | 050_W_RECON_CHASE_PB_PULL |\n| BOA | 005_W_RECON_BOA_PB_PULL |\n\nThe tidal jobs that pull the files are the first thing to check. They are all under the Group \u201cRECON_DAILY_BATCH > PB_RECON_FILE_RETRIEVAL\u201d .\n\n[Embedded image OCR from: Recon Tidal jobs.png]\n\nIn Tidal, we first select the PB retrieval job that is suspect from the email alert.\n\n1. Note the job Status: Check if job has completed normally, abnormally, or not run at all.\n\n1. Note that an abnormal completion indicates an error that needs to be investigated\n\n2. Normal completion does not rule out file issues. If a job completes normally, investigation into missing / bad date files is still needed as per the alert email.\n\n2. Right-click on the job, select \u201cDetails\u201d and select the \u201cOutput\u201d tab. This tab will show what the job has done. Example outputs: (in the below Run 3 is the latest, Run 2 is the previous and Run 1 is the first.\n\n[Embedded image OCR from: Recon Tidal Job output downloaded files.png]\n\n[Embedded image OCR from: Recon Tidal Job output tab content.png]\n\n[Embedded image OCR from: Recon Tidal job Output tab content1.png]\n\n3. 1. Not all errors can be accurate so Tidal job output errors need to also be confirmed by checking actual events on the US2-PROC2 server. This is explained in the [[4.2 Checking Files on us1-proc02]] Section.\n\nRelated notes:\n- 7. us1-proc02 Login\n- Recon Tidal jobs.png\n- Recon Tidal Job output downloaded files.png\n- Recon Tidal Job output tab content.png\n- Recon Tidal job Output tab content1.png",
+   "seconds": 4.8
+  },
+  "chat": {
+   "collections_queried": [
+    "obsidian",
+    "kb_docs",
+    "recon_assist_file"
+   ],
+   "collection": "obsidian",
+   "method": "retrieval",
+   "answer_kind": "doc",
+   "answer": "To rerun a tidal recon job, follow these steps:\n\n1. Identify the specific TIDAL Job Name from the table provided for your Prime Broker (e.g., \"010_W_RECON_CITI_PB_PULL\" for CITI).\n   \n2. In Tidal, select the PB retrieval job that is suspect and right-click on it to choose \u201cDetails\u201d then go to the \u201cOutput\u201d tab to verify its status.\n\n3. If necessary, rerun the job by selecting the job in Tidal and initiating a new run manually under the Group \"RECON_DAILY_BATCH > PB_RECON_FILE_RETRIEVAL\". \n\nNote: Refer to the \"[[4.2 Checking Files on us1-proc02]] Section\" for further investigation if errors persist or are not clear from the Tidal job output alone.",
+   "seconds": 51.1
+  }
+ },
+ {
+  "id": "PR-04",
+  "question": "how to manually load a file in the recon tool",
+  "expected": "5. Manual File Loading in RECON Tool",
+  "ask": {
+   "collection": "obsidian",
+   "method": "semantic",
+   "answer": "Source: Obsidian Notes\n\n5. Manual File Loading in RECON Tool\n\nCategory: Moore\n\nOnce the correct files are in the PBs folders, we may be requested by Patrick to manually load the files into the RECON Tool.\nTo open the RECON tool, simply click the icon on the windows bar\n\n[Embedded image OCR from: Recon Tool app icon.png]\n\nWhen we first open the RECON Tool, just click >>LOGIN. Credentials are automatically filled. This is the opening page of the RECON Tool:\n\n[Embedded image OCR from: Recon Tool UI screenshot.png]\n\nThe Two Sections below:\n\n- Sanity Check Before Loading Files, and\n\n- Sanity Check Completed - Loading of Files\n\nHave to be performed for every file that is required to be loaded.\n\n# Sanity Check Before Loading Files\n\nBefore any loading takes place, a due diligence that none of the missing / bad date files have already been loaded is required.\n\n1. Navigate to Tasks > Undo Read. Wait a few seconds and another window will open\n\n[Embedded image OCR from: Recon navigating Undo read.png]\n\n1. Check required to ensure the files to be loaded are not already loaded\n\n[Embedded image OCR from: Recon Undo Read search fields.png]\n\n2. We will fill in 3 fields in the opened Window (Undo Read) based on the mappings found columns F, G and H in the [[3. RECON File Mappings |Recon File Mappingd]] Sheet that are available per file:\n\n[Embedded image OCR from: Recon File format and batch job name.png]\n\n3. 1. Fill in the three fields in the following order:\n\n1. Batch Job > from Column H\n\n2. Data Source > from Column F\n\n3. File Format > from Column G\n\n4. Check the results:\n\n1. Find the file we are planning to load\n\n2. Confirm that column \u201cRead In\u201d does not include current data\n\n[Embedded image OCR from: Recon checking for loaded data.png]\n\n3. 1. We can see that latest read in file is 12/22/2025 in our example. so if the file needs to be loaded for 12/23/2025, then we are ok to move to load.\n\n1. 1. Close the Undo Read window by clicking the red X on the top right of the window or clicking the \u201cClose\u201d button on the lower right side of the window.\n\n2. Navigate to Tasks > Data Load\n\n[Embedded image OCR from: RECON navigating for data load.png]\n\n3. three sections of that Data Load window need to be modified:\n\n[Embedded image OCR from: Recon Data Load Screen.png]\n\n1. 1. File Load Type will remain as \u201cFile\u201d\n\n2. Data Source will be set to the value in column F for the required file (Transaction, Cash or Holding)\n\n3. File Format will be set as per the value in Column G, in our case \u201cGS Cash Activity\u201d\n\n4. Select the required file from the three dots option in the File Name(s) section.\n\n4. Click Load and monitor the output in the bottom section of the window \u201cData Load Progress Status\u201d. there will be skipped rows, and then loaded rows.\n\n5. If there are no errors and we can see loaded and skipped rows, then once all required files are loaded, update Patrick that File is loaded and if he can confirm and state if there are any additional requirements for us to check.\n\n6. If the file shows it is Read In on current date we want to load the file for, then confirm with Patrick that we see the same file loaded in RECON tool having the current Read In date.\n\n1. Stop here. Do not load. Wait for Confirmation from Patrick on required actions. Escalate as necessary to ensure proper resolution.\n\nRelated notes:\n- Recon Tool app icon.png\n- Recon Tool UI screenshot.png\n- Recon navigating Undo read.png\n- Recon Undo Read search fields.png\n- 3. RECON File Mappings",
+   "seconds": 4.7
+  },
+  "chat": {
+   "collections_queried": [
+    "obsidian",
+    "recon_assist_file",
+    "kb_docs"
+   ],
+   "collection": "obsidian",
+   "method": "retrieval",
+   "answer_kind": "doc",
+   "answer": "To manually load a file in the RECON Tool, follow these steps:\n\n1. \"Navigate to Tasks > Undo Read\" and wait for another window to open.\n2. Fill in three fields based on columns F, G, and H from the Recon File Mapping Sheet: Batch Job (Column H), Data Source (Column F), and File Format (Column G).\n3. Check that the file you plan to load is not already loaded by confirming \"column \u2018Read In\u2019 does not include current data.\"\n4. If it's safe to proceed, navigate to Tasks > Data Load.\n5. Set \"File Load Type\" as \"File,\" set \"Data Source\" based on Column F, and \"File Format\" from Column G.\n6. Select the required file using the three dots option in the File Name(s) section, then click Load.\n\nMonitor the progress at the bottom of the window and notify Patrick once all files are loaded or if there's a discrepancy with the Read In date.",
+   "seconds": 50.7
+  }
+ },
+ {
+  "id": "PR-05",
+  "question": "weekend restart procedure for moore prod",
+  "expected": "Automated 21R2 Weekend Restart (PROD)",
+  "ask": {
+   "collection": "kb_docs",
+   "method": "semantic",
+   "answer": "Source: Kb Docs\n\nAutomated 21R2 Weekend Restart\n\nErrors Encountered If you see that the Tidal Job did not run try to rerun the job and if that doesn't work try to use the scripts to manually restart the services. You can find the steps in this page: https://agent.omnivista.com/kb?id=80 If Tidal is down, notify helpdesk@moorecap.com , helpdesk-london@moorecap.co.uk . You can proceed with checks and restart servers manually instead.\n\nJob Did Not Run\r\nIf the received emails indicate that the job group was successful, please proceed to 'Server Checks'. However, if the job group completed abnormally, please check Tidal to see if the jobs ran and if they ran and completed normally proceed with checks. If it completed abnormally, try to rerun the job and see if it completed normally, if not, please call Zahraa Awad.\r\nTidal Job is CRD_WEEKLY_RESTART\r\n\r\n\r\n\r\nServer Checks\r\n1. Log in to your assigned Moore machine:\r\nGo to NetScaler AAA \r\n\r\n\r\n\r\nb. Log in using your Moore username (ex. omni_zawad) and password.\r\n\r\n2. Access each of UAT, QA, and PROD CRD Web Admin to check that the services are running:\r\nPROD:\r\nUsing Google Chrome, go to us1-crd02:8081/crts/ \r\nLog in with your individual user credentials\r\nYou should see 18 active CharlesRiver services:\r\nus1-crd028081\r\nus1-crd038081\r\nus1-crd038082\r\nus1-crd048081\r\nus1-crd048082\r\nus1-crd058081\r\nus1-crd058082\r\nus1-crd068081\r\nus1-crd068082\r\nus1-crd078081\r\nus1-crd088081\r\nus1-crd088082\r\nus1-crd108081\r\nus1-crd118081\r\nus1-crd118082\r\nus1-crd128081\r\nus1-crd128082\r\nus1-crdfix018081\r\n\r\n\r\n\r\nb. On us1-crd02:8081/crts/ Webadmin, we need to check the below:\r\nRTAPI status should be 1/1 running for all services except us1-crd108081, us1-crd118081, us1-crd118082, and us1-crdfix018081.\r\nIf RTAPI status on one of the services is 0/1 running, go to that service's RTAPI on Webadmin, Stop it then start it and click save.\r\nMessage Broadcaster should have status Active for us1-crd078081. (Note - if you see it Active in us1-crd088081 that means that was due to a recent failover, okay to proceed.) \r\nMessage Processors should have status 1 running for us1-crd078081. (Note - if you see it Active in us1-crd088081 that means that was due to a recent failover, okay to proceed.) \r\nTrade Gateway should be 3 configured for all middle tiers.\r\nCTM is Active.\r\nGo to Trade Gateway on us1-crd118082.\r\nGo to CTM.\r\nIt should have Connection Status and Status Request as Active and Auto-Start Status Requestor is set to Yes.\r\n\r\nIf they are not in active status, stop Status Requestor \u2192 Unlock Credentials \u2192 Start Status Requestor.If step iv didn\u2019t work, reach out to ops@moorecap.com, cc Maher (maher.almanakly@moorecap.com) and inform them.Workflow Rules should have status Active for us1-crd108081.Ensure the \"Table Event Publisher\" is active on US1-CRD118081. If it is not Active, refer to this PageRandomly check 4 to 5 of the MTs' \"cr_server.log\" files once the previous checks are completed, and make sure we do not see Errors in the log that are repeating regularly after the section \"Java started with\" from the log file. The errors could be multiple errors, so it is not currently possible to list all, but the log should look similar to the below, where no errors are observed and confirmation on the \"Artemis\" service is connected (check red rectangle).Search he log for \"DistributedLock\", and make sure the client and server both point to prod MTs and that there are no UAT servers mentioned:If we do see errors after the restart kick in, then likely a manual restart of all the MTs is required. Refer to this document.\r\nMOVE TO NEXT SECTION\r\n\r\n3. UAT:\r\nUsing Google Chrome, go to us2uat-cr03:8081/crts/ \r\nLog in with your individual user credentials\r\nYou should see 6 active CharlesRiver services:\r\nus2uat-cr038081\r\nus2uat-cr048081\r\nus2uat-cr048082\r\nus2uat-cr058081\r\nus2uat-cr058082\r\nus2uat-cr068081\r\n\r\n\r\n\r\n4. QA:\r\nUsing Google Chrome, go to us2qa-cr01:8081/crts/ \r\nLog in with your individual user credentials\r\nYou should see 2 active Charles River services:\r\nus2qa-cr018081\r\nus2qa-cr028081\r\n\r\n\r\n\r\nSending Out Email\r\n If you have access to Halo, there will be a ticket for the Weekend Restart, make sure to Triage, Take Ownership and do the needed steps for the ticket.\r\nIf you do not have access to Halo, send an email to Maher (maher.almanakly@moorecap.com), Andrew (andrew.adams@omnivista.com), charlesriversupport@moorecap.com and cc omv-moore-support@omnivistasolutions.com to inform that the restart was completed successfully.\r\nSubject: Weekly CRD Restart Checks - Sunday July 2nd, 2023\r\nBody:\r\nHello Maher and Andrew,\r\nPlease note that the weekly restart completed normally. All CRD services are running and triggers and audit parameters are enabled.\n\nEvery Sunday, we initiate a restart of the Moore CRD servers for three environments: QA, UAT, and PROD. This process occurs at 12:30 am EST, which corresponds to 8:30 AM Dubai time, facilitated by Tidal jobs. The jobs are expected to conclude by 12:50 am EST, and subsequently, we anticipate receiving an email confirming the successful completion of the jobs. (Please note the time changes during daylight savings)\r\nTo ensure that the jobs have been completed successfully and that all the necessary services are active and running, we need to conduct several checks before 3 am EST which is 11 am Dubai time.\r\nTo execute the weekend restart checks, follow the below steps:\r\nCheck that we receive the success/failure emails for the weekly restart job group. These emails should be sent to charlesriversupport@moorecap.com. We will be receiving three emails, one for each environment (QA/UAT, PROD). Example emails are seen in the screenshots below.\r\nQA/UAT: The email is sent from SchedulerQA@moorecap.com.\r\nPROD: The email is sent from Scheduler@moorecap.com.",
+   "seconds": 28.0
+  },
+  "chat": {
+   "collections_queried": [
+    "kb_docs",
+    "obsidian"
+   ],
+   "collection": "kb_docs",
+   "method": "retrieval",
+   "answer_kind": "doc",
+   "answer": "To perform the weekend restart procedure for Moore prod:\n\n1. Check that you receive the success/failure emails for the weekly restart job group, which should be sent to charlesriversupport@moorecap.com by 12:50 am EST (8:50 AM Dubai time). \"We will be receiving three emails, one for each environment (QA/UAT, PROD).\" \n2. If the email indicates success and the job group was successful, proceed to 'Server Checks' as detailed in the document.\n3. For PROD specifically, log into us1-crd02:8081/crts/ Webadmin using your credentials and verify that all CharlesRiver services are running with their respective statuses as outlined in the \"Server Checks\" section of the procedure.",
+   "seconds": 35.4
+  }
+ },
+ {
+  "id": "PR-06",
+  "question": "how do I copy FIX logs to my machine",
+  "expected": "How to copy FIX Logs to local machine",
+  "ask": {
+   "collection": "kb_docs",
+   "method": "semantic",
+   "answer": "Source: Kb Docs\n\nHow to copy FIX Logs to local machine\n\nFIX Log LocationsWhen logged into a Soros virtual workstation, open File Explorer to access the FIX message logs at the below locations:\r\nProd File Location: \\\\vsompcrv05\\logs\\cameron_buy.log\r\nArchived Prod Logs: \\\\nyc-sor-vlog-01\\Logs\\CharlesRiver\\ProdV17\\FIX\r\nUAT File Location: \\\\vrchdcrv01\\CharlesRiver\\17_mt1\\serverapps\\logs\r\nSoros moves FIX logs that are more than 3 days old into an Archive folder. If you don\u2019t see the logs for the date that you need in the Prod file location, they were likely moved to the Archive folder.\r\n\r\nAccessing FIX logviewer.batNavigate to the following location inside of the UAT Middle tier:\r\nC:\\CharlesRiver\\17_mt1\\serverapps\\fix\\bin\\logviewer.bat\r\n\r\nCopying the FIX LogsWhenever you are viewing FIX logs, it is important to copy them to a local location first before viewing. Otherwise, if you open them directly, the FIX Engine will no longer be able to write to them, which can cause catastrophic breaks.\r\n\r\nThere two ways we can copy the FIX logs to a safe, location:\r\nVia Command Prompt\r\nVia File Explorer\r\n\r\nCopying Via File ExplorerOpen File Explorer\r\nType in the FIX Log Location that you need.\r\nThen copy the cameron_buy.log file and paste it to your virtual workstation in a location of your preference. For example, you may paste it directly to your Desktop for quick access and then move it to a more organized subfolder later. \r\nCopying Via Command PromptThis method has a few extra steps due to the fact that we can\u2019t access our user working folders from the command prompt (this is because they are on a separate network drive). However, this method is safer than the above since you don\u2019t run the risk of mis-clicking when attempting to copy the file.\r\nFrom the Start Menu on your Soros virtual workstation, launch Command Prompt\r\nIdentify your preferred file location.\r\nIn the example below, the preferred file location is the 'Documents' folder, i.e., C:\\User\\ \\Documents\r\nExecute the following command: copy \\\\ /Y \r\nIn this example, the command is 'copy \\\\vsompcrv05\\logs\\cameron_buy.log /Y C:\\Users\\torrek\\Documents'\r\nThe target environment is Production, so we access 'vsompcrv05'. \r\nWe want the latest FIX logs, so we target 'cameron_buy.log'. Prior days' logs will be appended with the date (e.g. 'cameron_buy.log.06-25-2025'). \r\nKathleen Torres is the user in this example, so she is using her own Documents folder for the destination folder. \r\nThe '/Y' flag suppresses prompts that would confirm whether you want to overwrite existing files in the destination folder.\r\nYou can learn more about the 'copy' command by searching online for 'Windows Commands copy'.\r\n\r\nTo make the logs accessible for viewing in the UAT middle tier, you will need to then copy and paste this file into your User Working folder.\r\nOpen image-202501-220737.pn",
+   "seconds": 26.2
+  },
+  "chat": {
+   "collections_queried": [
+    "kb_docs",
+    "obsidian"
+   ],
+   "collection": "kb_docs",
+   "method": "retrieval",
+   "answer_kind": "doc",
+   "answer": "To copy FIX logs to your machine:\n\nVia File Explorer:\n\"Type in the FIX Log Location that you need. Then copy the cameron_buy.log file and paste it to your virtual workstation in a location of your preference.\"\n\nVia Command Prompt:\n\"From the Start Menu on your Soros virtual workstation, launch Command Prompt. Identify your preferred file location. Execute the following command: 'copy \\\\vsompcrv05\\logs\\cameron_buy.log /Y C:\\Users\\torrek\\Documents'.\" \n\nEnsure you replace 'C:\\Users\\torrek\\Documents' with your actual destination folder path.",
+   "seconds": 25.2
+  }
+ },
+ {
+  "id": "PR-07",
+  "question": "steps for one madison data load failure",
+  "expected": "One Madison Data Load Status FAILURE article",
+  "ask": {
+   "collection": "kb_docs",
+   "method": "semantic",
+   "answer": "Source: Kb Docs\n\nOne Madison Group - Data Load Status - No files Found in S3 Bucket\n\nSteps for files in AWS S3 Bucket:\r\nLogin to the AWS at here.This should open directly into the '/load' folder:There should appear 3 files in the Objects section as follows:Whether the files exist or not:If files do not exist, an email has to be sent to the following to ask for the files to be dropped:roua.achi@omnivista.com;abdelrahman.deiab@omnivista.com;skaplan@onemadisongroup.com;xzhang@onemadisongroup.com;pfazzino@onemadisongroup.com;JSCNAV@intertrustgroup.com;Kunal.Kukreja@cscglobal.comEmail sample:If files exist, then go to the 'SnowFlake' Section below\r\nSnowFlake Steps:\r\n\r\nOpen the Snowflake at this linkClick on 'Create' > 'SQL Worksheet'Define the db you will be using where it says \"No Databases selected\" as follows:Run the stored procedure either by file or by running the main SP:NOTE: Running an SP should be: CALL () e.g. CALL SP_DATA_LOAD()Once completed, an updated email showing success for the three files should be received. If not, we can manually check if the data is loaded successfully using 2 methods:Method 1: Use the following select statements: NOTE: as_of_date will be T-1. Example: 2025-04-17 will have files and as_of_date of 2025-04-16.Method 2: By checking the Staging tables for the three files:If the files appearing have a date of T-1, and the Last Modified Time is inline with when the files were called through the SP, then its confirmed that the data is loaded.Final Step is to send email confirming files were loaded:\n\nWe receive the 1MAD data load email around 7 AM EST. The file comes in with a success or failure, and contains a body:\r\n\r\nPlease note that there should be no files during the US holidays. If we receive an email regarding a failure, it is expected.\r\nPositions: No Files Found In The S3 BucketTrades: No Files Found In The S3 BucketVPOS: No Files Found In The S3 Bucket\r\n\r\nIndicating one or more of the three files were not found.\r\n\r\nScreenshot of email:",
+   "seconds": 30.0
+  },
+  "chat": {
+   "collections_queried": [
+    "kb_docs",
+    "obsidian",
+    "xml_test"
+   ],
+   "collection": "kb_docs",
+   "method": "retrieval",
+   "answer_kind": "doc",
+   "answer": "Steps for handling a One Madison data load failure due to no files found in the S3 bucket:\n\n1. \"Login to the AWS at here. This should open directly into the '/load' folder.\"\n2. Check if there are 3 expected files in the Objects section.\n3. If files do not exist, send an email to the following addresses: \n   \"roua.achi@omnivista.com;abdelrahman.deiab@omnivista.com;skaplan@onemadisongroup.com;xzhang@onemadisongroup.com;pfazzino@onemadisongroup.com;JSCNAV@intertrustgroup.com;Kunal.Kukreja@cscglobal.com\"\n4. Use the provided email sample for communication.",
+   "seconds": 28.1
+  }
+ },
+ {
+  "id": "PR-08",
+  "question": "how to check charles river logs on a user machine",
+  "expected": "CR Log Folder for Errors note",
+  "ask": {
+   "collection": "obsidian",
+   "method": "semantic",
+   "answer": "Source: Obsidian Notes\n\nCharles River Log Folder for Errors\n\nThere are more than one way to check for logs on a user's local machine:\n\nCategory: Moore\n\n1. Navigate on the local Machine to: C:\\ \"Program Files (x86) > CharlesRiver > 21R2 (or install version) > client > logs:\n\n[Embedded image OCR from: path_to_logs1.png]\n\n2. Navigate to C:\\ \"Program Files (x86) > CharlesRiver > 21R2 (or install version) > client\n\n3. Look for file cr.ini:\n\n[Embedded image OCR from: cr.ini_file.png]\n\nRelated notes:\n- path_to_logs1.png\n- cr.ini_file.png",
+   "seconds": 6.1
+  },
+  "chat": {
+   "collections_queried": [
+    "kb_docs",
+    "obsidian"
+   ],
+   "collection": "obsidian",
+   "method": "retrieval",
+   "answer_kind": "doc",
+   "answer": "To check Charles River logs on a user machine, navigate to the following directory:  \n\"C:\\Program Files (x86)\\CharlesRiver\\21R2 (or install version)\\client\\logs\".  \n\nQuote from document: \"Navigate on the local Machine to: C:\\ 'Program Files (x86) > CharlesRiver > 21R2 (or install version) > client > logs\"",
+   "seconds": 41.4
+  }
+ },
+ {
+  "id": "AG-01",
+  "question": "how many KB articles are there",
+  "expected": "178 active articles (NOT 348 chunks)",
+  "ask": {
+   "collection": "kb_docs",
+   "method": "metadata_sql",
+   "answer": "There are 178 matching identifier(s).",
+   "seconds": 14.4
+  },
+  "chat": {
+   "collections_queried": [
+    "kb_docs",
+    "xml_test",
+    "obsidian"
+   ],
+   "collection": "kb_docs",
+   "method": "retrieval",
+   "answer_kind": "doc",
+   "answer": "There are 178 matching identifier(s).",
+   "seconds": 28.7
+  }
+ },
+ {
+  "id": "AG-02",
+  "question": "how many articles mention FIX",
+  "expected": "SQL truth: distinct articles with fix in nlp_text",
+  "ask": {
+   "collection": "kb_docs",
+   "method": "metadata_sql",
+   "answer": "There are 48 matching identifier(s) for nlp_text contains FIX.",
+   "seconds": 8.2
+  },
+  "chat": {
+   "collections_queried": [
+    "kb_docs",
+    "obsidian",
+    "xml_test"
+   ],
+   "collection": "kb_docs",
+   "method": "retrieval",
+   "answer_kind": "doc",
+   "answer": "There are 48 matching identifier(s) for nlp_text contains FIX.",
+   "seconds": 15.4
+  }
+ },
+ {
+  "id": "AG-03",
+  "question": "how many FIX tags are there",
+  "expected": "947 (namespace=tag)",
+  "ask": {
+   "collection": "xml_test",
+   "method": "metadata_sql",
+   "answer": "There are 947 matching identifier(s) for identifier_namespace = Tag.",
+   "seconds": 7.8
+  },
+  "chat": {
+   "collections_queried": [
+    "kb_docs",
+    "obsidian",
+    "xml_test"
+   ],
+   "collection": "xml_test",
+   "method": "retrieval",
+   "answer_kind": "doc",
+   "answer": "There are 947 matching identifier(s) for identifier_namespace = Tag.",
+   "seconds": 16.2
+  }
+ },
+ {
+  "id": "AG-04",
+  "question": "how many Goldman files are in the recon mapping",
+  "expected": "16 (15 if NULL row uncounted \u2014 CODE-024)",
+  "ask": {
+   "collection": "recon_assist_file",
+   "method": "metadata_sql",
+   "answer": "There are 16 matching identifier(s) for Prime Broker = Goldman.",
+   "seconds": 14.8
+  },
+  "chat": {
+   "collections_queried": [
+    "recon_assist_file",
+    "kb_docs",
+    "obsidian"
+   ],
+   "collection": "recon_assist_file",
+   "method": "retrieval",
+   "answer_kind": "doc",
+   "answer": "There are 16 matching identifier(s) for Prime Broker = Goldman.",
+   "seconds": 17.9
+  }
+ },
+ {
+  "id": "AG-05",
+  "question": "how many images do I have for M42",
+  "expected": "verify astro_test",
+  "ask": {
+   "collection": "astro_test",
+   "method": "metadata_sql",
+   "answer": "There are 1 matching identifier(s) for primary_name = m42.",
+   "seconds": 18.0
+  },
+  "chat": {
+   "collections_queried": [
+    "obsidian",
+    "xml_test",
+    "astro_test"
+   ],
+   "collection": "astro_test",
+   "method": "retrieval",
+   "answer_kind": "doc",
+   "answer": "There are 1 matching identifier(s) for primary_name = m42.",
+   "seconds": 25.3
+  }
+ },
+ {
+  "id": "AG-06",
+  "question": "how many galaxies are in the catalog",
+  "expected": "count type=Gx in astro_catalog",
+  "ask": {
+   "collection": "astro_catalog",
+   "method": "metadata_sql",
+   "answer": "There are 13226 matching identifier(s).",
+   "seconds": 7.7
+  },
+  "chat": {
+   "collections_queried": [
+    "astro_catalog",
+    "obsidian",
+    "xml_test"
+   ],
+   "collection": "astro_catalog",
+   "method": "retrieval",
+   "answer_kind": "doc",
+   "answer": "There are 13226 matching identifier(s).",
+   "seconds": 21.8
+  }
+ },
+ {
+  "id": "AG-07",
+  "question": "list all prime brokers in the recon file",
+  "expected": "BOA, BONY, CHASE, CITCO, CITI, CS, DB, Goldman, JPM, MIZUHO, Morgan",
+  "ask": {
+   "collection": "recon_assist_file",
+   "method": "metadata_sql",
+   "answer": "11 value(s):\n\n- `BOA`\n- `BONY`\n- `CHASE`\n- `CITCO`\n- `CITI`\n- `Credit Suisse`\n- `Deutsche`\n- `Goldman`\n- `JPM`\n- `MIZUHO`\n- `Morgan`",
+   "seconds": 13.8
+  },
+  "chat": {
+   "collections_queried": [
+    "kb_docs",
+    "obsidian",
+    "recon_assist_file"
+   ],
+   "collection": "recon_assist_file",
+   "method": "retrieval",
+   "answer_kind": "doc",
+   "answer": "11 value(s):\n\n- `BOA`\n- `BONY`\n- `CHASE`\n- `CITCO`\n- `CITI`\n- `Credit Suisse`\n- `Deutsche`\n- `Goldman`\n- `JPM`\n- `MIZUHO`\n- `Morgan`",
+   "seconds": 21.1
+  }
+ },
+ {
+  "id": "AG-08",
+  "question": "which broker has the most recon files",
+  "expected": "group-by type, Goldman likely",
+  "ask": {
+   "collection": "recon_assist_file",
+   "method": "metadata_sql",
+   "answer": "- `Goldman`: 16\n- `CITI`: 15\n- `JPM`: 14\n- `Credit Suisse`: 9\n- `Morgan`: 6\n- `Deutsche`: 3\n- `BOA`: 3\n- `MIZUHO`: 3\n- `CHASE`: 3\n- `BONY`: 2\n- `CITCO`: 1",
+   "seconds": 6.4
+  },
+  "chat": {
+   "collections_queried": [
+    "kb_docs",
+    "obsidian",
+    "recon_assist_file"
+   ],
+   "collection": "recon_assist_file",
+   "method": "retrieval",
+   "answer_kind": "doc",
+   "answer": "- `Goldman`: 16\n- `CITI`: 15\n- `JPM`: 14\n- `Credit Suisse`: 9\n- `Morgan`: 6\n- `Deutsche`: 3\n- `BOA`: 3\n- `MIZUHO`: 3\n- `CHASE`: 3\n- `BONY`: 2\n- `CITCO`: 1",
+   "seconds": 14.1
+  }
+ }
+]

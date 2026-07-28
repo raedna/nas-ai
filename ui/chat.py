@@ -213,7 +213,8 @@ def render_chat_panel():
                         record_feedback(q, a, verdict,
                                         collection=r.get("collection"),
                                         method=r.get("method"),
-                                        session_id=state["session_id"])
+                                        session_id=state["session_id"],
+                                        source_entry=r.get("source_entry"))
                         _up_btn.props(
                             "flat dense size=sm icon=thumb_up"
                             + (" color=positive" if verdict == "up" else ""))

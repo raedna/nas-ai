@@ -14,7 +14,8 @@
     "filters": {
       "field_filters": []
     },
-    "template_config": {}
+    "template_config": {},
+    "about_scan": "off"
   },
   "kb_docs": {
     "path": "/Users/raednasr/RaedsMacM1/nas-ai/table_test_input/KB_Articles RN_20260225.csv",
@@ -39,7 +40,8 @@
         }
       ]
     },
-    "template_config": {}
+    "template_config": {},
+    "about_scan": "all"
   },
   "kb_docs_nofilter": {
     "path": "/Volumes/raedsync/Documents/OmniVista/Support Desk/KB Articles/KB_Articles RN_20260225.csv",
@@ -50,7 +52,8 @@
     "notes": "KB as of  20260225",
     "filters": {
       "field_filters": []
-    }
+    },
+    "about_scan": "all"
   },
   "obsidian": {
     "path": "/Volumes/raedsync/Notes/Obsidian",
@@ -119,7 +122,8 @@
     "asset_search_roots": [],
     "source_label": "M51",
     "routing_description": "Collection of astro photos for M51, containing Fit, FITS and XISF images from raw camera and pixinsight pre-processing and processing.  Metadata includes info on target, object, gain, coordinates",
-    "notes": "M51 as of 2026-04-23"
+    "notes": "M51 as of 2026-04-23",
+    "about_scan": "off"
   },
   "image_test": {
     "path": "/Users/raednasr/RaedsMacM1/nas-ai/images_tests",
@@ -134,7 +138,8 @@
     "notes": "",
     "filters": {
       "field_filters": []
-    }
+    },
+    "about_scan": "off"
   },
   "bbg_fields": {
     "path": "/Users/raednasr/RaedsMacM1/nas-ai/table_test_input/BBG_FIELDS_TEST.xlsx",
@@ -153,7 +158,8 @@
     },
     "template_config": {
       "sheet_name": "Sheet1"
-    }
+    },
+    "about_scan": "off"
   },
   "recon_assist_file": {
     "path": "/Volumes/raedsync/Documents/OmniVista/Support Desk/RECON/RECON_Moore-PB Mapping_100225.xlsx",
@@ -170,7 +176,8 @@
     "filters": {
       "field_filters": []
     },
-    "template_config": {}
+    "template_config": {},
+    "about_scan": "off"
   },
   "astro_test": {
     "path": "/Users/raednasr/RaedsMacM1/nas-ai/astro_test_files",
@@ -183,7 +190,8 @@
     "asset_search_roots": [],
     "source_label": "",
     "routing_description": "this collection contains astrophotography images of .fit and .xisf files.",
-    "notes": ""
+    "notes": "",
+    "about_scan": "off"
   },
   "pdf_test": {
     "path": "/Users/raednasr/RaedsMacM1/nas-ai/pdf_test_files",
@@ -215,7 +223,8 @@
     "filters": {
       "field_filters": []
     },
-    "template_config": {}
+    "template_config": {},
+    "about_scan": "off"
   },
   "halo_tickets": {
     "path": "/Users/raednasr/RaedsMacM1/nas-ai/halo_tickets",
