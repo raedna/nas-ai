@@ -83,11 +83,35 @@ def halo_serializer(parsed, file_path, template_config, file_tags, collection_na
 
     items = []
 
+    # ---- merge relationships (mined BEFORE the noise filter drops the
+    # system actions that carry them) --------------------------------------
+    import re as _re_m
+    merged_in = []
+    _pat = _re_m.compile(cfg.get("merge_id_pattern", r"ticket\s*id:?\s*(\d+)"),
+                         _re_m.IGNORECASE)
+    for act in parsed.get("actions", []):
+        if str(act.get("outcome") or "").strip().lower() in cfg.get(
+                "merge_outcomes", []):
+            for mid in _pat.findall(str(act.get("note") or "")):
+                if mid not in merged_in:
+                    merged_in.append(mid)
+    _mi_raw = t.get("merged_into_id")
+    merged_into = (str(_mi_raw) if _mi_raw and str(_mi_raw) not in ("0", tid)
+                   else None)
+    if merged_in or merged_into:
+        base["merged_tickets"] = merged_in
+        if merged_into:
+            base["merged_into"] = merged_into
+        print(f"[HALO SERIALIZER] ticket {tid} merges: in={merged_in} "
+              f"into={merged_into}")
+
     # ---- header chunk --------------------------------------------------
     header_text = (f"Ticket {tid}: {summary}\n\n"
                    f"Team: {base['team']} | Client: {base['client_name']} "
                    f"| Opened: {base['dateoccurred'][:10]} by {t.get('user_name')}\n"
                    + (f"Categories: {' / '.join(categories)}\n" if categories else "")
+                   + (f"Merged tickets: {', '.join(merged_in)}\n" if merged_in else "")
+                   + (f"Merged into ticket: {merged_into}\n" if merged_into else "")
                    + f"\n{details}")
     items.append({
         "text": header_text,
@@ -97,10 +121,20 @@ def halo_serializer(parsed, file_path, template_config, file_tags, collection_na
         "identifier_namespace": "ticket",
         "identifier_kind": "source",
         "primary_name": summary,
-        "description": details,
+        # Merge relationships ride on the DESCRIPTION so every answer that
+        # shows the ticket mentions them — users won't ask "what was
+        # merged"; the ticket should say it when selected.
+        "description": (details
+                        + (f"\n\nMerged tickets: {', '.join(merged_in)}"
+                           if merged_in else "")
+                        + (f"\nMerged into ticket: {merged_into}"
+                           if merged_into else "")),
         "opened_by": t.get("user_name"),
         "link_keys": [f"ticket:{tid}"],
-        "related_link_keys": [],
+        # merged tickets become link edges when/if those tickets are ingested
+        "related_link_keys": ([f"ticket:{m}" for m in merged_in]
+                              + ([f"ticket:{merged_into}"] if merged_into
+                                 else [])),
         **(file_tags or {}),
     })
 

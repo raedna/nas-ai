@@ -24,6 +24,7 @@ EDITABLE = {
     "memory.filler_words",
     "front_followup_markers",
     "concept_links",
+    "glossary",               # glossary.<term> = {means, same_as: [...]}
 }
 
 

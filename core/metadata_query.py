@@ -249,8 +249,23 @@ def _where(collection: str, filters: List[Dict], df_keys=frozenset()):
                 clauses.append(f"LOWER({expr}) = LOWER(%s)")
                 params.append(f["value"])
         else:
-            clauses.append(f"{expr} ILIKE %s")
-            params.append(f"%{f['value']}%")
+            # (Tried and reverted 2026-07-29: OR-ing the 'about' line into
+            # nlp_text contains-filters — abouts generically say issue/fix/
+            # order, listing noise jumped 7->13. Synonym gaps ('bad dates'
+            # vs 'incorrect dates') are declared-glossary territory, not a
+            # substring problem.)
+            _syns = [s for s in (f.get("_synonyms") or []) if str(s).strip()]
+            if _syns:
+                # Declared-equivalent phrases OR together: the site says
+                # 'bad dates' == 'incorrect dates'; matching either
+                # satisfies this filter.
+                _alts = [f["value"]] + _syns
+                clauses.append("(" + " OR ".join(
+                    [f"{expr} ILIKE %s"] * len(_alts)) + ")")
+                params.extend([f"%{a}%" for a in _alts])
+            else:
+                clauses.append(f"{expr} ILIKE %s")
+                params.append(f"%{f['value']}%")
     return " AND ".join(clauses), params
 
 def _best_value_field(question: str, collection: str) -> Optional[str]:
@@ -301,6 +316,56 @@ def _concept_label_filter(question: str, collection: str) -> Optional[Dict]:
         return None
     except Exception:
         return None
+
+def _about_closest(collection, filters, question, df_keys, count_with,
+                   limit=5):
+    """Anchored semantic fallback for zeroed descriptor claims: entries
+    matching the STILL-GROUNDED claim filters (+injected anchors), ranked
+    by about-vector similarity to the question. Returns an honest
+    closest-match answer string, or None when no claim grounds (a question
+    about nothing real must stay a zero — the Bloomberg lesson) or no
+    about vectors exist."""
+    try:
+        _alive = [f for f in filters
+                  if f.get("_injected") or count_with([f]) > 0]
+        if not any(not f.get("_injected") for f in _alive):
+            return None
+        w, p = _where(collection, _alive, df_keys)
+        rows = fetchall(
+            f"SELECT primary_name, MIN(identifier) AS ident FROM chunks "
+            f"WHERE {w} AND COALESCE(primary_name,'') != '' "
+            f"GROUP BY primary_name LIMIT 50", tuple(p))
+        if not rows:
+            return None
+        import json as _json
+        from core.embedder import embed_text
+        _qv = _json.dumps(embed_text(question))
+        _names = [r["primary_name"] for r in rows]
+        _ids = {r["primary_name"]: r["ident"] for r in rows}
+        av = fetchall(
+            "SELECT primary_name, about, 1 - (embedding <=> %s::vector) AS sim "
+            "FROM about_vectors WHERE collection_name = %s "
+            "AND primary_name = ANY(%s) ORDER BY sim DESC LIMIT %s",
+            (_qv, collection, _names, int(limit)))
+        if not av:
+            return None
+        _grounded_desc = ", ".join(
+            f"{f['field']} {'=' if f['op'] == 'equals' else 'contains'} "
+            f"{f['value']}" for f in _alive if not f.get("_injected"))
+        lines = [f"No exact match found for the full wording — closest "
+                 f"entries among those matching {_grounded_desc}, by what "
+                 f"they are about:"]
+        for r in av:
+            _about_s = " ".join(str(r["about"] or "")[:180].split())
+            lines.append(f"- `{_ids.get(r['primary_name'], '')}` — "
+                         f"{r['primary_name']}: {_about_s}")
+        print(f"[METADATA] about-closest fallback: {len(av)} entries "
+              f"(anchor: {_grounded_desc})")
+        return "\n\n".join(lines)
+    except Exception as e:
+        print(f"[METADATA] about-closest fallback failed: {e}")
+        return None
+
 
 def run_metadata_query(collection: str, question: str, intent_mode: str = None) -> Optional[Dict]:
     """Entry point. Returns {'result': str, 'spec': dict} or None (caller falls back)."""
@@ -431,10 +496,51 @@ def run_metadata_query(collection: str, question: str, intent_mode: str = None) 
             _v = str(f.get("value", ""))
             if (f.get("op") == "contains" and " " in _v.strip()
                     and not f.get("_injected")):
-                _words_cf = [w for w in _re0.findall(r"[a-z0-9]{3,}", _v.lower())]
-                if len(_words_cf) > 1:
-                    print(f"[METADATA] split phrase contains filter: "
-                          f"{_v!r} -> {_words_cf}")
+                # Declared glossary phrases stay WHOLE with their synonyms as
+                # OR-alternatives ('bad dates' also matches 'incorrect
+                # dates') — the site declared them equivalent; splitting
+                # would lose the phrase, skipping would lose the synonyms.
+                _v_low_cf = _v.lower()
+                _gloss_hit = None
+                try:
+                    from core.glossary import load_glossary, synonyms_for
+                    for _term_cf in sorted(load_glossary(), key=len,
+                                           reverse=True):
+                        if " " in _term_cf and _re0.search(
+                                r"\b" + _re0.escape(_term_cf) + r"\b",
+                                _v_low_cf):
+                            _gloss_hit = (_term_cf, synonyms_for(_term_cf))
+                            break
+                except Exception:
+                    _gloss_hit = None
+                if _gloss_hit:
+                    _term_cf, _syns_cf = _gloss_hit
+                    print(f"[METADATA] glossary phrase filter: {_term_cf!r} "
+                          f"(+ synonyms {_syns_cf})")
+                    _split_f.append({"field": f["field"], "op": "contains",
+                                     "value": _term_cf,
+                                     "_synonyms": _syns_cf,
+                                     "_split_group": _v})
+                    _v_rest_cf = _re0.sub(
+                        r"\b" + _re0.escape(_term_cf) + r"\b", " ", _v_low_cf)
+                else:
+                    _v_rest_cf = _v_low_cf
+                _words_cf = [w for w in _re0.findall(r"[a-z0-9]{3,}",
+                                                     _v_rest_cf)]
+                # De-pluralize: contains is substring, so 'date' already
+                # matches 'dates' — but 'issues' can never match 'issue'.
+                # Filtering on the singular form matches both.
+                _words_cf = [(w[:-1] if w.endswith("s") and len(w) > 3
+                              and not w.endswith("ss") else w)
+                             for w in _words_cf]
+                # After a glossary phrase was extracted, the ORIGINAL filter
+                # must never fall through (its unsplit phrase would AND-kill
+                # the group) — remainder words join the split regardless of
+                # count.
+                if _gloss_hit or len(_words_cf) > 1:
+                    if _words_cf:
+                        print(f"[METADATA] split phrase contains filter: "
+                              f"{_v!r} -> {_words_cf}")
                     for _w_cf in _words_cf:
                         _split_f.append({"field": f["field"], "op": "contains",
                                          "value": _w_cf,
@@ -603,6 +709,19 @@ def run_metadata_query(collection: str, question: str, intent_mode: str = None) 
                 # with "all tickets" (honest-looking breadth dump).
                 print("[METADATA] all content claims zero-result — honest "
                       "zero kept (injected anchors may not stand alone)")
+                # ANCHORED about-similarity fallback: descriptor words
+                # zeroed ('bad dates' — the data says 'dates are being
+                # modified'), but some claim words still ground ('fra').
+                # Rank ONLY the grounded entries by about-vector similarity
+                # to the full question and answer with an honest
+                # closest-match label (existing weakness marker, so
+                # arbitration/widening treat it correctly). Vocabulary
+                # chasing via synonyms was rejected as hardcoding; semantic
+                # aboutness is what the ingestion scan is FOR.
+                _sem = _about_closest(collection, spec["filters"], question,
+                                      df_keys, _count_with)
+                if _sem:
+                    return {"result": _sem, "spec": spec}
             elif _keep and _count_with(_keep) > 0:
                 print(f"[METADATA] dropped zero-result filters, kept: {_keep}")
                 spec["filters"] = _keep

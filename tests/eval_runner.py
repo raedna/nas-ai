@@ -82,7 +82,11 @@ QUESTIONS = [
     ("NA-01", "what is FIX tag 99999", "not found — tag doesn't exist", "xml_test"),
     ("NA-02", "what is the recon mapping for barclays_fx_swap.txt", "not found — must not invent a job", "recon_assist_file"),
     ("NA-03", "how do I restart the Bloomberg terminal server", "not found — no such procedure", "kb_docs"),
-    ("NA-04", "what are the FIX 5.0 SP2 changes", "not found — only 4.2/4.4 ingested", "xml_test"),
+    ("NA-04", "what are the FIX 5.0 SP2 changes",
+     "not found — only 4.2/4.4 ingested. A weak-labeled about-closest list "
+     "('No exact match found... closest entries') is ACCEPTED (user "
+     "decision 2026-07-30: prefer an honest weak answer that can be "
+     "demoted); inventing SP2 content is NOT.", "xml_test"),
     # --- Category 7: Multi-item ---
     ("MI-01", "what are tags 22, 35 and 54", "SecurityIDSource + MsgType + Side", "xml_test"),
     ("MI-02", "give me the tidal jobs for gsact.txt and gspos.txt", "both Goldman job names", "recon_assist_file"),

@@ -59,5 +59,27 @@
     "invisible_below": 0.01,
     "winner_min": 0.03,
     "_doc": "Evidence-check veto on the LLM reranker (2026-07-28 shadow calibration): fire only when the LLM's chosen doc scores below invisible_below on the BGE cross-encoder AND a doc in the LLM's own top-3 scores >= winner_min. Consensus of two independent judges; thresholds are sanity checks, not the whole case."
+  },
+  "glossary": {
+    "ctm": {
+      "means": "Central Trade Manager (Omgeo/DTCC) — the post-trade matching system. A SEPARATE system from Charles River/CRD.",
+      "same_as": [
+        "central trade manager"
+      ]
+    },
+    "moore": {
+      "means": "Moore Capital Management, the client. Also written MCM.",
+      "same_as": [
+        "mcm",
+        "moore capital management"
+      ]
+    },
+    "bad dates": {
+      "means": "incorrect dates in recon files (dates in the reference date column not matching the expected business date)",
+      "same_as": [
+        "incorrect dates",
+        "wrong dates"
+      ]
+    }
   }
 }

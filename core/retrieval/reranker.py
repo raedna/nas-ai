@@ -193,9 +193,24 @@ def llm_rerank(points: List, question: str) -> List:
 
         candidates_text = "\n\n".join(candidates)
 
+        # Declared domain glossary (config system.json glossary): injected
+        # ONLY when a term/synonym appears in the question — corrects wrong
+        # model beliefs (CTM is not Charles River) at the source instead of
+        # patching the ranking afterwards. The BGE veto stays as backstop.
+        _gloss_lines = []
+        try:
+            from core.glossary import glossary_for_question
+            _gloss_lines = glossary_for_question(question)
+        except Exception:
+            _gloss_lines = []
+        _gloss_txt = ("Domain glossary (authoritative for this site):\n"
+                      + "\n".join(_gloss_lines) + "\n"
+                      if _gloss_lines else "")
+
         system_prompt = (
             "You are an expert system engineer routing support files and knowledge base articles. "
             "Your task is to find the single most relevant document for the user's query. "
+            + _gloss_txt +
             "Key domain rules: "
             "- '21R2' and 'PROD' refer to the production environment. "
             "- 'DEV' and '23R3' refer to the development environment. "

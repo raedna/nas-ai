@@ -175,6 +175,30 @@ def fetch_ticket(creds, ticket_id, tickets_dir):
     json.dump(combined, open(out, "w"), indent=1)
     print(f"[HALO API] wrote {out.name} ({len(actions)} actions, "
           f"{len(images)} images)")
+
+    # Follow merge references (depth 1): a ticket's answer names its merged
+    # tickets — those must exist in the corpus to be shown. Only fetch ids
+    # not already on disk; no recursion, so merge chains cannot loop.
+    try:
+        import re as _re
+        from HALO.halo_normalizer import _cfg as _hn_cfg
+        _mcfg = _hn_cfg()
+        _merge_ids = set()
+        for act in actions:
+            if str(act.get("outcome") or "").strip().lower() in _mcfg.get(
+                    "merge_outcomes", []):
+                _merge_ids.update(_re.findall(
+                    _mcfg.get("merge_id_pattern", r"ticket\s*id:?\s*(\d+)"),
+                    str(act.get("note") or ""), _re.IGNORECASE))
+        _mi = t.get("merged_into_id")
+        if _mi and str(_mi) not in ("0", str(ticket_id)):
+            _merge_ids.add(str(_mi))
+        for _mid in sorted(_merge_ids):
+            if not (tickets_dir / f"halo_ticket_{_mid}.json").exists():
+                print(f"[HALO API] following merge reference -> {_mid}")
+                fetch_ticket(creds, _mid, tickets_dir)
+    except Exception as _me:
+        print(f"[HALO API] merge-follow skipped: {_me}")
     return str(out)
 
 

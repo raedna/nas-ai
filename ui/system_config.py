@@ -226,3 +226,65 @@ def _system_settings_section():
         ui.button("Add alias", on_click=_va_add).props("unelevated")
 
     _va_refresh()
+
+    # ---- Glossary manager (journaled writes via core.config_store) --------
+    ui.separator().classes("my-3")
+    ui.label("Domain Glossary").classes("text-lg font-bold")
+    ui.label("Declared site vocabulary the models cannot know — 'CTM is the "
+             "post-trade matching system, not Charles River'; 'Moore is "
+             "MCM'; 'bad dates means incorrect dates'. Injected into LLM "
+             "prompts when the term appears in a question; synonyms widen "
+             "discovery filters. Every change is backed up to "
+             "config/history/.").classes("text-xs text-gray-500 mb-1")
+
+    gl_box = ui.column().classes("w-full gap-1")
+
+    def _gl_refresh():
+        from core.config_store import get_key
+        gl_box.clear()
+        data = get_key("glossary") or {}
+        with gl_box:
+            if not data:
+                ui.label("No glossary entries yet.").classes("text-gray-500")
+            for _term, _e in sorted((data or {}).items()):
+                _syns = ", ".join((_e or {}).get("same_as") or [])
+                with ui.row().classes("items-center gap-2"):
+                    ui.label(_term).classes("font-medium w-40")
+                    ui.label((_e or {}).get("means") or "").classes(
+                        "flex-grow text-sm")
+                    if _syns:
+                        ui.label(f"= {_syns}").classes(
+                            "text-xs text-gray-500")
+                    def _rm(t=_term):
+                        from core.config_store import delete_key
+                        delete_key(f"glossary.{t}")
+                        ui.notify("Glossary entry removed", type="warning")
+                        _gl_refresh()
+                    ui.button(on_click=_rm).props(
+                        "flat dense size=sm icon=close color=negative")
+
+    with ui.row().classes("w-full items-center gap-2 mt-1"):
+        gl_term = ui.input("Term (e.g. ctm)").props(
+            "outlined dense").classes("w-40")
+        gl_means = ui.input("Means (shown to the LLM)").props(
+            "outlined dense").classes("flex-grow")
+        gl_syns = ui.input("Synonyms (comma-separated, optional)").props(
+            "outlined dense").classes("w-64")
+
+        def _gl_add():
+            from core.config_store import set_key
+            _t = (gl_term.value or "").strip().lower()
+            _m = (gl_means.value or "").strip()
+            if not (_t and _m):
+                ui.notify("Term and meaning are required", type="warning")
+                return
+            _s = [x.strip().lower() for x in (gl_syns.value or "").split(",")
+                  if x.strip()]
+            set_key(f"glossary.{_t}", {"means": _m, "same_as": _s})
+            gl_term.value = gl_means.value = gl_syns.value = ""
+            ui.notify("Glossary entry saved — live immediately",
+                      type="positive")
+            _gl_refresh()
+        ui.button("Add entry", on_click=_gl_add).props("unelevated")
+
+    _gl_refresh()

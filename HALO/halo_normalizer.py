@@ -44,6 +44,13 @@ def _cfg():
         "boilerplate_truncate": [str(x) for x in c.get("boilerplate_truncate", [
             "*** Moore Europe Legal Disclaimer",
         ])],
+        # Merge relationships are mined from system actions BEFORE the
+        # noise filter drops them: outcome names + the id pattern inside
+        # their notes ('Ticket ID: 44547 was merged into this Ticket').
+        "merge_outcomes": [str(x).lower() for x in c.get("merge_outcomes", [
+            "other ticket merged"])],
+        "merge_id_pattern": str(c.get("merge_id_pattern",
+                                      r"ticket\s*id:?\s*(\d+)")),
     }
 
 
