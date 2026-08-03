@@ -426,6 +426,15 @@ def analyze_fix_message(raw: str) -> Dict[str, Any]:
     enum_hits = sum(1 for r in decoded_rows if r.get("value_name"))
 
     business_object = build_fix_business_object(decoded_rows)
+    party_structural_warnings = (
+        business_object.get("party_structural_warnings") or []
+    )
+
+    warnings.extend(
+        warning.get("message") or str(warning)
+        for warning in party_structural_warnings
+    )
+
     summary = build_fix_summary(business_object)
     quantity_warnings = _validate_fix_quantities(business_object)
     warnings.extend(quantity_warnings)

@@ -178,6 +178,7 @@ NORMAL_EXEC_TYPE_TRANSITIONS = {
     ("1", "5"),  # PartialFill -> Replaced
     ("1", "F"),  # PartialFill -> Trade
     ("F", "F"),  # Trade -> Trade
+    ("0", "F"),  # New -> Trade
 }
 
 
@@ -191,6 +192,56 @@ RESTATEMENT_EXEC_TYPES = {"D", "G", "H"}
 def _clean(value: Any) -> str:
     return str(value or "").strip()
 
+ORD_STATUS_CODES = {
+    "NEW": "0",
+    "PARTIALLYFILLED": "1",
+    "PARTIALLY FILLED": "1",
+    "FILLED": "2",
+    "CANCELED": "4",
+    "CANCELLED": "4",
+    "REPLACED": "5",
+    "PENDINGCANCEL": "6",
+    "PENDING CANCEL": "6",
+    "REJECTED": "8",
+    "PENDINGNEW": "A",
+    "PENDING NEW": "A",
+    "PENDINGREPLACE": "E",
+    "PENDING REPLACE": "E",
+}
+
+
+def _normalize_ord_status(value: Any) -> str:
+    cleaned = _clean(value)
+
+    if cleaned in ORD_STATUS_LABELS:
+        return cleaned
+
+    return ORD_STATUS_CODES.get(cleaned.upper(), cleaned)
+
+EXEC_TYPE_CODES = {
+    "NEW": "0",
+    "PARTIALFILL": "1",
+    "PARTIAL FILL": "1",
+    "FILL": "2",
+    "FILLED": "2",
+    "CANCELED": "4",
+    "CANCELLED": "4",
+    "REPLACED": "5",
+    "REJECTED": "8",
+    "TRADE": "F",
+}
+
+
+def _normalize_exec_type(value: Any) -> str:
+    cleaned = _clean(value)
+
+    if cleaned in {
+        "0", "1", "2", "4", "5", "8",
+        "D", "F", "G", "H",
+    }:
+        return cleaned
+
+    return EXEC_TYPE_CODES.get(cleaned.upper(), cleaned)
 
 def _to_float(value: Any) -> Optional[float]:
     raw = _clean(value).replace(",", "")
@@ -305,10 +356,10 @@ def _analyze_status_change(
 
     before_msg_type = _clean(before.get("msg_type"))
     after_msg_type = _clean(after.get("msg_type"))
-    before_exec_type = _clean(before.get("exec_type"))
-    after_exec_type = _clean(after.get("exec_type"))
-    before_ord_status = _clean(before.get("ord_status"))
-    after_ord_status = _clean(after.get("ord_status"))
+    before_exec_type = _normalize_exec_type(before.get("exec_type"))
+    after_exec_type = _normalize_exec_type(after.get("exec_type"))
+    before_ord_status = _normalize_ord_status(before.get("ord_status"))
+    after_ord_status = _normalize_ord_status(after.get("ord_status"))
 
     if _value_changed(before.get("msg_type"), after.get("msg_type")):
         severity = "warning"
@@ -327,7 +378,11 @@ def _analyze_status_change(
             ),
         ))
 
-    if _value_changed(before.get("ord_status"), after.get("ord_status")):
+    if (
+        before_ord_status
+        and after_ord_status
+        and _value_changed(before.get("ord_status"), after.get("ord_status"))
+    ):
         transition = (before_ord_status, after_ord_status)
         severity = "info" if transition in NORMAL_ORD_STATUS_TRANSITIONS else "warning"
 
@@ -346,7 +401,11 @@ def _analyze_status_change(
             ),
         ))
 
-    if _value_changed(before.get("exec_type"), after.get("exec_type")):
+    if (
+        before_exec_type
+        and after_exec_type
+        and _value_changed(before.get("exec_type"), after.get("exec_type"))
+    ):
         transition = (before_exec_type, after_exec_type)
         severity = "info" if transition in NORMAL_EXEC_TYPE_TRANSITIONS else "warning"
 
@@ -814,7 +873,7 @@ def build_sequence_insights(
     else:
         summary = (
             f"Analyzed {len(clean_messages)} messages across "
-            f"{len(relationship_groups)} relationship group(s). "
+            f"{len(relationship_groups)} lifecycle(s). "
             f"Found {related_group_count} related group(s) and "
             f"{unrelated_message_count} unrelated message(s). "
             f"Generated {len(sequence_changes)} within-group sequence insight(s)."

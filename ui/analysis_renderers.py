@@ -206,7 +206,7 @@ def render_sequence_result(result: dict):
     groups = result.get("groups") or []
 
     if groups:
-        ui.label("Related Groups").classes("text-lg font-semibold q-mt-md")
+        ui.label("Order Lifecycles").classes("text-lg font-semibold q-mt-md")
 
         group_rows = []
 

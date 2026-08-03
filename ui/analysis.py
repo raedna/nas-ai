@@ -821,9 +821,9 @@ def render_analysis_panel():
             return ", ".join(labels[:-1]) + f", and {labels[-1]}"
 
         # ---------------------------------------------------------
-        # Relationship analysis
+        # Lifecycle analysis
         # ---------------------------------------------------------
-        ui.label("Relationship Analysis").classes(
+        ui.label("Lifecycle Analysis").classes(
             "text-md font-semibold q-mt-md"
         )
 
@@ -853,7 +853,7 @@ def render_analysis_panel():
                 ).classes("text-red-7")
 
         if related_groups:
-            ui.label("Related Groups").classes(
+            ui.label("Order Lifecycles").classes(
                 "text-sm font-semibold text-green-8 q-mt-sm"
             )
 
@@ -874,7 +874,7 @@ def render_analysis_panel():
         # Changes within related groups only
         # ---------------------------------------------------------
         if sequence_changes:
-            ui.label("Changes Within Related Groups").classes(
+            ui.label("Lifecycle Progression").classes(
                 "text-md font-semibold q-mt-md"
             )
 
@@ -1747,7 +1747,7 @@ def render_analysis_panel():
 
         groups = result.get("groups") or []
         if groups:
-            ui.label("Related Groups").classes(
+            ui.label("Order Lifecycles").classes(
                 "text-lg font-semibold q-mt-md"
             )
 
@@ -2572,14 +2572,40 @@ def render_analysis_panel():
                     ui.notify("Could not read selected session id.", color="negative")
                     return
 
+                sselected_session = {}
+
+                selected_rows = list(table.selected or [])
+
+                if len(selected_rows) == 1:
+                    selected_session = selected_rows[0]
+                elif selected_session_dropdown.value:
+                    selected_session = next(
+                        (
+                            session
+                            for session in table.rows
+                            if str(session.get("id")) == str(session_id)
+                        ),
+                        {},
+                    )
+
                 messages = list_fix_analysis_messages(session_id)
 
                 saved_session_viewer.clear()
 
                 with saved_session_viewer:
-                    ui.label(
-                        f"Saved Analysis Session {session_id}"
-                    ).classes("text-lg font-bold")
+                    with ui.card().classes("w-full q-px-md q-py-sm bg-blue-1"):
+                        ui.label(
+                            selected_session.get("save_note")
+                            or f"Saved Analysis Session {session_id}"
+                        ).classes("text-lg font-bold")
+
+                        ui.label(
+                            f"📂 {selected_session.get('source_name') or 'Unknown source'}   •   "
+                            f"{selected_session.get('analysis_mode') or 'Unknown mode'}   •   "
+                            f"{selected_session.get('message_count') or len(messages)} messages   •   "
+                            f"{selected_session.get('warning_count') or 0} warnings\n"
+                            f"Saved: {selected_session.get('created_at') or 'Unknown date'}"
+                        ).classes("text-sm text-grey-8")
 
                     if not messages:
                         ui.label("No messages found for this saved session.").classes("text-red")
@@ -2610,10 +2636,6 @@ def render_analysis_panel():
                             "sending_time": msg.get("sending_time"),
                             "transact_time": msg.get("transact_time"),
                         })
-
-                    tag_result_area = ui.column().classes("w-full q-mt-md")
-
-                    compare_saved_area = ui.column().classes("w-full q-mt-md")
 
                     def add_selected_saved_message_to_compare():
                         selected_rows = list(message_table.selected or [])
@@ -2726,27 +2748,235 @@ def render_analysis_panel():
                                     "tag_warning": tag.get("tag_warning"),
                                     "enum_warning": tag.get("enum_warning"),
                                     "_row_class": saved_tag_row_class(tag),
+                                    "tag_status": tag.get("tag_status"),
                                 })
 
-                            decoded_table = ui.table(
-                                columns=[
-                                    {"name": "position_index", "label": "#", "field": "position_index", "align": "left", "sortable": True},
-                                    {"name": "tag", "label": "Tag ID", "field": "tag", "align": "left", "sortable": True},
-                                    {"name": "tag_name", "label": "Name", "field": "tag_name", "align": "left", "sortable": True},
-                                    {"name": "value", "label": "Tag Value", "field": "value", "align": "left", "sortable": True},
-                                    {"name": "value_name", "label": "Tag Value Name", "field": "value_name", "align": "left", "sortable": True},
-                                    {"name": "description", "label": "Description", "field": "description", "align": "left"},
-                                    {"name": "tag_warning", "label": "Tag Warning", "field": "tag_warning", "align": "left"},
-                                    {"name": "enum_warning", "label": "Enum Warning", "field": "enum_warning", "align": "left"},
-                                ],
-                                rows=tag_rows,
-                                row_key="position_index",
-                                pagination={
-                                    "rowsPerPage": 0,
-                                    "sortBy": "position_index",
-                                    "descending": False,
-                                },
-                            ).classes("w-full")
+                            with ui.row().classes(
+                                "w-full no-wrap items-start q-gutter-md"
+                            ).style("min-width: 0;"):
+
+                                with ui.column().classes(
+                                    "decoded-table-column"
+                                ).style(
+                                    "width: calc(80% - 8px); min-width: 0;"
+                                ):
+                                    with ui.element("div").classes(
+                                        "w-full border rounded decoded-values-scroll"
+                                    ):
+                                        decoded_table = ui.table(
+                                            columns=[
+                                                {
+                                                    "name": "position_index",
+                                                    "label": "#",
+                                                    "field": "position_index",
+                                                    "align": "left",
+                                                    "sortable": True,
+                                                },
+                                                {
+                                                    "name": "tag",
+                                                    "label": "Tag ID",
+                                                    "field": "tag",
+                                                    "align": "left",
+                                                    "sortable": True,
+                                                },
+                                                {
+                                                    "name": "tag_name",
+                                                    "label": "Tag Name",
+                                                    "field": "tag_name",
+                                                    "align": "left",
+                                                    "sortable": True,
+                                                },
+                                                {
+                                                    "name": "value",
+                                                    "label": "Tag Value",
+                                                    "field": "value",
+                                                    "align": "left",
+                                                    "sortable": True,
+                                                },
+                                                {
+                                                    "name": "value_name",
+                                                    "label": "Tag Value Name",
+                                                    "field": "value_name",
+                                                    "align": "left",
+                                                    "sortable": True,
+                                                },
+                                            ],
+                                            rows=tag_rows,
+                                            row_key="position_index",
+                                            selection="single",
+                                            pagination={
+                                                "rowsPerPage": 0,
+                                                "sortBy": "position_index",
+                                                "descending": False,
+                                            },
+                                        ).classes("w-full")
+
+                                        decoded_table.add_slot("body", r"""
+                                        <q-tr
+                                          :props="props"
+                                          @click="$parent.$emit('row-inspect', props.row)"
+                                          :class="props.row._row_class"
+                                        >
+                                          <q-td auto-width>
+                                            <q-checkbox
+                                              v-model="props.selected"
+                                              dense
+                                              @click.stop
+                                            />
+                                          </q-td>
+
+                                          <q-td
+                                            v-for="col in props.cols"
+                                            :key="col.name"
+                                            :props="props"
+                                            style="white-space: nowrap; vertical-align: top;"
+                                          >
+                                            {{ col.value }}
+                                          </q-td>
+                                        </q-tr>
+                                        """)
+
+                                with ui.card().classes(
+                                    "tag-inspector q-pa-md"
+                                ).style(
+                                    "width: calc(20% - 8px); "
+                                    "min-width: 280px; "
+                                    "position: sticky; "
+                                    "top: 132px;"
+                                ):
+                                    ui.label("Tag Inspector").classes(
+                                        "text-md font-semibold"
+                                    )
+
+                                    ui.label(
+                                        "Select a decoded row to inspect its dictionary details."
+                                    ).classes(
+                                        "text-xs text-grey-7 q-mb-md"
+                                    )
+
+                                    inspector_state = ui.badge(
+                                        "No tag selected",
+                                        color="grey",
+                                    ).props("outline")
+
+                                    inspector_tag = ui.label(
+                                        "Tag: —"
+                                    ).classes("font-semibold")
+
+                                    inspector_name = ui.label("Name: —")
+                                    inspector_value = ui.label("Current Value: —")
+                                    inspector_meaning = ui.label("Meaning: —")
+
+                                    ui.separator().classes("q-my-sm")
+
+                                    inspector_dictionary = ui.label(
+                                        "Dictionary Status: —"
+                                    ).classes("text-sm")
+
+                                    inspector_description = ui.label(
+                                        "Select a row to view its description."
+                                    ).classes(
+                                        "text-sm text-grey-8 whitespace-pre-wrap"
+                                    )
+
+                                    ui.separator().classes("q-my-sm")
+
+                                    ui.label("Review Notes").classes(
+                                        "text-sm font-semibold"
+                                    )
+
+                                    inspector_warnings = ui.label(
+                                        "None"
+                                    ).classes(
+                                        "text-sm text-grey-8 whitespace-pre-wrap"
+                                    )
+
+                            def populate_saved_tag_inspector(row):
+                                if not row:
+                                    return
+
+                                tag_warning = str(
+                                    row.get("tag_warning") or ""
+                                ).strip()
+
+                                enum_warning = str(
+                                    row.get("enum_warning") or ""
+                                ).strip()
+
+                                tag_status = str(
+                                    row.get("tag_status") or ""
+                                ).strip()
+
+                                is_unknown = tag_status.lower() in {
+                                    "custom",
+                                    "unknown",
+                                    "missing",
+                                    "not_found",
+                                    "not found",
+                                }
+
+                                if tag_warning or enum_warning:
+                                    inspector_state.set_text("Review required")
+                                    inspector_state.props(
+                                        "color=negative outline"
+                                    )
+                                elif is_unknown:
+                                    inspector_state.set_text("Custom / unknown")
+                                    inspector_state.props(
+                                        "color=purple outline"
+                                    )
+                                else:
+                                    inspector_state.set_text("Known / valid")
+                                    inspector_state.props(
+                                        "color=positive outline"
+                                    )
+
+                                inspector_tag.set_text(
+                                    f"Tag: {row.get('tag') or '—'}"
+                                )
+                                inspector_name.set_text(
+                                    f"Name: {row.get('tag_name') or '—'}"
+                                )
+                                inspector_value.set_text(
+                                    f"Current Value: {row.get('value') or '—'}"
+                                )
+                                inspector_meaning.set_text(
+                                    f"Meaning: {row.get('value_name') or '—'}"
+                                )
+                                inspector_dictionary.set_text(
+                                    f"Dictionary Status: {tag_status or '—'}"
+                                )
+                                inspector_description.set_text(
+                                    row.get("description")
+                                    or "No description available."
+                                )
+
+                                notes = [
+                                    note
+                                    for note in (
+                                        tag_warning,
+                                        enum_warning,
+                                    )
+                                    if note
+                                ]
+
+                                inspector_warnings.set_text(
+                                    "\n".join(notes) or "None"
+                                )
+
+                            def inspect_saved_tag_row(event):
+                                row = event.args
+
+                                if isinstance(row, list) and row:
+                                    row = row[0]
+
+                                if isinstance(row, dict):
+                                    populate_saved_tag_inspector(row)
+
+                            decoded_table.on(
+                                "row-inspect",
+                                inspect_saved_tag_row,
+                            )
 
                             def reset_saved_tag_sorting():
                                 decoded_table.pagination = {
@@ -2759,22 +2989,13 @@ def render_analysis_panel():
                             ui.button(
                                 "Reset Sorting",
                                 on_click=reset_saved_tag_sorting,
-                            ).props("outline size=sm").classes("q-mt-sm")
-
-                            decoded_table.add_slot(
-                                "body",
-                                """
-                                <q-tr :props="props" :class="props.row._row_class">
-                                    <q-td v-for="col in props.cols" :key="col.name" :props="props">
-                                        {{ col.value }}
-                                    </q-td>
-                                </q-tr>
-                                """
-                            )
+                            ).props(
+                                "outline size=sm"
+                            ).classes("q-mt-sm")
 
                     ui.label(
                         "Select one saved message row, then click View Selected Message Tags."
-                    ).classes("text-sm text-blue-7 font-bold q-mt-md")
+                    ).classes("text-sm text-blue-7 font-bold q-mt-xs")
 
                     with ui.row().classes("q-gutter-sm"):
                         ui.button(
@@ -2813,6 +3034,9 @@ def render_analysis_panel():
                         selection="multiple",
                         pagination={"rowsPerPage": 0},
                     ).classes("w-full")
+
+                    tag_result_area = ui.column().classes("w-full q-mt-sm")
+                    compare_saved_area = ui.column().classes("w-full q-mt-sm")
 
                     def add_selected_messages_to_workspace():
                         selected_rows = list(message_table.selected or [])
@@ -3054,7 +3278,10 @@ def render_analysis_panel():
                     color="negative",
                 )
                 return
-            insights = build_sequence_insights(sequence_result.get("messages") or [])
+            insights = build_sequence_insights(
+                sequence_result.get("messages") or [],
+                sequence_result.get("groups") or [],
+            )
 
             reporting_area.clear()
             with reporting_area:
