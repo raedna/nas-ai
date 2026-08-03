@@ -1044,3 +1044,121 @@ counter live. Verified: tag-22 served from cache with badge.
 MEMORY & LEARNING ARC COMPLETE (M1 sessions, M2 memory, M4a capture+prior,
 M4b cache). Remaining in group: splitter, M3 preferences, archive eval
 bucket.
+
+## Splitter + widening revert + AR bucket DONE (2026-07-18/28, committed)
+
+Multi-item value splitter (goldman/jpm) + dual-intent splitter (XC-03 two
+headings/sources) verified; widening revert rule (weak retry winner never
+displaces a non-empty original — CTM archive hijack fix); AR-01..06
+archive bucket in the eval (AR-01 expectation amended: 44946 is
+FRA-feeding, not dates). Numeric groundedness: JSON floats ('30.0') ground
+against question numbers ('30') numerically — hallucinated 300.0 still
+dies. Known splitter defect: sub-questions lose pronoun referents
+("do I have images of it" — XC-04 second half).
+
+## RETR-05 sequel: the about/keywords arc (2026-07-28..30, committed)
+
+Ingestion-time 'about' scan: one LLM call per doc-shaped entry stores
+{about, keywords, related} in chunk payloads (background task, resumable,
+on-demand button + post-ingest switch; per-collection about_scan
+all/auto/off in collections.json — kb_docs is 'all' because its articles
+are entity_row via the tables pipeline; "doc_type is a weak proxy" lesson
+re-confirmed). about_vectors table: embedded about lines.
+
+VERDICT HISTORY (all falsified by test, recorded in reranker comments):
+substring subject-guard variants (caps-cap removal, title dominance,
+all-content-words, about-df vetting) — each fixed one exhibit and broke
+another; about-vector promotion — fixed CTM/FRA exhibits, LOST the eval
+(NA-03 Bloomberg hallucination-adjacent, PP-07/PR-07 near-but-wrong);
+about-as-rerank-content (alone or hybrid) — 14B entity-vs-action bias
+worsened. LESSON: embedding similarity measures nearness; near-but-wrong
+is more dangerous than far-and-wrong. LLM rerank reads content and is the
+better relevance judge; deterministic overrides need lexical certainty.
+
+WHAT SHIPPED: BGE cross-encoder VETO (consensus rule): fires only when the
+LLM's pick scores < invisible_below (0.01) on BGE AND a doc in the LLM's
+OWN top-3 scores >= winner_min (0.03) — thresholds in config bge_veto,
+calibrated on the 2026-07-28 shadow card (wrong picks 0.001-0.004, right-
+but-disputed 0.119+, true winners >= 0.032, AR-03's must-not-fire false
+winner 0.028 OUTSIDE the top-3 -> consensus condition). CTM fixed both
+casings; KB smokes 10/10; eval green.
+
+## Domain glossary + about-closest (2026-07-30, committed)
+
+config glossary.<term> = {means, same_as}: declared site vocabulary
+(CTM != Charles River — one injected glossary line made the 14B rank the
+CTM guide #1 by itself; Moore=MCM; 'bad dates'). Consumers: rerank prompt
+injection (term-in-question gated), discovery filter synonym OR-expansion
+(glossary phrases stay whole), System Config manager UI. Journaled via
+config_store. REJECTED: online enrichment (Investopedia) — the glossary
+holds what the internet cannot know; generic definitions feed the wrong
+side of the collision. About-closest fallback: when descriptor claims zero
+but an anchor claim grounds, rank the anchored entries by about-vector sim
+and answer with an honest closest-match label (weak marker semantics).
+NA-04 expectation amended (user decision: prefer honest weak answers that
+can be demoted). Source-anchored feedback: votes record source_entry; a
+vote counts only while the collection answers from that same entry.
+
+## Small hills (2026-08-02)
+
+3B counter verdict: front_escalated 2/516 (0.4%) — KEEP; statement veto
+caught 9, chat veto 1, cache served 7. Spec cache: (collection, question)
+memoized 300s TTL (metadata_spec_cache_ttl), deep-copied both ways
+(downstream mutates filters) — was 6x 10-27s LLM per widened question.
+"Found 0 item(s)" header lie -> 'No direct match found — closest results:'
+(existing weak marker, honesty preserved). ORDER BY hunt: 5 unordered
+sibling/sampling queries pinned (router entry lookups prefer shortest
+identifier = header; metadata value sampling was flapping spec prompts).
+Title-rung token matching ('solution' no longer hits inside 'Resolution').
+runtime_counters + about_vectors added to SQL inspector whitelist.
+
+## HALO structuring arc (2026-08-02, IN TEST)
+
+Sections per action (config-mapped): issue/responses/internal_notes/
+closure — closure is sign-off, NOT the fix (user correction). LLM solution
+extraction at serialization (whole thread in view, quotes + names source
+action ids -> auditable 44539-solution chunk; has_solution=false -> no
+chunk, no invention; halo.solution_extraction switch). Synthetic chunks:
+-status, -merges. About scan for sectioned entries derives from the ISSUE
+only (about_scan_source_sections). Merge mining (Other Ticket Merged
+actions + merged_into_id) + parent/child (fetcher resolves children via
+API, family auto-follow) — payload + header + description + link edges.
+Ticket summary table (summary word + ticket id -> deterministic sectioned
+digest, long bodies click-to-expand; zero LLM at query time). not_equals
+filter op + negation-aware alias injection ('not resolved' -> status !=
+Closed). Halo API UI panel (pull ticket/latest N/incremental/ALL,
+background tasks). Write-if-changed fetcher (mtime-skip preservation;
+volatile_fields config + changed-keys diagnostic). SCALE NOTES for 10k
+tickets: query-time flat IF pgvector indexed (check before bulk pull);
+enrichment is the wall — mitigations: closed-only extraction, batched
+issue-abouts, fast-model option, slow resumable backfill. Pilot: 100
+tickets. Attachments + category-mapping PARKED. Sub-collections per
+category REJECTED (routing explosion; category is a filterable anchor).
+
+## Open defects / queue (2026-08-02)
+
+DL-04 focus-word banner flap (may be healed by ORDER BY — watch eval);
+"who closed X" verbatim full-entry render (polish: focused questions
+should synthesize); raw-render labels action id for merged entries
+(cosmetic); synthesis-timeout fallback should say so; XC-04 split pronoun
+referents; quoted-chain pruning (prerequisite for fat threads); image
+dedupe by hash; derived/action chunks each pay their own about scan
+(batch/skip optimization); glossary capture from chat ("remember that X
+means Y" -> proposal, note proposes config disposes); M3 preferences;
+M4b/prior similarity phase (needs verdict corpus); weak-widening at
+3-wide routes; UI-04 auth gate; DL-06/10 astro rendering; Decoded Values
+collapsible; "Draft from corpus" glossary button.
+
+## Pilot checklist (100 tickets, queued 2026-08-02)
+
+Selective embedding experiment: halo.embed_sections ["issue","solution"]
+vs all-embedded — run the discovery card both ways, answers vote (BM25 +
+payload SQL retained for unembedded sections either way; ~3x smaller
+vector index at 10k scale). Measure: per-ticket enrichment time, query
+latency, pgvector index need (HNSW before bulk pull), spec-prompt growth
+from new payload fields. Post-184051 regression fixes to re-eval: lazy
+BGE veto (top-pick-first scoring), grounding token-coverage ratio (0.4),
+retreat-within-keep, letter<->digit title tokens (DL-10), DB-derived
+namespace patterns + section focus with declared section_synonyms
+('who resolved X' -> status; 'solution for X' -> 44539-solution).
+AR-02 expectation made corpus-relative.

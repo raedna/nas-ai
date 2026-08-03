@@ -143,17 +143,22 @@ def _bge_veto(reranked: List, question: str) -> List:
                                      or _pl.get("description") or "")[:512]))
         if len(_order) < 2:
             return reranked
-        _scores = {nm: float(sc) for (nm, _), sc in zip(
-            _order, model.predict(
-                [(question, passage) for _, passage in _order]))}
+        # LAZY SCORING (eval 2026-08-02: scoring the whole pool on every
+        # rerank cost 10-20s x retries — +15s avg): score the top pick
+        # ALONE first; almost always visible -> done in ~1s. Only an
+        # invisible top pick pays for its top-3 challengers.
         _top_nm = _order[0][0]
-        _top_sc = _scores.get(_top_nm, 0.0)
+        _top_sc = float(model.predict([(question, _order[0][1])])[0])
         if _top_sc >= _inv:
             return reranked
-        # candidate winners: the LLM's own top-3 distinct entries
-        _short = [nm for nm, _ in _order[:3] if nm != _top_nm]
-        _best_nm = max(_short, key=lambda n: _scores.get(n, 0.0),
-                       default=None)
+        _short_pairs = [(nm, passage) for nm, passage in _order[:3]
+                        if nm != _top_nm]
+        if not _short_pairs:
+            return reranked
+        _scores = {nm: float(sc) for (nm, _), sc in zip(
+            _short_pairs, model.predict(
+                [(question, passage) for _, passage in _short_pairs]))}
+        _best_nm = max(_scores, key=_scores.get, default=None)
         if _best_nm and _scores.get(_best_nm, 0.0) >= _win:
             print(f"RERANK bge veto: {_top_nm!r} ({_top_sc:.3f}) -> "
                   f"{_best_nm!r} ({_scores[_best_nm]:.3f})")

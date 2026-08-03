@@ -64,6 +64,45 @@ def render_ingestion_panel():
     scan_box = ui.column().classes("w-full")
     result_box = ui.column().classes("w-full mt-2")
 
+    # ---- Halo API pull (background; credentials never enter the UI) -------
+    ui.separator().classes("my-4")
+    ui.label("Halo API Pull").classes("text-lg font-medium")
+    ui.label("Pulls combined ticket JSONs into the tickets folder (merge "
+             "references auto-follow). Ingest afterwards with Run Ingestion "
+             "on halo_tickets. Track progress in Background Tasks.").classes(
+        "text-xs text-gray-500")
+    with ui.row().classes("w-full items-center gap-2"):
+        halo_tid = ui.input("Ticket #").props("outlined dense").classes("w-32")
+
+        def _halo_pull(mode, value=None):
+            from core.background_runner import launch_halo_sync
+            try:
+                launch_halo_sync(mode, value)
+                ui.notify(f"Halo pull launched ({mode})", type="positive")
+            except Exception as e:
+                ui.notify(f"Halo pull failed to launch: {e}", type="negative")
+            refresh_status()
+
+        def _pull_ticket():
+            _t = (halo_tid.value or "").strip()
+            if not _t.isdigit():
+                ui.notify("Enter a numeric ticket id", type="warning")
+                return
+            _halo_pull("ticket", _t)
+        ui.button("Pull ticket", on_click=_pull_ticket).props("outline")
+        halo_n = ui.number("Latest N", value=10, min=1, max=500,
+                           step=1).props("outlined dense").classes("w-28")
+        ui.button("Pull latest",
+                  on_click=lambda: _halo_pull("latest", int(halo_n.value))
+                  ).props("outline")
+        ui.button("Pull new since last sync",
+                  on_click=lambda: _halo_pull("incremental")).props("outline")
+        ui.button("Pull ALL",
+                  on_click=lambda: _halo_pull("full")).props(
+            "outline color=orange").tooltip(
+            "Ignores sync state — refetches every ticket; slow on large "
+            "instances")
+
     ui.separator().classes("my-4")
     with ui.row().classes("items-center w-full"):
         ui.label("Background Tasks").classes("text-lg font-medium")

@@ -166,12 +166,63 @@ def fetch_ticket(creds, ticket_id, tickets_dir):
     images = _download_images(creds, t.get("details_html"), ticket_id, tickets_dir)
 
     t["status_name"] = _status_names(creds).get(str(t.get("status_id")))
+
+    # Parent/child (same treatment as merges): children are resolved via
+    # the API HERE so the serializer never needs network access.
+    child_ids = []
+    try:
+        if int(t.get("child_count") or 0) > 0:
+            _cl = _get(creds, "/api/Tickets",
+                       {"parent_id": ticket_id, "count": 200})
+            _cts = _cl.get("tickets", _cl if isinstance(_cl, list) else [])
+            child_ids = [str(c["id"]) for c in _cts if c.get("id")]
+            print(f"[HALO API] ticket {ticket_id}: {len(child_ids)} "
+                  f"child ticket(s)")
+    except Exception as _ce:
+        print(f"[HALO API] child lookup skipped: {_ce}")
+
     combined = {
         "ticket": t,
         "actions": actions,
         "images": [{"path": p, "name": n} for p, n in images],
+        "child_ticket_ids": child_ids,
     }
     out = tickets_dir / f"halo_ticket_{ticket_id}.json"
+    # WRITE-IF-CHANGED: ingestion skips by mtime+size, so rewriting an
+    # unchanged ticket forces a full (LLM-enriched) re-ingest. Compare
+    # ignoring declared volatile fields (config halo.volatile_fields —
+    # SLA clocks etc. change every fetch without meaning anything).
+    try:
+        from core.system_config import load_system_config as _lsc_vf
+        _volatile = set(_lsc_vf().get("halo", {}).get("volatile_fields", []))
+    except Exception:
+        _volatile = set()
+
+    def _stable(obj):
+        if isinstance(obj, dict):
+            return {k: _stable(v) for k, v in obj.items()
+                    if k not in _volatile}
+        if isinstance(obj, list):
+            return [_stable(x) for x in obj]
+        return obj
+
+    _new_txt = json.dumps(_stable(combined), indent=1, sort_keys=True)
+    if out.exists():
+        try:
+            _old_txt = json.dumps(_stable(json.load(open(out))), indent=1,
+                                  sort_keys=True)
+            if _old_txt == _new_txt:
+                print(f"[HALO API] {out.name} unchanged — not rewritten")
+                return str(out)
+            # diagnostic: which top-level ticket keys differ (candidates
+            # for halo.volatile_fields if they churn meaninglessly)
+            _old_t = (json.load(open(out)).get("ticket") or {})
+            _diff = [k for k in t if str(t.get(k)) != str(_old_t.get(k))]
+            if _diff:
+                print(f"[HALO API] {out.name} changed ticket keys: "
+                      f"{_diff[:15]}")
+        except Exception:
+            pass
     json.dump(combined, open(out, "w"), indent=1)
     print(f"[HALO API] wrote {out.name} ({len(actions)} actions, "
           f"{len(images)} images)")
@@ -193,6 +244,11 @@ def fetch_ticket(creds, ticket_id, tickets_dir):
         _mi = t.get("merged_into_id")
         if _mi and str(_mi) not in ("0", str(ticket_id)):
             _merge_ids.add(str(_mi))
+        # family follows: parent + children fetch alongside merges
+        _par = t.get("parent_id")
+        if _par and str(_par) not in ("0", str(ticket_id)):
+            _merge_ids.add(str(_par))
+        _merge_ids.update(child_ids)
         for _mid in sorted(_merge_ids):
             if not (tickets_dir / f"halo_ticket_{_mid}.json").exists():
                 print(f"[HALO API] following merge reference -> {_mid}")
@@ -202,12 +258,30 @@ def fetch_ticket(creds, ticket_id, tickets_dir):
     return str(out)
 
 
-def sync(full=False, only_ticket=None):
+def sync(full=False, only_ticket=None, latest=None):
+    """Modes: only_ticket=<id> pulls one (+merge follows); latest=<n> pulls
+    the n most recently updated tickets; full=True ignores sync state and
+    pulls everything; default = incremental since last sync."""
     creds, tickets_dir, cfg = _halo_cfg()
     tickets_dir.mkdir(parents=True, exist_ok=True)
 
     if only_ticket:
         fetch_ticket(creds, only_ticket, tickets_dir)
+        return
+
+    if latest:
+        params = {"count": int(latest), "open_only": "false",
+                  "order": "dateoccurred", "orderdesc": "true"}
+        listing = _get(creds, "/api/Tickets", params)
+        tickets = listing.get("tickets",
+                              listing if isinstance(listing, list) else [])
+        print(f"[HALO API] latest mode: {len(tickets)} ticket(s)")
+        for t in tickets:
+            try:
+                fetch_ticket(creds, t["id"], tickets_dir)
+            except Exception as e:
+                print(f"[HALO API] ticket {t.get('id')} failed: {e}")
+        print("[HALO API] latest pull complete")
         return
 
     state = {"last_sync": None} if full else _load_sync_state(tickets_dir)

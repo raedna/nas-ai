@@ -153,6 +153,52 @@ def launch_about_scan(collection_name):
     print(f"[BACKGROUND] Launched about scan for {collection_name}")
 
 
+def _run_halo_sync_task(mode, value, task_id):
+    try:
+        from HALO.halo_fetcher import sync
+        if mode == "ticket":
+            sync(only_ticket=str(value))
+        elif mode == "latest":
+            sync(latest=int(value))
+        elif mode == "full":
+            sync(full=True)
+        else:
+            sync()
+        execute(
+            "UPDATE background_tasks SET status='done', finished_at=NOW() WHERE id=%s AND status='running'",
+            (task_id,)
+        )
+        print(f"[BACKGROUND] Halo sync complete ({mode}={value})")
+    except Exception as e:
+        execute(
+            "UPDATE background_tasks SET status='failed', finished_at=NOW() WHERE id=%s AND status='running'",
+            (task_id,)
+        )
+        print(f"[BACKGROUND] Halo sync failed ({mode}): {e}")
+
+
+def launch_halo_sync(mode="incremental", value=None):
+    """Background Halo API pull: mode in ticket|latest|full|incremental.
+    Credentials stay in the file OUTSIDE the workspace (config pointer);
+    the UI never sees them."""
+    execute(
+        "INSERT INTO background_tasks (task_name, collection, status) VALUES (%s, %s, 'running')",
+        (f'halo_sync_{mode}', 'halo_tickets')
+    )
+    rows = fetchall(
+        "SELECT id FROM background_tasks WHERE collection='halo_tickets' AND status='running' AND task_name=%s ORDER BY id DESC LIMIT 1",
+        (f'halo_sync_{mode}',)
+    )
+    task_id = rows[0]['id'] if rows else None
+    thread = threading.Thread(
+        target=_run_halo_sync_task,
+        args=(mode, value, task_id),
+        daemon=True
+    )
+    thread.start()
+    print(f"[BACKGROUND] Launched halo sync ({mode}={value})")
+
+
 def is_cross_link_running():
     """Check if any cross-link discovery is currently running."""
     rows = fetchall(

@@ -148,7 +148,24 @@ def render_chat_panel():
 
         kind = resp.get("answer_kind") if isinstance(resp, dict) else None
         raw = resp.get("raw_answer") if isinstance(resp, dict) else None
-        if kind == "doc" and isinstance(raw, str) and raw.strip() and raw.strip() != content.strip():
+        _tsum = resp.get("ticket_summary") if isinstance(resp, dict) else None
+        if _tsum and _tsum.get("rows"):
+            # Sectioned ticket digest: label/brief rows; long bodies expand
+            # on click (user design 2026-08-02 — the table holds summaries
+            # and inventories, never bodies).
+            with card:
+                for r in _tsum["rows"]:
+                    if (r.get("full") or "").strip() and \
+                            r["full"].strip() != (r.get("brief") or "").strip():
+                        with ui.expansion(f"{r['label']}: {r['brief']}"
+                                          ).classes("w-full"):
+                            ui.markdown(r["full"]).classes("text-sm")
+                    else:
+                        with ui.row().classes("w-full gap-2 items-baseline"):
+                            ui.label(r["label"]).classes(
+                                "font-medium w-32 shrink-0")
+                            ui.label(r.get("brief") or "").classes("text-sm")
+        elif kind == "doc" and isinstance(raw, str) and raw.strip() and raw.strip() != content.strip():
             # Concise answer, then the full entry (with its images) in an expander.
             render_answer(card, content, [], show_ocr=True)
             with card:

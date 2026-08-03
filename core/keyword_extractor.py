@@ -118,15 +118,31 @@ def scan_collection(collection_name: str, task_id=None,
     print(f"[KEYWORDS] {collection_name} (about_scan={mode}): "
           f"{len(rows)} entries, {len(rows) - len(todo)} annotated, "
           f"{len(todo)} to scan")
+    # About = what the entry IS ABOUT. For sectioned entries (tickets), that
+    # is the INITIATING issue — resolution/closure chatter would blur it
+    # (user decision 2026-08-02). Declared source sections; entries without
+    # section metadata scan whole as before.
+    try:
+        import json as _json2
+        from core.paths import SYSTEM_CONFIG_PATH as _SCP2
+        with open(_SCP2, "r", encoding="utf-8") as _f2:
+            _src_sections = [str(s).lower() for s in _json2.load(_f2).get(
+                "about_scan_source_sections", ["issue"])]
+    except Exception:
+        _src_sections = ["issue"]
+
     scanned = failed = 0
     for name in todo:
         if is_cancelled and is_cancelled(task_id):
             print(f"[KEYWORDS] {collection_name}: cancelled after {scanned}")
             break
         parts = fetchall(
-            "SELECT nlp_text FROM chunks WHERE collection_name = %s "
+            "SELECT nlp_text, LOWER(COALESCE(payload->>'section','')) AS sec "
+            "FROM chunks WHERE collection_name = %s "
             "AND primary_name = %s ORDER BY id", (collection_name, name))
-        full = "\n\n".join(p["nlp_text"] or "" for p in parts)
+        _issue_parts = [p for p in parts if p["sec"] in _src_sections]
+        full = "\n\n".join(p["nlp_text"] or ""
+                           for p in (_issue_parts or parts))
         if not full.strip():
             continue
         res = extract_entry(name, full)

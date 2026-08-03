@@ -26,4 +26,5 @@ def parse_halo(file_path, template_config=None):
     images = data.get("images") or []
     print(f"[HALO PARSER] ticket {ticket.get('id')}: "
           f"{len(actions)} actions, {len(images)} images")
-    return {"ticket": ticket, "actions": actions, "images": images}
+    return {"ticket": ticket, "actions": actions, "images": images,
+            "child_ticket_ids": data.get("child_ticket_ids") or []}

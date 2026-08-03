@@ -722,7 +722,7 @@ def run_query_with_method(
                     _linked_pts = get_by_identifier(_link["target_collection"], _link["target_identifier"])
                     if not _linked_pts:
                         _linked_rows = _fetchall(
-                            "SELECT payload FROM chunks WHERE collection_name = %s AND (payload->>'source_file' = %s OR payload->>'primary_name' = %s) LIMIT 1",
+                            "SELECT payload FROM chunks WHERE collection_name = %s AND (payload->>'source_file' = %s OR payload->>'primary_name' = %s) ORDER BY LENGTH(COALESCE(identifier, '')), id LIMIT 1",
                             (_link["target_collection"], _link["target_identifier"], _link["target_identifier"])
                         )
                         if _linked_rows:
@@ -933,6 +933,42 @@ def run_query_with_method(
 
         if points:
             payload = points[0].payload or {}
+            # SECTION FOCUS (sectioned entries, e.g. tickets): when a
+            # question token names a sibling chunk's section ('solution',
+            # 'status', 'merges'), that section answers instead of the
+            # header — 'what is the solution for ticket 44539' must hit
+            # 44539-solution, not the issue text. Siblings share the
+            # entity's link key; sections are payload data, not code.
+            try:
+                import re as _re_sf
+                _q_words_sf = _re_sf.findall(r"[a-z]{3,}",
+                                             question.lower())
+                _q_toks_sf = {w.rstrip("sd") for w in _q_words_sf}
+                # declared bridges: 'who resolved X' -> status section,
+                # 'fix for X' -> solution (config section_synonyms)
+                try:
+                    import json as _json_sf
+                    from core.paths import SYSTEM_CONFIG_PATH as _SCP_SF
+                    with open(_SCP_SF, "r", encoding="utf-8") as _fsf:
+                        _syn_sf = _json_sf.load(_fsf).get(
+                            "section_synonyms", {}) or {}
+                except Exception:
+                    _syn_sf = {}
+                _q_secs_sf = {_syn_sf[w] for w in _q_words_sf
+                              if w in _syn_sf}
+                _sibs = fetch_points_related_to_link_key(
+                    collection, f"{namespace}:{identifier}", limit=50)
+                for _sp in list(points) + list(_sibs or []):
+                    _sec = str((_sp.payload or {}).get("section") or "")
+                    # normalized match: 'merges'~'merged', 'status'~'status'
+                    if _sec and (_sec.rstrip("sd") in _q_toks_sf
+                                 or _sec in _q_secs_sf):
+                        payload = _sp.payload or {}
+                        print(f"RETRIEVAL section focus: {identifier} -> "
+                              f"section '{_sec}'")
+                        break
+            except Exception:
+                pass
             payload["_question"] = question
             return {
                 "method": "structured_namespace_lookup",
@@ -1021,7 +1057,7 @@ def run_query_with_method(
                 _linked_pts = get_by_identifier(_link["target_collection"], _link["target_identifier"])
                 if not _linked_pts:
                     _linked_rows = _fetchall(
-                        "SELECT payload FROM chunks WHERE collection_name = %s AND (payload->>'source_file' = %s OR payload->>'primary_name' = %s) LIMIT 1",
+                        "SELECT payload FROM chunks WHERE collection_name = %s AND (payload->>'source_file' = %s OR payload->>'primary_name' = %s) ORDER BY LENGTH(COALESCE(identifier, '')), id LIMIT 1",
                         (_link["target_collection"], _link["target_identifier"], _link["target_identifier"])
                     )
                     if _linked_rows:

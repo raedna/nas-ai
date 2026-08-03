@@ -50,19 +50,44 @@ def extract_explicit_identifier_namespace(question: str) -> Tuple[Optional[str],
     import re
     q = normalize_simple_text(question)
 
-    namespace_patterns = [
-        (r"\btag\s+(\d+)\b", "tag"),
-        (r"\bfield\s+([A-Z0-9_]+)\b", "field"),
-        (r"\bcomponent\s+(\d+)\b", "component"),
-        (r"\bcomponentid\s+(\d+)\b", "componentid"),
-    ]
-
-    for pattern, namespace in namespace_patterns:
-        match = re.search(pattern, q, re.IGNORECASE)
+    # Namespaces come from the DATA (was a hardcoded tag/field/component
+    # list — 'ticket 44539' had no chance until 2026-08-02, when a grown
+    # corpus let 'solution for ticket 44539' answer from ticket 45562).
+    # Single-word namespaces only; the word must appear right before the
+    # identifier token, singular or plural ('tickets 44539' tolerated).
+    for namespace in _known_namespaces():
+        match = re.search(
+            rf"\b{re.escape(namespace)}s?\s+#?([A-Za-z0-9_.\-]+)\b",
+            q, re.IGNORECASE)
         if match:
             return namespace, match.group(1)
 
     return None, None
+
+
+_NS_CACHE = {"ts": 0.0, "vals": []}
+
+
+def _known_namespaces():
+    """DISTINCT single-word identifier_namespace values across chunks,
+    cached 300s. Longest first so 'componentid 5' wins over 'component'."""
+    import time
+    if time.time() - _NS_CACHE["ts"] < 300 and _NS_CACHE["vals"]:
+        return _NS_CACHE["vals"]
+    try:
+        from core.db import fetchall
+        rows = fetchall(
+            "SELECT DISTINCT identifier_namespace AS ns FROM chunks "
+            "WHERE identifier_namespace IS NOT NULL", ())
+        vals = sorted(
+            {str(r["ns"]) for r in rows
+             if r["ns"] and str(r["ns"]).isalpha()},
+            key=len, reverse=True)
+        if vals:
+            _NS_CACHE.update(ts=time.time(), vals=vals)
+        return vals or _NS_CACHE["vals"]
+    except Exception:
+        return _NS_CACHE["vals"]
 
 
 def extract_explicit_identifier(question: str) -> Optional[str]:

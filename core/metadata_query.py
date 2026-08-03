@@ -23,7 +23,8 @@ _TABLE_COLUMNS = {"identifier", "primary_name", "description", "doc_type",
                   "source_file", "source_type", "identifier_namespace", "nlp_text"}
 
 _OPERATIONS = {"count", "count_distinct", "list_distinct", "group_by"}
-_FILTER_OPS = {"equals", "contains"}
+_FILTER_OPS = {"equals", "not_equals", "contains"}
+_OP_SYM = {"equals": "=", "not_equals": "!="}
 
 
 # Pipeline bookkeeping keys — present in every payload but NOT data. Letting
@@ -91,7 +92,7 @@ def _field_values(collection: str, fields: set, df_keys=frozenset()) -> Dict[str
                 (collection,))
         else:
             rows = fetchall(
-                f"SELECT DISTINCT {expr} AS v FROM chunks WHERE collection_name = %s AND {expr} IS NOT NULL LIMIT 25",
+                f"SELECT DISTINCT {expr} AS v FROM chunks WHERE collection_name = %s AND {expr} IS NOT NULL ORDER BY v LIMIT 25",
                 (collection,))
         vals = [str(r["v"]) for r in rows if r["v"]]
         if len(vals) == 1:
@@ -154,8 +155,47 @@ def _schema_role_lines(collection: str) -> str:
     return ""
 
 
+# Spec cache: the spec depends only on (question, collection, schema) —
+# none change within a turn, yet the answer path, the discovery path and
+# every widening retry each re-extracted it (6 x 10-27s of LLM time on one
+# question). Deep-copied on store AND fetch: downstream mutates filters in
+# place (coercions, splits), and a shared dict would poison the next
+# consumer with the previous one's mutations. TTL declared in config
+# (metadata_spec_cache_ttl) so schema edits age out.
+_SPEC_CACHE: Dict = {}
+
+
+def _spec_cache_ttl() -> float:
+    try:
+        import json as _json
+        from core.paths import SYSTEM_CONFIG_PATH
+        with open(SYSTEM_CONFIG_PATH, "r", encoding="utf-8") as f:
+            return float(_json.load(f).get("metadata_spec_cache_ttl", 300))
+    except Exception:
+        return 300.0
+
+
 def _extract_spec(question: str, collection: str, fields: set, field_values: Dict) -> Optional[Dict]:
-    """LLM extracts a structured aggregation spec. Returns None if unusable."""
+    """LLM extracts a structured aggregation spec. Returns None if unusable.
+    Memoized per (collection, normalized question) — see _SPEC_CACHE."""
+    import copy as _copy
+    import re as _re_sc
+    import time as _time_sc
+    _key = (collection,
+            _re_sc.sub(r"[^a-z0-9]+", " ", str(question).lower()).strip())
+    _hit = _SPEC_CACHE.get(_key)
+    if _hit and _time_sc.time() - _hit[0] < _spec_cache_ttl():
+        print(f"[METADATA] spec cache hit for {collection}")
+        return _copy.deepcopy(_hit[1])
+    _spec = _extract_spec_llm(question, collection, fields, field_values)
+    _SPEC_CACHE[_key] = (_time_sc.time(), _copy.deepcopy(_spec))
+    if len(_SPEC_CACHE) > 200:
+        _SPEC_CACHE.pop(next(iter(_SPEC_CACHE)))
+    return _spec
+
+
+def _extract_spec_llm(question: str, collection: str, fields: set, field_values: Dict) -> Optional[Dict]:
+    """The actual LLM call — only reached on cache miss."""
     from core.local_llm_client import call_local_llm_json
 
     field_list = ", ".join(sorted(fields))
@@ -166,7 +206,7 @@ def _extract_spec(question: str, collection: str, fields: set, field_values: Dic
         "- operation: one of 'count', 'count_distinct', 'list_distinct', 'group_by'\n"
         "- target_field: the field to count/list/group (must be from the allowed list), "
         "or null for plain row counts\n"
-        "- filters: list of {field, op, value} where op is 'equals' or 'contains'; "
+        "- filters: list of {field, op, value} where op is 'equals', 'not_equals' or 'contains'; use not_equals for NEGATED questions ('not resolved', 'except closed', 'other than X'); "
         "field must be from the allowed list; empty list if no filter\n"
         "- reason: brief, MAX 8 words\n\n"
         "Rules:\n"
@@ -232,7 +272,22 @@ def _where(collection: str, filters: List[Dict], df_keys=frozenset()):
     params: list = [collection]
     for f in filters:
         expr = _field_expr(f["field"], df_keys)
-        if f["op"] == "equals":
+        if f["op"] == "not_equals":
+            # NULL-safe scalar inequality; array fields exclude rows whose
+            # array CONTAINS the value.
+            if expr.startswith("payload->>"):
+                _key = f["field"].replace("'", "")
+                clauses.append(
+                    "(CASE WHEN jsonb_typeof(payload->'{k}') = 'array' "
+                    "THEN NOT EXISTS (SELECT 1 FROM jsonb_array_elements_text("
+                    "payload->'{k}') _v WHERE LOWER(_v) = LOWER(%s)) "
+                    "ELSE LOWER(COALESCE({e}, '')) != LOWER(%s) END)".format(
+                        k=_key, e=expr))
+                params.extend([f["value"], f["value"]])
+            else:
+                clauses.append(f"LOWER(COALESCE({expr}, '')) != LOWER(%s)")
+                params.append(f["value"])
+        elif f["op"] == "equals":
             # Array-aware equality: a jsonb-array payload field (e.g.
             # versions: ["4.2","4.4"]) matches when it CONTAINS the value;
             # scalar fields compare as before. Decided per-row by type, so
@@ -350,7 +405,7 @@ def _about_closest(collection, filters, question, df_keys, count_with,
         if not av:
             return None
         _grounded_desc = ", ".join(
-            f"{f['field']} {'=' if f['op'] == 'equals' else 'contains'} "
+            f"{f['field']} {_OP_SYM.get(f['op'], 'contains')} "
             f"{f['value']}" for f in _alive if not f.get("_injected"))
         lines = [f"No exact match found for the full wording — closest "
                  f"entries among those matching {_grounded_desc}, by what "
@@ -455,26 +510,45 @@ def run_metadata_query(collection: str, question: str, intent_mode: str = None) 
                          .get(collection, {}) or {}).items()}
         except Exception:
             _aliases = {}
-        _alias_targets = {v for t, v in _aliases.items() if t in _qt}
+        _alias_pairs = [(t, v) for t, v in _aliases.items() if t in _qt]
+        _alias_targets = {v for _, v in _alias_pairs}
+
+        def _negated(site_word):
+            """Deterministic negation scent: a negator within two words
+            before the site word ('not resolved', "aren't closed",
+            'not yet resolved')."""
+            return bool(_re0.search(
+                r"\b(?:not|no|non|never|isn'?t|aren'?t|wasn'?t|weren'?t|"
+                r"without|except|excluding|un)\W+(?:\w+\W+){0,2}?"
+                + _re0.escape(site_word), question.lower()))
+
         _filtered_fields = {f["field"] for f in spec["filters"]}
         for _fld, _vals in sorted(field_values.items()):
             if _fld in _filtered_fields:
                 continue
             for _v in _vals:
                 if str(_v).lower() in _qt:
+                    _op = ("not_equals" if _negated(str(_v).lower())
+                           else "equals")
                     spec["filters"].append(
-                        {"field": _fld, "op": "equals", "value": str(_v),
+                        {"field": _fld, "op": _op, "value": str(_v),
                          "_injected": True})
                     _filtered_fields.add(_fld)
-                    print(f"[METADATA] value-anchor filter injected: {_fld} = {_v}")
+                    print(f"[METADATA] value-anchor filter injected: "
+                          f"{_fld} {_op} {_v}")
                     break
-                if str(_v) in _alias_targets:
+                _t_hit = next((t for t, v in _alias_pairs if v == str(_v)),
+                              None)
+                if _t_hit is not None:
+                    # negation is checked against the USER'S word ('not
+                    # resolved'), not the data value ('Closed')
+                    _op = ("not_equals" if _negated(_t_hit) else "equals")
                     spec["filters"].append(
-                        {"field": _fld, "op": "equals", "value": str(_v),
+                        {"field": _fld, "op": _op, "value": str(_v),
                          "_injected": True})
                     _filtered_fields.add(_fld)
-                    print(f"[METADATA] alias filter injected: {_fld} = {_v} "
-                          f"(declared alias)")
+                    print(f"[METADATA] alias filter injected: {_fld} {_op} "
+                          f"{_v} (declared alias)")
                     break
 
         for f in spec["filters"]:
@@ -486,6 +560,26 @@ def run_metadata_query(collection: str, question: str, intent_mode: str = None) 
                         print(f"[METADATA] filter regrounded: {f} -> {fld} equals {f['value']}")
                         f["field"], f["op"] = fld, "equals"
                     break
+
+        # ALIAS POLARITY GUARD (deterministic): a value grounded by a
+        # declared alias must carry the operator the QUESTION's polarity
+        # dictates — 'are resolved' (alias resolved->Closed, not negated)
+        # means equals Closed; the LLM emitted not_equals Closed and
+        # inverted AR-02 (2026-08-03). The declaration outranks the LLM's
+        # choice of operator, both directions.
+        for f in spec["filters"]:
+            if f.get("op") not in ("equals", "not_equals"):
+                continue
+            _tok_ap = next((t for t, v in _alias_pairs
+                            if v == str(f.get("value"))), None)
+            if _tok_ap is None:
+                continue
+            _want_ap = "not_equals" if _negated(_tok_ap) else "equals"
+            if f["op"] != _want_ap:
+                print(f"[METADATA] alias polarity corrected: {f['field']} "
+                      f"{f['op']} -> {_want_ap} {f['value']} "
+                      f"(alias '{_tok_ap}')")
+                f["op"] = _want_ap
 
         # Multi-word CONTAINS phrases match nothing unless the words are
         # adjacent in the text ('FRA dates' never occurs; 'FRA' and 'dates'
@@ -563,7 +657,7 @@ def run_metadata_query(collection: str, question: str, intent_mode: str = None) 
         _g_kept, _g_dropped = [], False
         _q_low = question.lower()
         for f in spec["filters"]:
-            if f.get("op") != "equals":
+            if f.get("op") not in ("equals", "not_equals"):
                 _g_kept.append(f)
                 continue
             if f.get("_injected"):
@@ -588,11 +682,28 @@ def run_metadata_query(collection: str, question: str, intent_mode: str = None) 
                     for t in _re0.findall(r"\d+(?:\.\d+)?", _q_low))
             except ValueError:
                 pass
+            # Compact containment needs COVERAGE: 'goldman' grounding
+            # 'goldmansachs' (58%) is a name-prefix; 'halo' inside
+            # 'halodemoorganization' (20%) blessed an invented filter
+            # (eval 2026-08-02). Ratio declared in config.
+            try:
+                import json as _json_gr
+                from core.paths import SYSTEM_CONFIG_PATH as _SCP_GR
+                with open(_SCP_GR, "r", encoding="utf-8") as _fgr:
+                    _min_ratio = float(_json_gr.load(_fgr).get(
+                        "grounding_min_token_ratio", 0.4))
+            except Exception:
+                _min_ratio = 0.4
             _grounded = (
                 _num_grounded
                 or (_v_raw and _v_raw in _q_low)
                 or bool(_vtoks & _qt)
-                or any(t in _vcompact for t in _qt)
+                or any(t in _vcompact
+                       and len(t) >= _min_ratio * len(_vcompact)
+                       for t in _qt)
+                # declared alias target ('resolved' in question grounds
+                # 'Closed') — trusted by declaration, both polarities
+                or str(f.get("value")) in _alias_targets
             )
             if _grounded:
                 _g_kept.append(f)
@@ -725,6 +836,17 @@ def run_metadata_query(collection: str, question: str, intent_mode: str = None) 
             elif _keep and _count_with(_keep) > 0:
                 print(f"[METADATA] dropped zero-result filters, kept: {_keep}")
                 spec["filters"] = _keep
+            elif _keep:
+                # The kept combination itself zeroes — usually a surviving
+                # claim on one chunk level AND an injected anchor on
+                # another (action_type=Resolved lives on actions; the
+                # namespace=ticket anchor matches headers). Anchors are
+                # guesses: retreat them WITHIN the kept set too.
+                _keep_claims = [f for f in _keep if not f.get("_injected")]
+                if _keep_claims and _count_with(_keep_claims) > 0:
+                    print(f"[METADATA] injected anchors retreated within "
+                          f"kept set: {_keep_claims}")
+                    spec["filters"] = _keep_claims
             # NOTE: never drop ALL filters. When every filter matches nothing,
             # that IS the answer ("FIX 5.0 SP2" doesn't exist in the data) —
             # dropping them turned a no-answer trap into a 200-row dump
@@ -750,7 +872,7 @@ def run_metadata_query(collection: str, question: str, intent_mode: str = None) 
         # Human-readable filter summary — every answer states WHAT was matched
         # (e.g. "type = String"), so the answer is self-explanatory.
         _fdesc = ", ".join(
-            f"{f['field']} {'=' if f['op'] == 'equals' else 'contains'} {f['value']}"
+            f"{f['field']} {_OP_SYM.get(f['op'], 'contains')} {f['value']}"
             for f in spec["filters"])
         _suffix = f" matching {_fdesc}" if _fdesc else ""
 

@@ -94,7 +94,11 @@ QUESTIONS = [
     ("MI-04", "what are the moore filenames for goldman and jpm activity", "both mappings (known gate gap: no identifier tokens)", "recon_assist_file"),
     # --- Category 8: Archive (halo_tickets on-demand + memory/learning) ---
     ("AR-01", "are there tickets about FRA dates?", "44539 (phrase-split AND scopes to dates; 44946 optional — it's FRA-feeding, not dates; NEVER 61643 Viteos)", "halo_tickets"),
-    ("AR-02", "how many halo tickets are resolved", "2 via action_type=Resolved or status=Closed alias", "halo_tickets"),
+    ("AR-02", "how many halo tickets are resolved",
+     "a grounded count via action_type=Resolved or status=Closed alias — "
+     "CORPUS-RELATIVE (was 2 in the 3-ticket pilot era; grew with the "
+     "2026-08-02 pull). Zero or an obsidian/kb hijack is a FAIL.",
+     "halo_tickets"),
     ("AR-03", "who is handling the FRA issue internally at Moore?", "Guillaume (weak-answer widening reaches the archive automatically)", "halo_tickets"),
     ("AR-04", "who resolved ticket 44539", "Mike Aghbabian (named ticket routes archive in)", "halo_tickets"),
     ("AR-05", "how do I fix the FRA dates issue", "kb Waiting Period runbook headline; tickets stay withheld (hint only)", "kb_docs"),

@@ -81,5 +81,31 @@
         "wrong dates"
       ]
     }
+  },
+  "metadata_spec_cache_ttl": 300,
+  "summary_words": [
+    "summary",
+    "summarize",
+    "overview"
+  ],
+  "grounding_min_token_ratio": 0.4,
+  "section_synonyms": {
+    "resolved": "status",
+    "closed": "status",
+    "closure": "status",
+    "solved": "solution",
+    "fix": "solution",
+    "fixed": "solution",
+    "communication": "responses",
+    "emails": "responses",
+    "email": "responses",
+    "replies": "responses",
+    "thread": "responses",
+    "notes": "internal_notes",
+    "internal": "internal_notes",
+    "merged": "merges",
+    "merge": "merges",
+    "problem": "issue",
+    "description": "issue"
   }
 }

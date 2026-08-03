@@ -39,6 +39,7 @@ WHITELIST = {
     "concept_vectors", "cross_links", "background_tasks",
     "chat_sessions", "chat_messages", "answer_feedback",
     "collection_vocab", "schemas", "sql_snippets",
+    "runtime_counters", "about_vectors",
 }
 
 # Statements / functions that must never appear in a generated query.
@@ -91,11 +92,11 @@ def _collection_profile(collection: Optional[str]) -> Dict[str, List[str]]:
         (collection,),
     )
     doc_types = _distinct(
-        "SELECT DISTINCT doc_type AS v FROM chunks WHERE collection_name = %s LIMIT 30",
+        "SELECT DISTINCT doc_type AS v FROM chunks WHERE collection_name = %s ORDER BY v LIMIT 30",
         (collection,),
     )
     source_types = _distinct(
-        "SELECT DISTINCT source_type AS v FROM chunks WHERE collection_name = %s LIMIT 30",
+        "SELECT DISTINCT source_type AS v FROM chunks WHERE collection_name = %s ORDER BY v LIMIT 30",
         (collection,),
     )
     filetypes = _distinct(

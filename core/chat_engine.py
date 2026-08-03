@@ -51,8 +51,17 @@ def _result_to_text(result) -> str:
     if isinstance(result, dict):
         if isinstance(result.get("results"), list):
             items = result["results"]
-            total = result.get("total_matches", len(items))
-            lines = [f"Found {total} item(s):"]
+            # total_matches counts BM25 hits only — semantic results can be
+            # non-empty while it reads 0, which produced the lying header
+            # "Found 0 item(s):" followed by a list. Honest phrasing instead:
+            # 'No direct match found' is an existing weakness marker, so
+            # arbitration/widening still treat these listings as weak —
+            # display fixed without smuggling in a behavior change.
+            total = int(result.get("total_matches") or 0)
+            if items and total == 0:
+                lines = ["No direct match found — closest results:"]
+            else:
+                lines = [f"Found {max(total, len(items))} item(s):"]
             for it in items:
                 if isinstance(it, dict):
                     name = (it.get("identifier") or it.get("primary_name")
@@ -695,9 +704,20 @@ def run_parallel_queries(collections: list, question: str, single_item: bool = F
         # which is otherwise constant for docs.
         if mrank == 2:
             _title = str((r.get("answer_payload") or {}).get("primary_name") or "")
-            _tc = _re.sub(r"[^a-z0-9]", "", _title.lower())
+            # TOKEN-level title matching — substring-in-compacted-title let
+            # 'solution' hit inside 'Lock File Error Resolution' and handed
+            # a ticket-solution question to a lock-file runbook. A word
+            # matches a word (with de-pluralizing), never a fragment of one.
+            # Letter<->digit boundaries split glued filename tokens
+            # ('ngc2064' -> ngc, 2064; 'gain100' -> gain, 100) so records
+            # named by concatenation still match — 'resolution' stays whole
+            # (DL-10 regression fix, 2026-08-02).
+            _t_toks = set(_re.findall(r"[a-z]{2,}|[0-9]{2,}",
+                                      _title.lower()))
+            _t_toks |= {t[:-1] for t in _t_toks
+                        if t.endswith("s") and len(t) > 3}
             _tvar = _qtoks | {t[:-1] for t in _qtoks if t.endswith("s") and len(t) > 3}
-            _thits = sum(1 for t in _tvar if t in _tc)
+            _thits = sum(1 for t in _tvar if t in _t_toks)
             return (mrank, 3 - min(_thits, 3), 2, _weak_answer(r),
                     -_fb_for(col), idx)
         # Groundedness is graded: an EQUALS filter on a real field whose value
@@ -1560,6 +1580,98 @@ def _is_empty_answer_text(t: str) -> bool:
         "No matching records"))
 
 
+def _ticket_summary(question: str):
+    """Deterministic ticket summary (user design 2026-08-02): a summary word
+    plus an identifier that IS a ticket routes to a sectioned digest built
+    straight from the section chunks — no LLM, nothing to hallucinate; the
+    about and solution rows reuse LLM work already done at ingestion.
+    Returns {tid, rows: [{label, brief, full}]} | None. Long bodies ride in
+    'full' — the UI renders those as click-to-expand."""
+    try:
+        import json as _json
+        import re as _re
+        from core.db import fetchall
+        from core.paths import SYSTEM_CONFIG_PATH
+        try:
+            with open(SYSTEM_CONFIG_PATH, "r", encoding="utf-8") as _f:
+                _words = [str(w).lower() for w in _json.load(_f).get(
+                    "summary_words", ["summary", "summarize", "overview"])]
+        except Exception:
+            _words = ["summary", "summarize", "overview"]
+        _ql = question.lower()
+        if not any(w in _ql for w in _words):
+            return None
+        for tid in _re.findall(r"\b\d{3,}\b", question):
+            rows = fetchall(
+                "SELECT identifier, description, payload FROM chunks "
+                "WHERE payload->>'ticket_id' = %s ORDER BY identifier",
+                (tid,))
+            if not any(r["identifier"] == tid for r in rows):
+                continue
+            _by_id = {r["identifier"]: r for r in rows}
+            _hdr = _by_id[tid]
+            _pl = _hdr["payload"] or {}
+            out = []
+            out.append({"label": "Ticket",
+                        "brief": f"{tid} — {_pl.get('summary') or ''}",
+                        "full": ""})
+            _st = _by_id.get(f"{tid}-status")
+            _st_txt = (_st["description"] if _st else
+                       f"Status: {_pl.get('status')}, "
+                       f"Priority: {_pl.get('priority')}")
+            out.append({"label": "Status",
+                        "brief": " ".join(str(_st_txt).split())[:200],
+                        "full": ""})
+            _about = str(_pl.get("about") or "").strip()
+            _issue_full = str(_hdr["description"] or "")
+            out.append({"label": "Issue",
+                        "brief": (_about or _issue_full)[:220],
+                        "full": _issue_full})
+            for _sec, _lbl in (("responses", "Communication"),
+                               ("internal_notes", "Internal notes")):
+                _acts = [r for r in rows
+                         if (r["payload"] or {}).get("section") == _sec]
+                if not _acts:
+                    continue
+                _lines, _fulls = [], []
+                for r in _acts:
+                    _ap = r["payload"] or {}
+                    _lines.append(f"{_ap.get('who')} "
+                                  f"({_ap.get('action_datetime')})")
+                    _fulls.append(f"--- {_ap.get('who')} "
+                                  f"({_ap.get('action_datetime')}):\n"
+                                  + str(r["description"] or ""))
+                out.append({"label": _lbl,
+                            "brief": f"{len(_acts)}: " + " · ".join(_lines),
+                            "full": "\n\n".join(_fulls)})
+            _sol = _by_id.get(f"{tid}-solution")
+            if _sol:
+                out.append({"label": "Solution",
+                            "brief": str(_sol["description"] or "")[:220],
+                            "full": str(_sol["description"] or "")})
+            _mg = (_pl.get("merged_tickets") or [])
+            _mi = _pl.get("merged_into")
+            if _mg or _mi:
+                out.append({"label": "Merged",
+                            "brief": (", ".join(_mg) if _mg else "")
+                            + (f" · merged into {_mi}" if _mi else ""),
+                            "full": ""})
+            _par = _pl.get("parent_ticket")
+            _kids = _pl.get("child_tickets") or []
+            if _par or _kids:
+                out.append({"label": "Family",
+                            "brief": (f"parent {_par}" if _par else "")
+                            + (" · " if _par and _kids else "")
+                            + (f"children {', '.join(_kids)}" if _kids
+                               else ""),
+                            "full": ""})
+            return {"tid": tid, "rows": out}
+        return None
+    except Exception as _e:
+        print(f"[TICKET SUMMARY] failed: {_e}")
+        return None
+
+
 def chat_turn(question: str, history: list, available_collections: list,
               session_id=None, explicit_collections: bool = False,
               skip_cache: bool = False) -> dict:
@@ -1723,6 +1835,21 @@ def chat_turn(question: str, history: list, available_collections: list,
     if DEBUG:
         print("DEBUG contextualize:", ctx)
 
+    # Ticket summary gate (deterministic; user design 2026-08-02)
+    _tsum = _ticket_summary(standalone_question)
+    if _tsum:
+        _md = ["| | |", "|---|---|"] + [
+            f"| **{r['label']}** | {r['brief']} |" for r in _tsum["rows"]]
+        return {
+            "role": "assistant",
+            "content": "\n".join(_md),
+            "method": "ticket_summary",
+            "collection": "halo_tickets",
+            "related_sections": [],
+            "answer_kind": "structured",
+            "ticket_summary": _tsum,
+        }
+
     # Step 1c (CODE-023): multi-item questions — deterministic gate, LLM split,
     # per-item fan-out, merged per-item answer. Single-item questions skip this
     # entirely (gate fails before any LLM call).
@@ -1862,7 +1989,7 @@ def chat_turn(question: str, history: list, available_collections: list,
     def _is_structured_collection(col):
         from core.db import fetchall as _fа
         rows = _fа(
-            "SELECT DISTINCT payload->>'doc_type' AS dt FROM chunks WHERE collection_name = %s LIMIT 5",
+            "SELECT DISTINCT payload->>'doc_type' AS dt FROM chunks WHERE collection_name = %s ORDER BY dt LIMIT 5",
             (col,)
         )
         doc_types = {r['dt'] for r in rows if r['dt']}

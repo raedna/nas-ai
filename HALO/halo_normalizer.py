@@ -51,6 +51,11 @@ def _cfg():
             "other ticket merged"])],
         "merge_id_pattern": str(c.get("merge_id_pattern",
                                       r"ticket\s*id:?\s*(\d+)")),
+        # Section roles per action (user decision 2026-08-02): outcomes in
+        # resolution_outcomes -> 'solution' (the special knowledge-bearing
+        # unit); hiddenfromuser -> 'internal_notes'; else 'responses'.
+        "resolution_outcomes": [str(x).lower() for x in c.get(
+            "resolution_outcomes", ["resolved"])],
     }
 
 
