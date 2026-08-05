@@ -16,7 +16,7 @@ The schema is KNOWN — defined here, saved once under the fixed stem
 'halo_ticket' — the first collection whose schema is a fact, not an
 inference.
 """
-from HALO.halo_normalizer import _cfg, _clean_text
+from HALO.halo_normalizer import _cfg, _clean_text, _prune_quoted
 
 _SCHEMA = {
     "identifier": ["ticket_id"],
@@ -174,6 +174,7 @@ def halo_serializer(parsed, file_path, template_config, file_tags, collection_na
         who = str(act.get("who") or "").strip()
         note = _clean_text(act.get("note") or "", cfg["boilerplate_prefixes"],
                            cfg.get("boilerplate_truncate", ()))
+        note = _prune_quoted(note, cfg.get("quoted_markers", ()))
         if not note:
             continue
         if outcome.lower() in cfg["noise_outcomes"]:
@@ -196,8 +197,11 @@ def halo_serializer(parsed, file_path, template_config, file_tags, collection_na
         else:
             section = "responses"
         _sec_label = ""
+        who_role = cfg.get("who_type_map", {}).get(
+            str(act.get("who_type")), "")
+        _who_disp = f"{who} ({who_role})" if who_role else who
         items.append({
-            "text": (f"Ticket {tid} ({summary}) — {outcome} by {who} "
+            "text": (f"Ticket {tid} ({summary}) — {outcome} by {_who_disp} "
                      f"({when}){_sec_label}:\n\n{note}"),
             **base,
             "identifier": aid,
@@ -208,6 +212,7 @@ def halo_serializer(parsed, file_path, template_config, file_tags, collection_na
                             + _sec_label,
             "description": note,
             "who": who,
+            "who_role": who_role,
             "action_type": outcome,
             "action_datetime": when,
             "section": section,
@@ -342,6 +347,47 @@ def halo_serializer(parsed, file_path, template_config, file_tags, collection_na
         # doc pipeline.
         items[0]["text"] += "\n\n" + "\n".join(
             f"[image: {i.get('name')}]" for i in imgs if i.get("name"))
+        # OCR (user decision 2026-08-03): screenshots in the originating
+        # request often carry the actual error text — run the doc
+        # pipeline's OCR over the downloaded assets and make it
+        # SEARCHABLE on the header. Config switch halo.image_ocr.
+        try:
+            from core.system_config import load_system_config as _lsc_ocr
+            _ocr_on = bool(_lsc_ocr().get("halo", {}).get("image_ocr", True))
+        except Exception:
+            _ocr_on = True
+        if _ocr_on:
+            try:
+                from PIL import Image as _PILImage
+                from IMAGES.image_parser import _run_ocr
+                _ocr_map = {}
+                for i in imgs:
+                    _pth, _nm = i.get("path"), i.get("name")
+                    if not (_pth and _nm):
+                        continue
+                    try:
+                        _txt_ocr = _run_ocr(_PILImage.open(_pth),
+                                            enable_ocr=True).strip()
+                    except Exception:
+                        _txt_ocr = ""
+                    if _txt_ocr:
+                        _ocr_map[_nm] = _txt_ocr[:2000]
+                if _ocr_map:
+                    # doc-pipeline convention: LIST of {image_target,
+                    # ocr_text} dicts (the dict form crashed the renderer,
+                    # 2026-08-03)
+                    items[0]["embedded_image_ocr_map"] = [
+                        {"image_target": n, "ocr_text": t}
+                        for n, t in _ocr_map.items()]
+                    items[0]["has_embedded_image_ocr"] = True
+                    items[0]["text"] += "\n\n" + "\n\n".join(
+                        f"[Embedded image OCR from: {n}]\n{t}"
+                        for n, t in _ocr_map.items())
+                    print(f"[HALO SERIALIZER] ticket {tid} OCR: "
+                          f"{len(_ocr_map)} image(s), "
+                          f"{sum(len(v) for v in _ocr_map.values())} chars")
+            except Exception as _oe:
+                print(f"[HALO SERIALIZER] OCR skipped: {_oe}")
 
     _ensure_schema(collection_name)
     print(f"[HALO SERIALIZER] ticket {tid} -> {len(items)} chunks "

@@ -32,9 +32,9 @@ if str(PROJECT_ROOT) not in sys.path:
 # collection; first one when the expectation spans collections).
 QUESTIONS = [
     # --- Category 1: Direct Lookup ---
-    ("DL-01", "what is FIX tag 22", "SecurityIDSource definition", "xml_test"),
+    ("DL-01", "what is FIX tag 22", "SecurityIDSource definition", "fix_tags"),
     ("DL-02", "what is gsact.txt", "Goldman RECON mapping record", "recon_assist_file"),
-    ("DL-03", "what is tag 35 in FIX", "MsgType definition", "xml_test"),
+    ("DL-03", "what is tag 35 in FIX", "MsgType definition", "fix_tags"),
     ("DL-04", "jpm_activity.xlsx details", "JPM mapping record (verify filename)", "recon_assist_file"),
     ("DL-05", "what is the PB filename for gsact.txt", "SRPB_4000_..._Custody_Tra alias", "recon_assist_file"),
     ("DL-06", "what is the Whirlpool galaxy", "M51/NGC5194 catalog entry", "astro_catalog"),
@@ -44,7 +44,12 @@ QUESTIONS = [
     ("DL-10", "NGC 2064", "catalog entry (type, coordinates)", "astro_catalog"),
     # --- Category 2: Paraphrase / messy phrasing ---
     ("PP-01", "that goldman activity file, whats the tidal job for it", "gsact.txt -> 019_W_RECON_GOLDMAN_PRIO_PULL", "recon_assist_file"),
-    ("PP-02", "whats teh fix tag for order quantity", "OrderQty tag 38", "xml_test"),
+    ("PP-02", "whats teh fix tag for order quantity",
+     "OrderQty tag 38. Post registry-merge (2026-08-05) an honest weak "
+     "closest-list is ACCEPTED when 38/OrderQty LEADS it (user doctrine: "
+     "honest weak answers are demotable); a list without 38 on top, or an "
+     "invented tag, is a FAIL. Candidate improvement: tag_range standard-"
+     "first tie-break (tracker).", "fix_tags"),
     ("PP-03", "brodcaster acting up agian", "broadcaster troubleshooting", "kb_docs"),
     ("PP-04", "CR wont let me cancel a fix trade", "Cancel FIX Trades in CRD When Blocked", "kb_docs"),
     ("PP-05", "the us1 proc server thing for recon", "4.2 Checking Files on us1-proc02 / KB 2.2", "obsidian"),
@@ -63,34 +68,42 @@ QUESTIONS = [
     # --- Category 4: Aggregation ---
     ("AG-01", "how many KB articles are there", "178 active articles (NOT 348 chunks)", "kb_docs"),
     ("AG-02", "how many articles mention FIX", "SQL truth: distinct articles with fix in nlp_text", "kb_docs"),
-    ("AG-03", "how many FIX tags are there", "947 (namespace=tag)", "xml_test"),
+    ("AG-03", "how many FIX tags are there",
+     "CORPUS-RELATIVE: ~4972 in namespace=tag since the user-defined "
+     "registry merged into fix_tags (2026-08-04; was 947 in the "
+     "xml-only era). A count scoped to namespace=tag is correct; "
+     "chunk-count inflation or another collection answering is a FAIL.",
+     "fix_tags"),
     ("AG-04", "how many Goldman files are in the recon mapping", "16 (15 if NULL row uncounted — CODE-024)", "recon_assist_file"),
     ("AG-05", "how many images do I have for M42", "verify astro_test", "astro_test"),
     ("AG-06", "how many galaxies are in the catalog", "count type=Gx in astro_catalog", "astro_catalog"),
     ("AG-07", "list all prime brokers in the recon file", "BOA, BONY, CHASE, CITCO, CITI, CS, DB, Goldman, JPM, MIZUHO, Morgan", "recon_assist_file"),
     ("AG-08", "which broker has the most recon files", "group-by type, Goldman likely", "recon_assist_file"),
     ("AG-09", "how many images with gain 100", "verify astro_test file_gain", "astro_test"),
-    ("AG-10", "how many fields are in FIX 4.4", "Fields_FIX44 count", "xml_test"),
+    ("AG-10", "how many fields are in FIX 4.4", "Fields_FIX44 count", "fix_tags"),
     # --- Category 5: Cross-collection ---
     ("XC-01", "I'm missing gsact.txt from Goldman, what can I do", "mapping record + Tidal/sFTP procedure", "recon_assist_file"),
     ("XC-02", "what tidal job pulls jpm files and how do I check if it ran", "JPM job name + 4.1 checking procedure", "recon_assist_file"),
-    ("XC-03", "what is tag 38 and are there KB articles about FIX order issues", "tag def + FIX-related KB articles", "xml_test"),
+    ("XC-03", "what is tag 38 and are there KB articles about FIX order issues", "tag def + FIX-related KB articles", "fix_tags"),
     ("XC-04", "show me the M51 catalog entry and do I have images of it", "catalog entry + M51 images", "astro_catalog"),
     ("XC-05", "bad dates alert for citi, which file and what steps", "citi mapping + bad dates workflow", "recon_assist_file"),
     ("XC-06", "broadcaster is down, who do I contact and what do I check", "checklist article + contacts", "kb_docs"),
     # --- Category 6: No-answer traps ---
-    ("NA-01", "what is FIX tag 99999", "not found — tag doesn't exist", "xml_test"),
+    ("NA-01", "what is FIX tag 99999", "not found — tag doesn't exist", "fix_tags"),
     ("NA-02", "what is the recon mapping for barclays_fx_swap.txt", "not found — must not invent a job", "recon_assist_file"),
     ("NA-03", "how do I restart the Bloomberg terminal server", "not found — no such procedure", "kb_docs"),
     ("NA-04", "what are the FIX 5.0 SP2 changes",
      "not found — only 4.2/4.4 ingested. A weak-labeled about-closest list "
      "('No exact match found... closest entries') is ACCEPTED (user "
      "decision 2026-07-30: prefer an honest weak answer that can be "
-     "demoted); inventing SP2 content is NOT.", "xml_test"),
+     "demoted); inventing SP2 content is NOT.", "fix_tags"),
     # --- Category 7: Multi-item ---
-    ("MI-01", "what are tags 22, 35 and 54", "SecurityIDSource + MsgType + Side", "xml_test"),
-    ("MI-02", "give me the tidal jobs for gsact.txt and gspos.txt", "both Goldman job names", "recon_assist_file"),
-    ("MI-03", "compare FIX tag 38 and tag 152", "OrderQty vs CashOrderQty", "xml_test"),
+    ("MI-01", "what are tags 22, 35 and 54", "SecurityIDSource + MsgType + Side", "fix_tags"),
+    ("MI-02", "give me the tidal jobs for gsact.txt and gspos.txt",
+     "both Goldman job names MUST appear (019_W_RECON_GOLDMAN_PRIO_PULL / "
+     "gspos job). Accepted-mushy 2026-08-05: phrasing may hedge; missing "
+     "either job name is a FAIL.", "recon_assist_file"),
+    ("MI-03", "compare FIX tag 38 and tag 152", "OrderQty vs CashOrderQty", "fix_tags"),
     ("MI-04", "what are the moore filenames for goldman and jpm activity", "both mappings (known gate gap: no identifier tokens)", "recon_assist_file"),
     # --- Category 8: Archive (halo_tickets on-demand + memory/learning) ---
     ("AR-01", "are there tickets about FRA dates?", "44539 (phrase-split AND scopes to dates; 44946 optional — it's FRA-feeding, not dates; NEVER 61643 Viteos)", "halo_tickets"),
@@ -99,7 +112,12 @@ QUESTIONS = [
      "CORPUS-RELATIVE (was 2 in the 3-ticket pilot era; grew with the "
      "2026-08-02 pull). Zero or an obsidian/kb hijack is a FAIL.",
      "halo_tickets"),
-    ("AR-03", "who is handling the FRA issue internally at Moore?", "Guillaume (weak-answer widening reaches the archive automatically)", "halo_tickets"),
+    ("AR-03", "who is handling the FRA issue internally at Moore?",
+     "CORPUS-RELATIVE (user decision 2026-08-04): with many FRA tickets, "
+     "'the FRA issue' is ambiguous — an honest no-direct-match is ACCEPTED; "
+     "a targeted 'who from Moore is involved in ticket 44539' must name "
+     "Guillaume via ticket-focus synthesis. Inventing a handler is a FAIL.",
+     "halo_tickets"),
     ("AR-04", "who resolved ticket 44539", "Mike Aghbabian (named ticket routes archive in)", "halo_tickets"),
     ("AR-05", "how do I fix the FRA dates issue", "kb Waiting Period runbook headline; tickets stay withheld (hint only)", "kb_docs"),
     ("AR-06", "what is ticket 44946", "UAT XML processor FRA ticket header + thread", "halo_tickets"),

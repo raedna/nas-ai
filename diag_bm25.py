@@ -19,7 +19,7 @@ result = fetchone("""
            nlp_text_tsv IS NOT NULL as has_tsv,
            length(nlp_text::text) as nlp_len
     FROM chunks
-    WHERE collection_name = 'xml_test'
+    WHERE collection_name = 'fix_tags'
     AND primary_name = 'ExecBroker'
     LIMIT 1
 """)
@@ -31,7 +31,7 @@ rows = fetchall("""
     SELECT id, primary_name,
            ts_rank(nlp_text_tsv, plainto_tsquery('english', 'exec broker')) as rank
     FROM chunks
-    WHERE collection_name = 'xml_test'
+    WHERE collection_name = 'fix_tags'
     AND nlp_text_tsv @@ plainto_tsquery('english', 'exec broker')
     LIMIT 5
 """)
@@ -46,7 +46,7 @@ result = fetchone("""
            nlp_text_tsv::text as tsv_text,
            nlp_text
     FROM chunks
-    WHERE collection_name = 'xml_test'
+    WHERE collection_name = 'fix_tags'
     AND primary_name = 'ExecBroker'
     LIMIT 1
 """)
@@ -60,7 +60,7 @@ print("\n=== Simple word search for 'broker' ===")
 rows = fetchall("""
     SELECT primary_name
     FROM chunks
-    WHERE collection_name = 'xml_test'
+    WHERE collection_name = 'fix_tags'
     AND nlp_text_tsv @@ to_tsquery('english', 'broker')
     LIMIT 5
 """)

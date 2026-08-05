@@ -1419,6 +1419,21 @@ def generate_conversational_response(question: str, history: list, retrieved_ans
     else:
         system_prompt = GROUNDED_SYSTEM_PROMPT
 
+    # Declared glossary reaches SYNTHESIS too (was rerank-only): 'PB
+    # filename' means the record's alias — without the line the 14B flaps
+    # on site-vocabulary bridges (DL-05, 2026-08-05). Injected only when a
+    # term appears in the question.
+    if retrieved_answer:
+        try:
+            from core.glossary import glossary_for_question
+            _gl = glossary_for_question(question)
+            if _gl:
+                system_prompt = (system_prompt
+                                 + "\nDomain glossary (authoritative for "
+                                   "this site):\n" + "\n".join(_gl))
+        except Exception:
+            pass
+
     messages = []
     for m in history[-5:]:
         messages.append({"role": m["role"], "content": m["content"]})

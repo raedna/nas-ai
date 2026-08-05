@@ -300,7 +300,7 @@ def test_answer():
             "description": "Identifies class or source of SecurityID value.",
             "enum_values": [],
         }
-        answer = synthesize_answer(payload, [], "xml_test")
+        answer = synthesize_answer(payload, [], "fix_tags")
         assert "22" in answer
         assert "SecurityIDSource" in answer
         record("synthesize_answer: structured payload contains identifier + name", True)
@@ -320,7 +320,7 @@ def test_answer():
                 {"enum_value": "4", "enum_name": "ISIN", "description": "ISIN number"},
             ],
         }
-        answer = synthesize_answer(payload, ["enum_value"], "xml_test")
+        answer = synthesize_answer(payload, ["enum_value"], "fix_tags")
         assert "ISIN" in answer, f"Expected ISIN in answer: {answer}"
         assert "CUSIP" in answer, f"Expected CUSIP in answer: {answer}"
         record("synthesize_answer: enum_value role returns enum list", True)
@@ -387,7 +387,7 @@ def test_router_offline():
 
     # explain_query_routing — returns expected keys
     try:
-        result = explain_query_routing("xml_test", "what is tag 22")
+        result = explain_query_routing("fix_tags", "what is tag 22")
         required_keys = {"question", "intent_mode", "relationship_query", "enum_lookup_query", "namespace", "identifier"}
         missing = required_keys - set(result.keys())
         assert not missing, f"Missing keys: {missing}"
@@ -397,7 +397,7 @@ def test_router_offline():
 
     # explain_query_routing — namespace detection
     try:
-        result = explain_query_routing("xml_test", "what is tag 22")
+        result = explain_query_routing("fix_tags", "what is tag 22")
         assert result["identifier"] == "22", f"Expected identifier=22, got {result['identifier']}"
         record("explain_query_routing: detects identifier '22' in 'what is tag 22'", True)
     except Exception as e:
@@ -408,7 +408,7 @@ def test_router_offline():
 # 5. Live integration tests (requires PostgreSQL on NAS)
 # ---------------------------------------------------------------------------
 
-def test_live(collection: str = "xml_test"):
+def test_live(collection: str = "fix_tags"):
     print(f"\n── 5. Live integration tests (collection={collection}) ───────")
 
     # Check DB reachable
@@ -472,7 +472,7 @@ def test_live(collection: str = "xml_test"):
 def main():
     parser = argparse.ArgumentParser(description="Retrieval package smoke tests")
     parser.add_argument("--live", action="store_true", help="Also run DB-dependent tests")
-    parser.add_argument("--collection", default="xml_test", help="Collection for live tests")
+    parser.add_argument("--collection", default="fix_tags", help="Collection for live tests")
     parser.add_argument("--verbose", action="store_true", help="Show all detail lines")
     args = parser.parse_args()
 

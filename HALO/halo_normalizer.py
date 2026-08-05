@@ -56,6 +56,15 @@ def _cfg():
         # unit); hiddenfromuser -> 'internal_notes'; else 'responses'.
         "resolution_outcomes": [str(x).lower() for x in c.get(
             "resolution_outcomes", ["resolved"])],
+        # Quoted-chain pruning: reply notes embed the whole prior thread —
+        # every quoted layer already exists as its own action chunk (14
+        # chunks blew the 2.5K embed window; worst 74K chars). Lines
+        # STARTING with these markers begin a quoted message.
+        "who_type_map": {str(k): str(v) for k, v in c.get(
+            "who_type_map", {"1": "support agent",
+                             "2": "client-side"}).items()},
+        "quoted_markers": [str(x) for x in c.get("quoted_markers", [
+            "From: ", "-----Original Message", "________________________"])],
     }
 
 
@@ -142,3 +151,37 @@ def write_ticket_markdown(ticket_json_path, actions_json_path, out_dir):
     p.write_text(doc["text"], encoding="utf-8")
     print(f"[HALO] wrote {p} ({len(doc['text'])} chars)")
     return str(p)
+
+
+def _prune_quoted(text: str, markers=()) -> str:
+    """Cut the QUOTED TAIL of an email note. The note's own header may
+    itself start with 'From: ...' (within the first ~200 chars) — that one
+    is kept; the cut lands on the NEXT quoted-message marker. Information
+    is not lost: every quoted layer exists as its own action chunk."""
+    t = str(text or "")
+    if not markers:
+        return t
+    positions = []
+    offset = 0
+    for line in t.split("\n"):
+        stripped = line.lstrip()
+        if any(stripped.startswith(m) for m in markers):
+            positions.append(offset + (len(line) - len(stripped)))
+        offset += len(line) + 1
+    if not positions:
+        return t
+    cut = None
+    # the note's OWN header sits at position 0 after cleaning; anything
+    # later is a quoted message
+    if positions[0] <= 2:
+        if len(positions) > 1:
+            cut = positions[1]
+    else:
+        cut = positions[0]
+    if cut is None:
+        return t
+    pruned = t[:cut].rstrip()
+    if len(pruned) < len(t):
+        print(f"[HALO NORMALIZER] quoted tail pruned: "
+              f"{len(t)} -> {len(pruned)} chars")
+    return pruned

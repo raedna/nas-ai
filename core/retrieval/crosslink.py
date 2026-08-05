@@ -238,6 +238,23 @@ def fetch_structured_points_by_name_in_question(
             spans.append(" ".join(tokens[start:end]))
     spans = sorted(set(spans), key=len, reverse=True)
 
+    # A record legitimately NAMED with a question-noise word (registry tag
+    # 7286 'Value') must not match every question containing that word —
+    # 'what tag can have a VALUE ISIN' hijacked the reverse-enum path
+    # (2026-08-04). Single-word noise names are excluded from in-question
+    # matching; explicit lookups (namespace, exact name questions with
+    # more words) still reach them.
+    try:
+        from core.query_helpers import load_doc_query_hints as _ldqh_nq
+        _noise_nq = set()
+        for _k_nq in ("discovery_noise_words", "question_words",
+                      "stopwords"):
+            _noise_nq.update(str(x).lower()
+                             for x in _ldqh_nq().get(_k_nq, []))
+    except Exception:
+        _noise_nq = set()
+    spans = [s for s in spans if s not in _noise_nq]
+
     points = scroll_collection(
         collection_name=collection_name,
         doc_type="structured",

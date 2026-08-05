@@ -935,7 +935,26 @@ def run_metadata_query(collection: str, question: str, intent_mode: str = None) 
                     # spans so markdown doesn't italicize their underscores.
                     if c and " " not in c:
                         c = f"`{c}`"
-                    items.append(f"`{r['v']}`" + (f" — {c}" if c else ""))
+                    # identifier listings show BOTH the raw id and the
+                    # display value when they differ ('959 — AuctionType —
+                    # desc', user request 2026-08-05) — a bare name loses
+                    # the tag number, a bare number loses the name.
+                    _v0 = str(r.get("v0") or "")
+                    _vd = str(r["v"])
+                    # prefix-related = the display DERIVES from the raw id
+                    # (halo '44539-a17' -> '44539'): keep hiding the
+                    # internal id. Unrelated (tag '959' vs 'AuctionType'):
+                    # show both.
+                    if (_v0 and _v0 != _vd
+                            and not _v0.startswith(_vd)
+                            and not _vd.startswith(_v0)):
+                        _lead = f"`{_v0}` — `{_vd}`"
+                    else:
+                        _lead = f"`{_vd}`"
+                    # drop the companion when it just repeats the display
+                    if c and c.strip("`") == _vd:
+                        c = ""
+                    items.append(_lead + (f" — {c}" if c else ""))
                 if not items:
                     print("[METADATA] degenerate list result -> fallback to discovery")
                     return None

@@ -199,6 +199,19 @@ def structured_points_by_name_in_question(
         limit=5000,
     )
 
+    # noise-named records (registry tag 7286 'Value') must not match every
+    # question containing their word — same guard as the crosslink variant
+    # (2026-08-04)
+    try:
+        from core.query_helpers import load_doc_query_hints as _ldqh_sn
+        _noise_sn = set()
+        for _k_sn in ("discovery_noise_words", "question_words",
+                      "stopwords"):
+            _noise_sn.update(str(x).lower()
+                             for x in _ldqh_sn().get(_k_sn, []))
+    except Exception:
+        _noise_sn = set()
+
     matches = []
     for p in points:
         payload = p.payload or {}
@@ -207,6 +220,8 @@ def structured_points_by_name_in_question(
             continue
 
         name_norm = normalize_simple_text(name)
+        if name_norm in _noise_sn:
+            continue
         name_compact = "".join(name_norm.split())
 
         if name_norm in q_norm or name_compact in q_compact:

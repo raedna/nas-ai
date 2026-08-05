@@ -13,7 +13,7 @@ from core.retrieval.db_retrieval import search_bm25
 from core.retrieval.discovery import score_discovery_payload
 
 question = "what tags contain security"
-candidates = search_bm25('xml_test', 'security', limit=10)
+candidates = search_bm25('fix_tags', 'security', limit=10)
 print(f"BM25 candidates: {len(candidates)}")
 for p in candidates:
     payload = p.payload or {}

@@ -2509,7 +2509,7 @@ with tabs[5]:
     sql_collections = get_pg_collections()
     sql_query = st.text_area(
         "SQL Query",
-        value="SELECT primary_name, identifier, description, doc_type\nFROM chunks\nWHERE collection_name = 'xml_test'\nLIMIT 10",
+        value="SELECT primary_name, identifier, description, doc_type\nFROM chunks\nWHERE collection_name = 'fix_tags'\nLIMIT 10",
         height=150,
         key="sql_inspector_query"
     )
@@ -2672,7 +2672,7 @@ with tabs[7]:
     # Collection selector
     chat_collections = sorted(collections_cfg.keys())
     # Default operational collections for auto-routing
-    _default_chat_cols = [c for c in ["recon_assist_file", "obsidian", "kb_docs", "xml_test", "bbg_fields"] if c in collections_cfg]
+    _default_chat_cols = [c for c in ["recon_assist_file", "obsidian", "kb_docs", "fix_tags", "bbg_fields"] if c in collections_cfg]
     chat_col_select = st.multiselect(
         "Collections to search (leave empty for auto-select)",
         chat_collections,

@@ -21,7 +21,7 @@ rows = fetchall("""
     AND nlp_text_tsv @@ plainto_tsquery('english', %s)
     ORDER BY bm25_score DESC
     LIMIT 5
-""", ('exec broker', 'xml_test', 'exec broker'))
+""", ('exec broker', 'fix_tags', 'exec broker'))
 print(f"Found: {len(rows)}")
 for r in rows:
     print(f"  {r['primary_name']} score={r['bm25_score']}")
@@ -36,14 +36,14 @@ rows = fetchall("""
     AND nlp_text_tsv @@ plainto_tsquery('english', %s)
     ORDER BY bm25_score DESC
     LIMIT 5
-""", ('exec broker', 'xml_test', 'exec broker'))
+""", ('exec broker', 'fix_tags', 'exec broker'))
 print(f"Found: {len(rows)}")
 for r in rows:
     print(f"  {r['primary_name']} score={r['bm25_score']}")
 
 # Test 3: check param order in db_retrieval.search_bm25
 print("\n=== Test 3: replicate db_retrieval param order ===")
-collection_name = 'xml_test'
+collection_name = 'fix_tags'
 query = 'exec broker'
 conditions = [
     "collection_name = %s",

@@ -14,7 +14,7 @@ import psycopg2.extras
 
 # Test: call fetchall exactly as db_retrieval.search_bm25 does
 print("=== Exact db_retrieval.search_bm25 call ===")
-collection_name = 'xml_test'
+collection_name = 'fix_tags'
 query = 'exec broker'
 
 conditions = [

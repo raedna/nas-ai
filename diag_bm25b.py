@@ -12,13 +12,13 @@ if str(PROJECT_ROOT) not in sys.path:
 from core.retrieval.db_retrieval import search_bm25
 
 print("=== search_bm25 exec broker ===")
-results = search_bm25('xml_test', 'exec broker', limit=5)
+results = search_bm25('fix_tags', 'exec broker', limit=5)
 print(f"Found: {len(results)}")
 for p in results:
     print(f"  score={p.score:.3f} name={p.payload.get('primary_name')} doc_type={p.payload.get('doc_type')}")
 
 print("\n=== search_bm25 broker ===")
-results = search_bm25('xml_test', 'broker', limit=5)
+results = search_bm25('fix_tags', 'broker', limit=5)
 print(f"Found: {len(results)}")
 for p in results:
     print(f"  score={p.score:.3f} name={p.payload.get('primary_name')}")

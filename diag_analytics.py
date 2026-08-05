@@ -9,7 +9,7 @@ sys.path.insert(0, "/Users/raednasr/RaedsMacM1/nas-ai/claude")
 
 from core.retrieval.analytics import run_analytics, schema_context
 
-COLLECTION = "xml_test"   # change to a real collection
+COLLECTION = "fix_tags"   # change to a real collection
 QUESTIONS = [
     "how many files are in this collection",
     "how many records are there by type",

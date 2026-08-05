@@ -105,6 +105,49 @@ def bge_rerank(points: List, question: str) -> List:
         logging.getLogger(__name__).warning(f"BGE rerank failed: {e}")
         return points
 
+def _owner_guard(reranked: List, points: List, question: str) -> List:
+    """Identifier-OWNERSHIP guard (deterministic): a numeric id token in
+    the question ('ticket 44539') is OWNED by candidates whose own payload
+    identifier/ticket_id matches — a chunk from another ticket that merely
+    MENTIONS the id cannot fake ownership (2026-08-03: the LLM rerank
+    promoted 44946's 'Ticket Linked' action over 44539's own chunks
+    because its note contains the id; neither the subject guard nor the
+    BGE veto can catch a literal-id mention). When owners exist and the
+    top pick is not one, the best-RRF owner takes the lead."""
+    try:
+        import re as _re_og
+        _ids = _re_og.findall(r"\b\d{4,}\b", question)
+        if not _ids:
+            return reranked
+
+        def _owns(p_, tok):
+            pl = p_.payload or {}
+            _idf = str(pl.get("identifier") or "")
+            return (_idf == tok or _idf.startswith(tok + "-")
+                    or any(str(v) == tok for k, v in pl.items()
+                           if k.endswith("_id")))
+
+        for tok in _ids:
+            owners_exist = any(_owns(p_, tok) for p_ in points)
+            if not owners_exist:
+                continue
+            if _owns(reranked[0], tok):
+                return reranked
+            # best owner in RRF (points) order
+            for p_ in points:
+                if _owns(p_, tok):
+                    _nm = (p_.payload or {}).get("primary_name")
+                    print(f"RERANK owner guard: promoting {_nm!r} "
+                          f"(owns id {tok})")
+                    if p_ in reranked:
+                        reranked.remove(p_)
+                    reranked.insert(0, p_)
+                    return reranked
+    except Exception as _e:
+        print(f"RERANK owner guard skipped: {type(_e).__name__}: {_e}")
+    return reranked
+
+
 def _bge_veto(reranked: List, question: str) -> List:
     """Evidence-check veto (config system.json bge_veto). The LLM reranker
     stays the primary judge; the BGE cross-encoder — knowledge-free, so it
@@ -303,6 +346,7 @@ def llm_rerank(points: List, question: str) -> List:
                           f" (subjects {sorted(_subjects_sg)})")
                     reranked.insert(0, reranked.pop(_best_i))
 
+            reranked = _owner_guard(reranked, points, question)
             reranked = _bge_veto(reranked, question)
             return reranked
 

@@ -26,20 +26,20 @@ print("1. Tag 38 vs Tag 53 chunks (identifier, name, nlp_text head)")
 for tag in ("38", "53"):
     rows = fetchall(
         """SELECT identifier, primary_name, source_file, LEFT(nlp_text, 300) AS head
-           FROM chunks WHERE collection_name='xml_test' AND identifier=%s
+           FROM chunks WHERE collection_name='fix_tags' AND identifier=%s
            AND identifier_namespace='tag'""", (tag,))
     for r in rows:
         print(f"\n  tag {tag} [{r['source_file']}] {r['primary_name']}:")
         print(f"    {r['head']}")
 
 print("\n" + "=" * 70)
-print("2. BM25 (tsvector) ranking for 'order quantity' on xml_test")
+print("2. BM25 (tsvector) ranking for 'order quantity' on fix_tags")
 rows = fetchall(
     """SELECT identifier, primary_name,
               ts_rank(to_tsvector('english', nlp_text),
                       plainto_tsquery('english', 'order quantity')) AS rank
        FROM chunks
-       WHERE collection_name='xml_test'
+       WHERE collection_name='fix_tags'
          AND to_tsvector('english', nlp_text) @@ plainto_tsquery('english', 'order quantity')
        ORDER BY rank DESC LIMIT 10""", ())
 if not rows:
@@ -56,7 +56,7 @@ for q in ("whats teh fix tag for order quantity", "what is the fix tag for order
     v = embed_text(q)
     rows = fetchall(
         """SELECT identifier, primary_name, 1 - (embedding <=> %s::vector) AS sim
-           FROM chunks WHERE collection_name='xml_test'
+           FROM chunks WHERE collection_name='fix_tags'
            ORDER BY embedding <=> %s::vector LIMIT 8""", (str(v), str(v)))
     print(f"\n  '{q}':")
     for r in rows:
@@ -66,6 +66,6 @@ print("\n" + "=" * 70)
 print("4. Full router runs")
 from core.retrieval.router import run_query_with_method
 for q in ("whats teh fix tag for order quantity", "what is the fix tag for order quantity"):
-    r = run_query_with_method("xml_test", q)
+    r = run_query_with_method("fix_tags", q)
     print(f"\n  '{q}' -> method={r.get('method')}")
     print("  " + " ".join(str(r.get("result", ""))[:250].split()))

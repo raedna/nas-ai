@@ -958,15 +958,105 @@ def run_query_with_method(
                               if w in _syn_sf}
                 _sibs = fetch_points_related_to_link_key(
                     collection, f"{namespace}:{identifier}", limit=50)
+                _sec_hit = False
                 for _sp in list(points) + list(_sibs or []):
                     _sec = str((_sp.payload or {}).get("section") or "")
                     # normalized match: 'merges'~'merged', 'status'~'status'
                     if _sec and (_sec.rstrip("sd") in _q_toks_sf
                                  or _sec in _q_secs_sf):
                         payload = _sp.payload or {}
+                        _sec_hit = True
                         print(f"RETRIEVAL section focus: {identifier} -> "
                               f"section '{_sec}'")
                         break
+
+                # FOCUSED-QUESTION SYNTHESIS (2026-08-04): a question with
+                # content words beyond the id ('who from Moore is involved
+                # in ticket 44539') can't be answered by the header
+                # verbatim — and people like Guillaume exist only in email
+                # TEXT, not payloads. Assemble the entity's chunks in
+                # order and hand them to the normal doc-synthesis path
+                # (method name avoids the structured render keywords, so
+                # answer_kind='doc' -> concise faithful answer + full
+                # entry expansion). Plain 'what is ticket X' stays
+                # verbatim-fast.
+                # sectioned entities ONLY (tickets): tag/field records have
+                # linked siblings too, and the assembly hijacked
+                # 'what values can tag 22 have' away from the enum path
+                # (2026-08-04)
+                _is_sectioned = any(
+                    (p_.payload or {}).get("section")
+                    for p_ in list(points) + list(_sibs or []))
+                if not _sec_hit and _sibs and _is_sectioned:
+                    try:
+                        from core.query_helpers import (
+                            load_doc_query_hints as _ldqh_tf)
+                        _noise_tf = set()
+                        for _k_tf in ("question_words", "stopwords",
+                                      "discovery_noise_words"):
+                            _noise_tf.update(
+                                _ldqh_tf().get(_k_tf, []))
+                    except Exception:
+                        _noise_tf = set()
+                    _focus_tf = [
+                        w for w in _re_sf.findall(r"[a-z]{3,}",
+                                                  question.lower())
+                        if w not in _noise_tf
+                        and w != str(namespace).lower()
+                        and not w.isdigit()]
+                    if _focus_tf:
+                        def _ts_tf(p_):
+                            _pl_tf = p_.payload or {}
+                            return (str(_pl_tf.get("action_datetime")
+                                        or ""),
+                                    str(_pl_tf.get("identifier") or ""))
+                        _fam = list(points) + sorted(
+                            list(_sibs or []), key=_ts_tf)
+                        _seen_tf, _parts_tf, _total_tf = set(), [], 0
+                        for _p_tf in _fam:
+                            _pl_tf = _p_tf.payload or {}
+                            _idn = str(_pl_tf.get("identifier") or "")
+                            if _idn in _seen_tf:
+                                continue
+                            _seen_tf.add(_idn)
+                            _txt_tf = str(_pl_tf.get("text") or "")
+                            if not _txt_tf.strip():
+                                continue
+                            _parts_tf.append(_txt_tf[:2500])
+                            _total_tf += min(len(_txt_tf), 2500)
+                            if _total_tf > 7000:
+                                break
+                        # deterministic ACTORS line: roles come from
+                        # payload (who_type), not model guesses — 'who
+                        # from Moore' answers stopped lumping the support
+                        # agent's contacts in with the client (2026-08-04)
+                        _actors_tf = {}
+                        for _p_tf in _fam:
+                            _pl_a = _p_tf.payload or {}
+                            _w_a = str(_pl_a.get("who") or "").strip()
+                            if _w_a:
+                                _actors_tf.setdefault(
+                                    _w_a, str(_pl_a.get("who_role") or ""))
+                        if _actors_tf:
+                            _parts_tf.insert(0, "Ticket actors: " + "; ".join(
+                                f"{w} ({r})" if r else w
+                                for w, r in _actors_tf.items())
+                                + ". People mentioned only inside quoted "
+                                "emails belong to the organization in "
+                                "their own signature.")
+                        print(f"RETRIEVAL ticket focus synthesis: "
+                              f"{identifier} ({len(_parts_tf)} chunks, "
+                              f"focus {_focus_tf})")
+                        _hp = dict(points[0].payload or {})
+                        _hp["_question"] = question
+                        return {
+                            "method": "ticket_focus_assembly",
+                            "reason": (f"focused question on "
+                                       f"{namespace}:{identifier} — "
+                                       f"assembled entity synthesis"),
+                            "result": "\n\n".join(_parts_tf),
+                            "answer_payload": _hp,
+                        }
             except Exception:
                 pass
             payload["_question"] = question
@@ -985,6 +1075,10 @@ def run_query_with_method(
                     "enum_values_count": len(payload.get("enum_values") or []),
                 },
                 "result": synthesize_answer(payload, [], collection),
+                # images/OCR render from the chosen chunk's payload — this
+                # branch never carried it (ticket 45468: OCR ran at ingest,
+                # nothing displayed, 2026-08-03)
+                "answer_payload": payload,
             }
 
     # ------------------------------------------------------------------

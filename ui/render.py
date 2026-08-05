@@ -36,8 +36,15 @@ def build_image_items(payload):
     """Turn an answer payload's embedded-image fields into [{path, caption, ocr}]."""
     if not payload:
         return []
-    ocr_map = {e.get("image_target"): e.get("ocr_text", "")
-               for e in (payload.get("embedded_image_ocr_map") or [])}
+    _raw_ocr = payload.get("embedded_image_ocr_map") or []
+    if isinstance(_raw_ocr, dict):
+        # tolerated legacy shape {name: text} (halo chunks ingested
+        # 2026-08-03 before the serializer conformed to the list-of-dicts
+        # convention)
+        ocr_map = {str(k): str(v or "") for k, v in _raw_ocr.items()}
+    else:
+        ocr_map = {e.get("image_target"): e.get("ocr_text", "")
+                   for e in _raw_ocr if isinstance(e, dict)}
     targets = payload.get("embedded_image_targets") or []
     paths = payload.get("embedded_image_paths") or []
     items = []
@@ -169,6 +176,24 @@ def render_answer(container, text, image_items=None, show_ocr=True):
 
         if not found:
             ui.markdown(_md_safe(text))
+            # markers live in nlp_text; synthesized/structured answers
+            # (description-based) carry none — images were silently
+            # dropped (ticket 45468, 2026-08-03). No markers + items
+            # present -> append them after the text.
+            for it in image_items:
+                if it.get("path") and Path(it["path"]).exists():
+                    ui.image(it["path"]).classes(
+                        "max-w-2xl rounded border my-2")
+                    if it.get("caption"):
+                        ui.label(it["caption"]).classes(
+                            "text-xs text-gray-500")
+                    ocr = (it.get("ocr") or "").strip()
+                    if show_ocr and ocr:
+                        with ui.expansion(
+                                f"OCR / extracted text: {it['caption']}"
+                                ).classes("w-full"):
+                            ui.label(ocr).classes(
+                                "whitespace-pre-wrap text-sm")
         else:
             tail = text[pos:].strip()
             if tail:

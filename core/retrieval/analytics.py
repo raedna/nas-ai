@@ -40,6 +40,8 @@ WHITELIST = {
     "chat_sessions", "chat_messages", "answer_feedback",
     "collection_vocab", "schemas", "sql_snippets",
     "runtime_counters", "about_vectors",
+    # read-only system catalog views (index/size introspection)
+    "pg_indexes",
 }
 
 # Statements / functions that must never appear in a generated query.

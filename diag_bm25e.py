@@ -12,7 +12,7 @@ if str(PROJECT_ROOT) not in sys.path:
 from core.db import fetchall
 
 query = 'exec broker'
-collection_name = 'xml_test'
+collection_name = 'fix_tags'
 
 # Approach 1: CTE with single tsquery
 print("=== Approach 1: CTE ===")

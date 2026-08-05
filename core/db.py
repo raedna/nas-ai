@@ -449,6 +449,30 @@ def upsert_chunks_batch(chunks: List[Dict[str, Any]]) -> None:
 # ---------------------------------------------------------------------------
 # BM25 Search
 # ---------------------------------------------------------------------------
+_POOL_EXCL = {"ts": 0.0, "vals": ["status", "merges"]}
+
+
+def _generic_pool_excluded_sections():
+    """Sections excluded from GENERIC search pools (config
+    generic_pool_excluded_sections). Status/merges synthetics are precision
+    targets for section focus & metadata — in discovery pools they crowd
+    out content ('ticket N' keyword magnets, 10 of 25 slots, 2026-08-03).
+    The solution section stays discoverable — it is the knowledge unit."""
+    import time as _t
+    if _t.time() - _POOL_EXCL["ts"] < 60:
+        return _POOL_EXCL["vals"]
+    try:
+        import json as _j
+        from core.paths import SYSTEM_CONFIG_PATH as _SCP
+        with open(_SCP, "r", encoding="utf-8") as _f:
+            vals = [str(x) for x in _j.load(_f).get(
+                "generic_pool_excluded_sections", ["status", "merges"])]
+        _POOL_EXCL.update(ts=_t.time(), vals=vals)
+    except Exception:
+        pass
+    return _POOL_EXCL["vals"]
+
+
 def search_bm25(
     query: str,
     collection_name: str = None,
@@ -469,8 +493,9 @@ def search_bm25(
     """
     # Convert plain text to tsquery safely
     # plainto_tsquery handles multi-word queries without needing & | syntax
-    conditions = ["nlp_text_tsv @@ plainto_tsquery('english', %s)"]
-    params = [query]
+    conditions = ["nlp_text_tsv @@ plainto_tsquery('english', %s)",
+                  "COALESCE(payload->>'section','') != ALL(%s)"]
+    params = [query, _generic_pool_excluded_sections()]
 
     if collection_name:
         conditions.append("collection_name = %s")
@@ -583,8 +608,9 @@ def search_vector(
         collection_name: Optional collection filter
         limit:           Max results
     """
-    conditions = ["embedding IS NOT NULL"]
-    params = []
+    conditions = ["embedding IS NOT NULL",
+                  "COALESCE(payload->>'section','') != ALL(%s)"]
+    params = [_generic_pool_excluded_sections()]
 
     if collection_name:
         conditions.append("collection_name = %s")

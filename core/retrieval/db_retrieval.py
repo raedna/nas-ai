@@ -605,13 +605,17 @@ def search_enum_values(
           AND (
               LOWER(e.enum_value) = LOWER(%s)
               OR LOWER(e.enum_name) = LOWER(%s)
-              OR LOWER(e.enum_description) LIKE LOWER(%s)
+              -- prefix match: 'ISIN' must find 'ISINNumber' (exact-only
+              -- silently missed after the fix_tags re-ingest, 2026-08-05)
+              OR LOWER(e.enum_name) LIKE LOWER(%s)
+              OR LOWER(COALESCE(e.enum_description, '')) LIKE LOWER(%s)
           )
         LIMIT %s
     """
     rows = fetchall(
         sql,
-        (collection_name, search_text, search_text, f"%{search_text}%", limit)
+        (collection_name, search_text, search_text, f"{search_text}%",
+         f"%{search_text}%", limit)
     )
 
     points = []

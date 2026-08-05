@@ -22,7 +22,7 @@ cfg = load_system_config()
 client = QdrantClient(url=cfg["qdrant_url"])
 
 points, _ = client.scroll(
-    collection_name="xml_test",
+    collection_name="fix_tags",
     limit=10000,
     with_payload=True,
     with_vectors=False,

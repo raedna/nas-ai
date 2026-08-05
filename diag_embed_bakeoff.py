@@ -73,7 +73,7 @@ if junk and genuine:
 
 # ---- 2. routing: labeled questions vs per-collection sample centroids ----
 LABELED = [
-    ("what is FIX tag 22", "xml_test"),
+    ("what is FIX tag 22", "fix_tags"),
     ("what is gsact.txt", "recon_assist_file"),
     ("message broadcaster down", "kb_docs"),
     ("how to rerun a tidal recon job", "obsidian"),

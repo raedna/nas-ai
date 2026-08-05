@@ -1162,3 +1162,44 @@ retreat-within-keep, letter<->digit title tokens (DL-10), DB-derived
 namespace patterns + section focus with declared section_synonyms
 ('who resolved X' -> status; 'solution for X' -> 44539-solution).
 AR-02 expectation made corpus-relative.
+
+## Progressive routing experiment (queued 2026-08-04)
+
+Routing focuses (2-3 collections) but never COMMITS — each selected
+collection runs its own LLM chain (~3x rerank/spec cost). Experiment:
+high-confidence routes (named collection / strong tier-1 anchor) query
+the TOP collection alone; weak-answer widening adds the rest only when
+the answer disappoints. Shadow first: log what 1-wide would have picked
+vs 3-wide's winner, no behavior change; eval measures accuracy + avg
+seconds. Also queued: HNSW index on chunks.embedding BEFORE bulk pull
+(approximate — verify pools with the smoke card, tune ef_search).
+
+## About-fed background artifacts (queued 2026-08-04, user suggestion)
+
+Concept vectors (Tier-2/3 TF-IDF + embedding clustering) and the
+SIMILARITY half of cross-link discovery switch to the ABOUT line when a
+chunk has one (fallback nlp_text) — distilled aboutness beats email-body
+noise for clustering/labels; safer cash-out of "abouts as routing
+signal" than the falsified promotion mechanisms. NER/identifier-mention
+scanning STAYS on full text — mentions live in bodies (gsact.txt
+mid-email, Guillaume-class references); abouts strip exactly what it
+hunts. Config switch, gated by diag_concept_dist before/after + eval.
+
+## fix_tags merge saga CLOSED (2026-08-05, eval 144459 green)
+
+xml_test + FIX_User_Defined_Tags -> ONE fix_tags collection (user call:
+FIX is one domain; separate collections created the namespace collision).
+Latent bugs the merged corpus forced out, all fixed + eval-gated:
+CSV schema missing primary_name (Field column); noise-named records
+(tag 7286 'Value') hijacking name-in-question matching -> noise-vocab
+guard in both matchers; reverse-enum exact-name match missing
+'ISIN'->'ISINNumber' -> prefix match + NULL-safe description; listings
+show id AND name ('959 — AuctionType') with prefix-derived displays kept
+hidden (halo); glossary now reaches SYNTHESIS prompts (was rerank-only)
+-> DL-05 'PB filename'->alias bridge declared and answering. Sectioned-
+only gate on ticket-focus assembly (tag 22 enum hijack). who_type actor
+roles + deterministic actors line (Alison/OmniVista vs Moore).
+Expectations made corpus-relative: AG-03 (~4972), PP-02 (weak list w/ 38
+leading accepted), MI-02 (mushy accepted, both jobs required).
+QUEUED: tag_range derived field (standard/user_defined, boundary 5000
+declared) + standard-first tie-break for generic FIX name questions.

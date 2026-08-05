@@ -45,7 +45,27 @@
   },
   "halo": {
     "credentials_file": "/Users/raednasr/RaedsMacM1/nas-ai/halo_creds/halo_creds.json",
-    "tickets_dir": "/Users/raednasr/RaedsMacM1/nas-ai/halo_tickets"
+    "tickets_dir": "/Users/raednasr/RaedsMacM1/nas-ai/halo_tickets",
+    "noise_outcomes": [
+      "rule applied",
+      "re-assign",
+      "assigned to support desk",
+      "sla hold",
+      "status change",
+      "change priority",
+      "triaged",
+      "took ownership",
+      "other ticket merged",
+      "assign to mcm team"
+    ],
+    "boilerplate_truncate": [
+      "*** Moore Europe Legal Disclaimer",
+      "The information in this e-mail communication together with any attachments"
+    ],
+    "who_type_map": {
+      "1": "support agent",
+      "2": "client-side"
+    }
   },
   "value_aliases": {
     "halo_tickets": {
@@ -80,6 +100,13 @@
         "incorrect dates",
         "wrong dates"
       ]
+    },
+    "pb filename": {
+      "means": "the prime broker's original file name for a recon file — stored as the record's alias field ('Also known as')",
+      "same_as": [
+        "prime broker filename",
+        "pb file name"
+      ]
     }
   },
   "metadata_spec_cache_ttl": 300,
@@ -107,5 +134,9 @@
     "merge": "merges",
     "problem": "issue",
     "description": "issue"
-  }
+  },
+  "generic_pool_excluded_sections": [
+    "status",
+    "merges"
+  ]
 }
