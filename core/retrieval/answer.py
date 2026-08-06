@@ -183,6 +183,14 @@ def synthesize_answer(payload: Dict, roles: List[str], collection_name: str) -> 
                 lines.append(f"{field_name}: {field_value}")
         elif description:
             lines.append(f"\nDescription: {description}")
+        else:
+            # field-poor record: its substance may live only in the
+            # serialized row TEXT (astro_catalog rows — DL-06 rendered a
+            # bare name, 2026-08-06)
+            _txt_fb = str(payload.get("text") or "").strip()
+            if _txt_fb and _txt_fb != str(primary_name or "").strip():
+                lines.append("")
+                lines.append(_txt_fb[:1200])
 
         # Surface aliases ("Also known as" — e.g. a record's PB / original filename),
         # which were previously dropped from structured answers.
@@ -433,6 +441,10 @@ def synthesize_answer(payload: Dict, roles: List[str], collection_name: str) -> 
 
     if description:
         parts.append(f"Its description is: {description.rstrip('.')}.")
+    else:
+        _txt_fb7 = str(payload.get("text") or "").strip()
+        if _txt_fb7 and _txt_fb7 != str(name or "").strip():
+            parts.append(_txt_fb7[:1200])
 
     return " ".join(parts) if parts else "No answer found."
 

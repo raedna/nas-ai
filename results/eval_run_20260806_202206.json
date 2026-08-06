@@ -1,0 +1,420 @@
+[
+ {
+  "id": "DL-01",
+  "question": "what is FIX tag 22",
+  "expected": "SecurityIDSource definition",
+  "chat": {
+   "collections_queried": [
+    "fix_tags",
+    "obsidian"
+   ],
+   "collection": "fix_tags",
+   "method": "retrieval",
+   "answer_kind": "structured",
+   "answer": "Here is what I found:\n\nTag 22: SecurityIDSource\n\nDescription: Identifies class or source of the SecurityID (48) value. Required if SecurityID is specified.\n\nThis field is necessary when a SecurityID is provided, to specify its class or source.",
+   "seconds": 13.1
+  }
+ },
+ {
+  "id": "DL-02",
+  "question": "what is gsact.txt",
+  "expected": "Goldman RECON mapping record",
+  "chat": {
+   "collections_queried": [
+    "recon_assist_file",
+    "obsidian",
+    "memory"
+   ],
+   "collection": "recon_assist_file",
+   "method": "retrieval",
+   "answer_kind": "structured",
+   "answer": "Here is what I found:\n\nMoore file name: gsact.txt \u2014 Tidal Job Name: 019_W_RECON_GOLDMAN_PRIO_PULL.\n\nActive: YES\n\nPrime Broker: Goldman\n\nDate Column to Check: Column 1\n\nRecon Tool Data Source: Transaction\n\nRecon Tool File Format: GS Cash Activity\n\nIncluded in Email Alert: YES\n\nMove Script (K:/Recon/FTP): GSCopy_srpb.bat\n\nAlso known as: SRPB_4000_1200105898_DATA_Custody_Tra_286534_156520.xls\n\nType: Goldman\n\nThis file, gsact.txt, is related to a specific job for Goldman and is used in their reconciliation process.\n\n---\n**From memory:**\n\nthe gsact.txt file comes in at 5 AM Eastern time\n\n(User note, 2026-07-13 22:42)\n\ndate column for gsact.txt to check has changed to column 5\n\n(User note, 2026-07-13 23:08)",
+   "seconds": 18.0
+  }
+ },
+ {
+  "id": "DL-03",
+  "question": "what is tag 35 in FIX",
+  "expected": "MsgType definition",
+  "chat": {
+   "collections_queried": [
+    "fix_tags",
+    "obsidian",
+    "kb_docs"
+   ],
+   "collection": "fix_tags",
+   "method": "retrieval",
+   "answer_kind": "structured",
+   "answer": "Here is what I found:\n\nTag 35: MsgType\n\nDescription: Defines message type ALWAYS THIRD FIELD IN MESSAGE. (Always unencrypted)\nNote: A \"U\" as the first character in the MsgType field (i.e. U, U2, etc) indicates that the message format is privately defined between the sender and receiver.",
+   "seconds": 10.7
+  }
+ },
+ {
+  "id": "DL-04",
+  "question": "jpm_activity.xlsx details",
+  "expected": "JPM mapping record (verify filename)",
+  "chat": {
+   "collections_queried": [
+    "obsidian",
+    "recon_assist_file",
+    "kb_docs"
+   ],
+   "collection": "recon_assist_file",
+   "method": "retrieval",
+   "answer_kind": "structured",
+   "answer": "Here is what I found:\n\nNo direct match found for your query \u2014 the closest result is for the file named jpm_activity.xlsx, which is related to the Tidal Job Name: 090_W_RECON_JPM_PB_PULL.\n\nActive: YES\n\nPrime Broker: JPM\n\nDate Column to Check: Trade Date\n\nRecon Tool Data Source: Transaction\n\nRecon Tool File Format: JPM Trade Activity\n\nIncluded in Email Alert: YES\n\nMove Script (K:/Recon/FTP): JPMCopy.bat\n\nAlso known as: mcm_trade_activity.$y4$m4$d4.xlsx\n\nType: JPM\n\nThis information is based on the retrieved data provided. If you need more details, please let me know!",
+   "seconds": 15.9
+  }
+ },
+ {
+  "id": "DL-05",
+  "question": "what is the PB filename for gsact.txt",
+  "expected": "SRPB_4000_..._Custody_Tra alias",
+  "chat": {
+   "collections_queried": [
+    "recon_assist_file",
+    "memory",
+    "obsidian"
+   ],
+   "collection": "recon_assist_file",
+   "method": "retrieval",
+   "answer_kind": "structured",
+   "answer": "Here is what I found:\n\nThe PB filename for gsact.txt is: SRPB_4000_1200105898_DATA_Custody_Tra_286534_156520.xls\n\nThis file, also known as the prime broker's original file name (pb filename), corresponds to the Moore file name gsact.txt.",
+   "seconds": 31.2
+  }
+ },
+ {
+  "id": "DL-06",
+  "question": "what is the Whirlpool galaxy",
+  "expected": "M51/NGC5194 catalog entry",
+  "chat": {
+   "collections_queried": [
+    "obsidian",
+    "astro_catalog"
+   ],
+   "collection": "astro_catalog",
+   "method": "retrieval",
+   "answer_kind": "structured",
+   "answer": "Here is what I found:\n\nngc_id: NGC 5194 \u2014 comments: Whirlpool galaxy.\n\nra: 13.483\n\ndec: 47.183\n\nref: b'2006AJ....131.1163S'\n\ntype: SG\n\nv_mag: 8.1\n\nAlso known as: M51",
+   "seconds": 14.8
+  }
+ },
+ {
+  "id": "DL-07",
+  "question": "ARD_OPERATING_EXP_PER_ASM_ASK",
+  "expected": "BBG field A0356 definition",
+  "chat": {
+   "collections_queried": [
+    "bbg_fields"
+   ],
+   "collection": "bbg_fields",
+   "method": "retrieval",
+   "answer_kind": "structured",
+   "answer": "Here is what I found:\n\nId A0356 is ARD_OPERATING_EXP_PER_ASM_ASK.\n\nCategory: Fundamentals/Bloomberg Fundamentals/Standard Labels ARD/Industry Specific/Airlines\n\nDataType: Double\n\nDescription: ARD Operating Expense Per ASM (Ask)\n\nType: Fundamentals/Bloomberg Fundamentals/Standard Labels ARD/Industry Specific/Airlines",
+   "seconds": 12.7
+  }
+ },
+ {
+  "id": "DL-08",
+  "question": "message broadcaster down",
+  "expected": "Broadcaster Down / Alert Checklist KB article",
+  "chat": {
+   "collections_queried": [
+    "kb_docs",
+    "obsidian"
+   ],
+   "collection": "kb_docs",
+   "method": "retrieval",
+   "answer_kind": "doc",
+   "answer": "To address a down Message Broadcaster:\n\n1. Verify the status in Web Admin and notify MCM CRIMS Support chat immediately if it's Not Running.\n   \"If the status is Not Running, notify the MCM CRIMS Support chat immediately and proceed to investigate further.\"\n\n2. Follow consistent communication guidelines by updating the external Moore chat every few minutes.\n\n3. Investigate based on scenarios provided: CTM Blocking, Non-CTM Blocking, Long-Running Transactions, or No Blocking/Long-Running Transactions.\n   \"Scenario 1: CTM Blocking\", \"Scenario 2: Non-CTM Blocking\", etc.\n\n4. If no errors are found in logs after all checks, initiate a failover to the backup middle tier.",
+   "seconds": 21.8
+  }
+ },
+ {
+  "id": "DL-09",
+  "question": "how to merge a ticket in HaloITSM",
+  "expected": "Merge ticket KB article",
+  "chat": {
+   "collections_queried": [
+    "obsidian",
+    "kb_docs",
+    "halo_tickets"
+   ],
+   "collection": "kb_docs",
+   "method": "retrieval",
+   "answer_kind": "doc",
+   "answer": "To merge a ticket in HaloITSM:\n1. Identify the Tickets you wish to Merge From and Into.\n2. Checkbox the Tickets you wish to Merge INTO another ticket.\n3. \"Hover your Mouse over the Edit Icon and navigate to the Merge Button, Click that.\"\n4. On the merge ticket(s) screen, \"Locate the ticket by its ID or Summary Title that you wish to merge the chosen ticket(s) into.\" Adjust filters as necessary, click on the chosen ticket, then confirm selection.\nThe system will close the tickets you merged and leave a note on the ticket they were merged into, including adding all of the history of the original ticket.",
+   "seconds": 23.8
+  }
+ },
+ {
+  "id": "DL-10",
+  "question": "NGC 2064",
+  "expected": "catalog entry (type, coordinates)",
+  "chat": {
+   "collections_queried": [
+    "astro_catalog"
+   ],
+   "collection": "astro_catalog",
+   "method": "retrieval",
+   "answer_kind": "structured",
+   "answer": "Here is what I found:\n\nngc_id: NGC 2064 \u2014 comments: REFLECTION NEBULA.\nra: 5.772\ndec: 0.0\ntype: Nb(tb)",
+   "seconds": 11.5
+  }
+ },
+ {
+  "id": "AG-01",
+  "question": "how many KB articles are there",
+  "expected": "178 active articles (NOT 348 chunks)",
+  "chat": {
+   "collections_queried": [
+    "obsidian",
+    "pdf_test",
+    "kb_docs"
+   ],
+   "collection": "kb_docs",
+   "method": "retrieval",
+   "answer_kind": "doc",
+   "answer": "There are 178 matching identifier(s).",
+   "seconds": 23.9
+  }
+ },
+ {
+  "id": "AG-02",
+  "question": "how many articles mention FIX",
+  "expected": "SQL truth: distinct articles with fix in nlp_text",
+  "chat": {
+   "collections_queried": [
+    "obsidian",
+    "kb_docs",
+    "fix_tags"
+   ],
+   "collection": "fix_tags",
+   "method": "retrieval",
+   "answer_kind": "doc",
+   "answer": "There are 429 matching identifier(s) for nlp_text contains FIX.",
+   "seconds": 22.1
+  }
+ },
+ {
+  "id": "AG-03",
+  "question": "how many FIX tags are there",
+  "expected": "CORPUS-RELATIVE: ~4972 in namespace=tag since the user-defined registry merged into fix_tags (2026-08-04; was 947 in the xml-only era). A count scoped to namespace=tag is correct; chunk-count inflation or another collection answering is a FAIL.",
+  "chat": {
+   "collections_queried": [
+    "fix_tags",
+    "obsidian"
+   ],
+   "collection": "fix_tags",
+   "method": "retrieval",
+   "answer_kind": "doc",
+   "answer": "There are 4972 matching identifier(s) for identifier_namespace = tag.",
+   "seconds": 14.2
+  }
+ },
+ {
+  "id": "AG-04",
+  "question": "how many Goldman files are in the recon mapping",
+  "expected": "16 (15 if NULL row uncounted \u2014 CODE-024)",
+  "chat": {
+   "collections_queried": [
+    "recon_assist_file",
+    "obsidian",
+    "kb_docs"
+   ],
+   "collection": "recon_assist_file",
+   "method": "retrieval",
+   "answer_kind": "doc",
+   "answer": "There are 16 matching identifier(s) for Prime Broker = Goldman.",
+   "seconds": 34.6
+  }
+ },
+ {
+  "id": "AG-05",
+  "question": "how many images do I have for M42",
+  "expected": "verify astro_test",
+  "chat": {
+   "collections_queried": [
+    "obsidian",
+    "docx_test",
+    "astro_test"
+   ],
+   "collection": "astro_test",
+   "method": "retrieval",
+   "answer_kind": "doc",
+   "answer": "There are 1 matching identifier(s) for primary_name = m42.",
+   "seconds": 31.9
+  }
+ },
+ {
+  "id": "AG-06",
+  "question": "how many galaxies are in the catalog",
+  "expected": "count type=Gx in astro_catalog",
+  "chat": {
+   "collections_queried": [
+    "astro_catalog",
+    "obsidian",
+    "pdf_test"
+   ],
+   "collection": "astro_catalog",
+   "method": "retrieval",
+   "answer_kind": "doc",
+   "answer": "The retrieved data does not provide information about the number of galaxies in the catalog. It simply states: \"Found 0 matching records.\" This indicates there may be an issue with the query or the database is empty.",
+   "seconds": 30.7
+  }
+ },
+ {
+  "id": "AG-07",
+  "question": "list all prime brokers in the recon file",
+  "expected": "BOA, BONY, CHASE, CITCO, CITI, CS, DB, Goldman, JPM, MIZUHO, Morgan",
+  "chat": {
+   "collections_queried": [
+    "obsidian",
+    "kb_docs",
+    "recon_assist_file"
+   ],
+   "collection": "recon_assist_file",
+   "method": "retrieval",
+   "answer_kind": "doc",
+   "answer": "11 value(s):\n\n- `BOA`\n- `BONY`\n- `CHASE`\n- `CITCO`\n- `CITI`\n- `Credit Suisse`\n- `Deutsche`\n- `Goldman`\n- `JPM`\n- `MIZUHO`\n- `Morgan`",
+   "seconds": 30.7
+  }
+ },
+ {
+  "id": "AG-08",
+  "question": "which broker has the most recon files",
+  "expected": "group-by type, Goldman likely",
+  "chat": {
+   "collections_queried": [
+    "obsidian",
+    "kb_docs",
+    "recon_assist_file"
+   ],
+   "collection": "recon_assist_file",
+   "method": "retrieval",
+   "answer_kind": "doc",
+   "answer": "- `Goldman`: 16\n- `CITI`: 15\n- `JPM`: 14\n- `Credit Suisse`: 9\n- `Morgan`: 6\n- `Deutsche`: 3\n- `BOA`: 3\n- `MIZUHO`: 3\n- `CHASE`: 3\n- `BONY`: 2\n- `CITCO`: 1",
+   "seconds": 18.2
+  }
+ },
+ {
+  "id": "AG-09",
+  "question": "how many images with gain 100",
+  "expected": "verify astro_test file_gain",
+  "chat": {
+   "collections_queried": [
+    "obsidian",
+    "fix_tags",
+    "astro_test"
+   ],
+   "collection": "astro_test",
+   "method": "retrieval",
+   "answer_kind": "doc",
+   "answer": "There are 1 matching identifier(s) for gain = 100.",
+   "seconds": 23.5
+  }
+ },
+ {
+  "id": "AG-10",
+  "question": "how many fields are in FIX 4.4",
+  "expected": "Fields_FIX44 count",
+  "chat": {
+   "collections_queried": [
+    "fix_tags",
+    "obsidian",
+    "bbg_fields"
+   ],
+   "collection": "fix_tags",
+   "method": "retrieval",
+   "answer_kind": "doc",
+   "answer": "There are 912 matching identifier(s) for versions = 4.4.",
+   "seconds": 21.5
+  }
+ },
+ {
+  "id": "XC-01",
+  "question": "I'm missing gsact.txt from Goldman, what can I do",
+  "expected": "mapping record + Tidal/sFTP procedure",
+  "chat": {
+   "collections_queried": [
+    "recon_assist_file",
+    "memory",
+    "obsidian"
+   ],
+   "collection": "recon_assist_file",
+   "method": "retrieval",
+   "answer_kind": "structured",
+   "answer": "Here is what I found:\n\nMoore file name gsact.txt \u2014 Tidal Job Name: 019_W_RECON_GOLDMAN_PRIO_PULL.\n\nActive: YES\n\nPrime Broker: Goldman\n\nDate Column to Check: Column 1\n\nRecon Tool Data Source: Transaction\n\nRecon Tool File Format: GS Cash Activity\n\nIncluded in Email Alert: YES\n\nMove Script (K:/Recon/FTP): GSCopy_srpb.bat\n\nAlso known as: SRPB_4000_1200105898_DATA_Custody_Tra_286534_156520.xls\n\nType: Goldman\n\nIf you're missing the gsact.txt file from Goldman, ensure that the Tidal Job 019_W_RECON_GOLDMAN_PRIO_PULL is running successfully and check the specified FTP move script (GSCopy_srpb.bat) for any issues. Additionally, verify if the email alert has been received as it should indicate whether the file was processed correctly.",
+   "seconds": 34.3
+  }
+ },
+ {
+  "id": "XC-02",
+  "question": "what tidal job pulls jpm files and how do I check if it ran",
+  "expected": "JPM job name + 4.1 checking procedure",
+  "chat": {
+   "collections_queried": null,
+   "collection": null,
+   "method": "dual_intent",
+   "answer_kind": null,
+   "answer": "**What tidal job pulls jpm files?**\n\nSource: Obsidian Notes\n\n4.1 Checking the Tidal Recon Job\n\n# Summary Action\n\nCategory: Moore\n\nTidal Jobs errors are observed. Next step is to check the files on the us1-proc02 machine here: [[7. us1-proc02 Login]]\n\nRefer to the below for details on this step.\n\n# Detailed Action\n\nThe TIDAL Jobs responsible for pulling files are:\n\n| **Prime Broker** | **TIDAL Job Name** |\n| -------------------------------------------------------------------------- | ---------------------------------------------------------------- |\n| CITI | 010_W_RECON_CITI_PB_PULL |\n| Goldman (different files use different Tidal jobs, batch and Script files) | 020_W_RECON_GOLDMAN_PB_PULL 019_W_RECON_GOLDMAN_PRIO_PULL |\n| JPM | 090_W_RECON_JPM_PB_PULL |\n| Morgan | 070_W_RECON_MORGAN_PB_PULL |\n| Chase | 050_W_RECON_CHASE_PB_PULL |\n| BOA | 005_W_RECON_BOA_PB_PULL |\n\nThe tidal jobs that pull the files are the first thing to check. They are all under the Group \u201cRECON_DAILY_BATCH > PB_RECON_FILE_RETRIEVAL\u201d .\n\n[Embedded image OCR from: Recon Tidal jobs.png]\n\nIn Tidal, we first select the PB retrieval job that is suspect from the email alert.\n\n1. Note the job Status: Check if job has completed normally, abnormally, or not ru\n\n*Source: obsidian*\n\n---\n\n**How do I check if it ran?**\n\nSource: Obsidian Notes\n\n4.1 Checking the Tidal Recon Job\n\n# Summary Action\n\nCategory: Moore\n\nTidal Jobs errors are observed. Next step is to check the files on the us1-proc02 machine here: [[7. us1-proc02 Login]]\n\nRefer to the below for details on this step.\n\n# Detailed Action\n\nThe TIDAL Jobs responsible for pulling files are:\n\n| **Prime Broker** | **TIDAL Job Name** |\n| -------------------------------------------------------------------------- | ---------------------------------------------------------------- |\n| CITI | 010_W_RECON_CITI_PB_PULL |\n| Goldman (different files use different Tidal jobs, batch and Script files) | 020_W_RECON_GOLDMAN_PB_PULL 019_W_RECON_GOLDMAN_PRIO_PULL |\n| JPM | 090_W_RECON_JPM_PB_PULL |\n| Morgan | 070_W_RECON_MORGAN_PB_PULL |\n| Chase | 050_W_RECON_CHASE_PB_PULL |\n| BOA | 005_W_RECON_BOA_PB_PULL |\n\nThe tidal jobs that pull the files are the first thing to check. They are all under the Group \u201cRECON_DAILY_BATCH > PB_RECON_FILE_RETRIEVAL\u201d .\n\n[Embedded image OCR from: Recon Tidal jobs.png]\n\nIn Tidal, we first select the PB retrieval job that is suspect from the email alert.\n\n1. Note the job Status: Check if job has completed normally, abnormally, or not ru\n\n*Source: obsidian*",
+   "seconds": 22.6
+  }
+ },
+ {
+  "id": "XC-03",
+  "question": "what is tag 38 and are there KB articles about FIX order issues",
+  "expected": "tag def + FIX-related KB articles",
+  "chat": {
+   "collections_queried": null,
+   "collection": null,
+   "method": "dual_intent",
+   "answer_kind": null,
+   "answer": "**what is tag 38**\n\nTag 38 is OrderQty.\n\nDescription: Quantity ordered. This represents the number of shares for equities or par, face or nominal value for FI instruments.\n(Prior to FIX 4.2 this field was of type int)\n\n*Source: fix_tags*\n\n---\n\n**are there KB articles about FIX order issues**\n\n19 record(s) matching nlp_text contains fix, nlp_text contains order, nlp_text contains issue:\n\n- `537` \u2014 `QuoteType`\n- `6` \u2014 `AvgPx`\n- `63` \u2014 `SettlType`\n- `6620` \u2014 `IssueDate`\n- `6638` \u2014 `AllocClearingFirm`\n- `6665` \u2014 `NoLegs`\n- `6666` \u2014 `LegSide`\n- `6669` \u2014 `LegFactor`\n- `6670` \u2014 `LegSecurityID`\n- `6671` \u2014 `LegIDSource`\n- `6672` \u2014 `LegProduct`\n- `6673` \u2014 `LegSecurityType`\n- `6674` \u2014 `LegIssuer`\n- `6675` \u2014 `LegCouponRate`\n- `6676` \u2014 `LegMaturityDate`\n- `6677` \u2014 `LegSecurityDesc`\n- `6678` \u2014 `LegCurrency`\n- `6679` \u2014 `LegSettlmntTyp`\n- `6680` \u2014 `LegFutSettDate`\n\n*Source: fix_tags*",
+   "seconds": 41.5
+  }
+ },
+ {
+  "id": "XC-04",
+  "question": "show me the M51 catalog entry and do I have images of it",
+  "expected": "catalog entry + M51 images",
+  "chat": {
+   "collections_queried": null,
+   "collection": null,
+   "method": "dual_intent",
+   "answer_kind": null,
+   "answer": "**show me the M51 catalog entry**\n\nastro_file light_m51_180_0s_bin1_533mc_ir_gain100_20250314_231946_21_0c_0001 is M51.\n\nDescription: Camera: zwo asi533mc pro | Mount: zwo am5 | Exposure: 180.0 sec | Filter: IR | Resolution: 3008x3008 | Observed: 2025-03-14T19:16:45.721713\n\n*Source: M51*\n\n---\n\n**do I have images of it**\n\nSource: Obsidian Notes\n\nGo Live for Omni Website\n\nThe website items:\n\nCategory: Work Notes\n\n# Mega Menu:\n\n1. Omnivista logo is centered and not aligned on smaller screen\n\n2. Phone webpage needs fixing\n\n3. Rename \"Cyber Security\" to \"Support & Cyber Security\"\n\n4. clicking \"case studies\" still goes to old page. Fix\n\n# HomePage:\n\n1. Have a shutter stock moving images, and reorder to match the mega menu:\n\n[Embedded image OCR from: Pasted image 20260318111353.png]\n\n2. Ai Insights: add Expertise - use American spelling\n\n3. Application Development:\n\n1. Title: building solutions that scale with your ambitions. remove word \"digital\"\n\n4. Change wording:\n\n1. Change to Support and Cyber Security. provide title and description:\n\n[Embedded image OCR from: Pasted image 20260318112307.png]\n\n5. clients: remove franklin. Add DK.\n\n6. for the backgrounds, use cities where we operate: NY, Dubai, Pheonix Arizona, Des Moines\n\n1. Add on top right city name\n\n# Capabilities page:\n\n1. Representative Clients instead of OmniVista clients.\n\n2. Make the client logos a rotating pattern\n\n# AI Insights\n\n# Application Development:\n\n1. change to match title on other pages:\n\n[Embedded image OCR from: Pasted image 2026\n\n*Source: obsidian*",
+   "seconds": 17.5
+  }
+ },
+ {
+  "id": "XC-05",
+  "question": "bad dates alert for citi, which file and what steps",
+  "expected": "citi mapping + bad dates workflow",
+  "chat": {
+   "collections_queried": [
+    "kb_docs",
+    "recon_assist_file",
+    "bbg_fields"
+   ],
+   "collection": "kb_docs",
+   "method": "retrieval",
+   "answer_kind": "doc",
+   "answer": "For Citi, if there are \"bad dates\" alerts, review the email from ReconMonitorScript@moorecap.com at 6:52 am EST. The relevant steps for files with bad dates are:\n\n\"This alert is most likely due to Tidal Jobs pulling a file from a previous day. This also means that the primebrokers didn\u2019t send their files for the day.\"\n\nNo specific Citi file name is listed, so check all mentioned files in the email for incorrect dates.\n\n---\n**From recon_assist_file:**\n\nNo exact match found for 'bad dates alert for citi, which file and what steps'. Closest results:\n- citi_dcm_fees.csv: 010_W_RECON_CITI_PB_PULL \u2014 Dates should be today's date\n- citi_pos.txt: 010_W_RECON_CITI_PB_PULL\n- citi_dcm_cash.csv: 010_W_RECON_CITI_PB_PULL\n- hedge_act.csv: 010_W_RECON_CITI_PB_PULL\n- : ",
+   "seconds": 20.2
+  }
+ },
+ {
+  "id": "XC-06",
+  "question": "broadcaster is down, who do I contact and what do I check",
+  "expected": "checklist article + contacts",
+  "chat": {
+   "collections_queried": null,
+   "collection": null,
+   "method": "dual_intent",
+   "answer_kind": null,
+   "answer": "**broadcaster is down, who do I contact**\n\nSource: Kb Docs\n\nMessage Broadcaster Down\n\nStep 1: Initial Status Check\r\nVerify the status of the Message Broadcaster in Web Admin and open the Support mailbox simultaneously.\r\nIf the broadcaster is Active on us1-crd078081 (primary) or us1-crd088081 (backup), notify the MCM CRIMS Support \u2013 External chat that the alert has been received and the broadcaster is currently active. Also note that you will continue to monitor it's status. \r\nIf the status is Not Running, notify the MCM CRIMS Support chat immediately and proceed to investigate further.\r\nMessage Broadcaster not running screenshot here\r\n\r\nStep 2: Consistent Communication\r\nMaintain regular communication with the external Moore chat, providing updates every few minutes if the broadcaster remains down, if the root cause is still being investigated, or what actions are being taken\r\n\r\nScenarios for Investigation:\r\n\r\nScenario 1: CTM Blocking\r\nIf you find blocking in the Support mailbox, identify whether the SPIDs with a Blocker value of 0 are CTM related or not (captured below). If they are proceed with the following:\r\nAccess the prod database using the CRDADMIN login and terminate the blocking SPIDs.\r\nEscalate to the following tea\n\n*Source: kb_docs*\n\n---\n\n**what do I check**\n\nSource: Kb Docs\n\nSFM Sunday Health Check\n\nCase : One or more of the MTs or services was not rebooted at expected restart time, or they are down at the time of the check. Resolution: Continue with the health check for MTs that did restart cleanly. Escalate to #COMS@soros.com, #ExecutionTech@soros.com, and #Systems@soros.com In this case, Soros expects that the Systems team will pick it up later in the NY morning. Our responsibility here is to escalate only; Soros will complete the health check at this point. Case : Test order does not appear in the export to Enfusion. Resolution: Verify whether the Active Batch job CharlesRiverToEnfusionExport succeeded. Escalate to #COMS@soros.com, #ExecutionTech@soros.com.\n\nSFM Sunday Health Checks - Procedure\r\n\r\n1. Log into SFMLog in to your SFM account from your assigned machine.\r\nSaved links are machine-specific. Please use the same machine consistently for easier access.\r\nDesignated Omni Shared Machines:\r\nvwrkomnivista1\r\nvwrkomnivista2\r\nvwrkomnivista3\r\nvwrkomnivista4\r\n2. Access PROD WebAdminNavigate to http://csompcrv04:8086/\r\nVerify all 13 middle-tiers (MTs) are visible and running.\r\nCheck logs for any issues. \r\nMiddle-Tier Health CheckAll MT\n\n*Source: kb_docs*",
+   "seconds": 19.8
+  }
+ }
+]

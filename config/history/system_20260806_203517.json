@@ -71,10 +71,6 @@
     "halo_tickets": {
       "resolved": "Closed",
       "open": "New"
-    },
-    "astro_catalog": {
-      "galaxies": "Gx",
-      "galaxy": "Gx"
     }
   },
   "about_guard_margin": 0.03,
@@ -144,6 +140,5 @@
     "merges"
   ],
   "concept_from_about": true,
-  "reverse_enum_limit": 30,
-  "metadata_enum_values_cap": 30
+  "reverse_enum_limit": 30
 }

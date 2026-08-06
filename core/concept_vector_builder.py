@@ -105,18 +105,46 @@ def _mk_obj(row):
 # ---------------------------------------------------------------------------
 # Grouping — field-based (existing path) and entity_row computed (CV-02/03)
 # ---------------------------------------------------------------------------
+def _about_pref():
+    """Config concept_from_about (default True): clustering text and
+    vectors prefer the ingestion-time ABOUT line / about_vectors embedding
+    when an entry has one — distilled aboutness beats email-body noise for
+    grouping and labels (tracker 2026-08-04). Fallback: chunk text/vector.
+    NER/mention scanning is deliberately NOT changed — mentions live in
+    bodies."""
+    try:
+        import json as _j
+        from core.paths import SYSTEM_CONFIG_PATH as _p
+        with open(_p, "r", encoding="utf-8") as f:
+            return bool(_j.load(f).get("concept_from_about", True))
+    except Exception:
+        return True
+
+
 def _field_groups(collection):
     group_field = _get_group_field(collection)
+    _ab = _about_pref()
+    _txt_expr = ("COALESCE(c.payload->>'about', "
+                 "LEFT(c.payload->>'description', 1000), "
+                 "LEFT(c.payload->>'text', 1000), '')" if _ab else
+                 "COALESCE(LEFT(c.payload->>'description', 1000), "
+                 "LEFT(c.payload->>'text', 1000), '')")
+    _emb_expr = ("COALESCE(av.embedding, c.embedding)" if _ab
+                 else "c.embedding")
+    _join = ("LEFT JOIN about_vectors av ON av.collection_name = "
+             "c.collection_name AND av.primary_name = c.primary_name"
+             if _ab else "")
     rows = fetchall(f"""
             SELECT
-                id,
-                payload->>'{group_field}' AS group_value,
-                COALESCE(LEFT(payload->>'description', 1000), LEFT(payload->>'text', 1000), '') AS text,
-                embedding
-            FROM chunks
-            WHERE collection_name = %s
-            AND embedding IS NOT NULL
-            AND payload->>'{group_field}' IS NOT NULL
+                c.id,
+                c.payload->>'{group_field}' AS group_value,
+                {_txt_expr} AS text,
+                {_emb_expr} AS embedding
+            FROM chunks c
+            {_join}
+            WHERE c.collection_name = %s
+            AND c.embedding IS NOT NULL
+            AND c.payload->>'{group_field}' IS NOT NULL
         """, (collection,))
 
     groups = {}
@@ -150,12 +178,23 @@ def _entity_row_groups(collection):
     Tier 2: TF-IDF top terms -> one batched LLM call for a shared topic label."""
     from core.query_helpers import load_doc_query_hints
 
-    rows = fetchall("""
-        SELECT id, payload->>'tags' AS kb_tags,
-               COALESCE(payload->>'text', payload->>'description', '') AS text,
-               embedding
-        FROM chunks
-        WHERE collection_name = %s AND embedding IS NOT NULL
+    _ab = _about_pref()
+    _txt_expr2 = ("COALESCE(c.payload->>'about', c.payload->>'text', "
+                  "c.payload->>'description', '')" if _ab else
+                  "COALESCE(c.payload->>'text', "
+                  "c.payload->>'description', '')")
+    _emb_expr2 = ("COALESCE(av.embedding, c.embedding)" if _ab
+                  else "c.embedding")
+    _join2 = ("LEFT JOIN about_vectors av ON av.collection_name = "
+              "c.collection_name AND av.primary_name = c.primary_name"
+              if _ab else "")
+    rows = fetchall(f"""
+        SELECT c.id, c.payload->>'tags' AS kb_tags,
+               {_txt_expr2} AS text,
+               {_emb_expr2} AS embedding
+        FROM chunks c
+        {_join2}
+        WHERE c.collection_name = %s AND c.embedding IS NOT NULL
     """, (collection,))
 
     generic = {t.lower() for t in load_doc_query_hints().get("generic_terms", [])}

@@ -79,11 +79,26 @@ def upsert_collection_config(name, cfg):
 
 
 def delete_collection(name, drop_config=True):
-    """Delete a collection's data (chunks/files/enums/collections row); optionally its
-    config entry too. Children deleted before the parent (FK-safe)."""
+    """Delete a collection's data AND every derived artifact; optionally its
+    config entry too. Children deleted before the parent (FK-safe).
+    2026-08-05: deleted collections were haunting related sections —
+    concept_vectors, cross_links (both directions), about_vectors,
+    collection_vocab and schemas all survived deletion."""
     execute("DELETE FROM enum_values WHERE collection_name = %s", (name,))
     execute("DELETE FROM chunks WHERE collection_name = %s", (name,))
     execute("DELETE FROM files WHERE collection_name = %s", (name,))
+    for _sql in (
+        "DELETE FROM concept_vectors WHERE collection = %s",
+        "DELETE FROM cross_links WHERE source_collection = %s",
+        "DELETE FROM cross_links WHERE target_collection = %s",
+        "DELETE FROM about_vectors WHERE collection_name = %s",
+        "DELETE FROM collection_vocab WHERE collection = %s",
+        "DELETE FROM schemas WHERE collection_name = %s",
+    ):
+        try:
+            execute(_sql, (name,))
+        except Exception as _e:
+            print(f"[DELETE] artifact cleanup skipped ({_sql[:40]}...): {_e}")
     execute("DELETE FROM collections WHERE name = %s", (name,))
     if drop_config:
         cfg = load_collections_config()

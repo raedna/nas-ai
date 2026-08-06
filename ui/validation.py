@@ -46,9 +46,45 @@ def _save_json(path, obj):
 
 
 def render_validation_panel():
+    _schema_health_section()
+    ui.separator().classes("my-4")
     _schema_section()
     ui.separator().classes("my-4")
     _payload_inspector_section()
+
+
+# ===========================================================================
+# Section 0: Schema Health (self-service fossil detection, 2026-08-06)
+# ===========================================================================
+def _schema_health_section():
+    ui.label("Schema Health").classes("text-lg font-bold")
+    ui.label("Audits stored schemas against actual rows: null names, "
+             "label-free renders, numeric type roles, stale columns — the "
+             "fossil-schema diseases, detectable without domain knowledge."
+             ).classes("text-xs text-gray-500 mb-1")
+    _sh_box = ui.column().classes("w-full")
+
+    async def _run_health():
+        from nicegui import run as _run
+        from core.schema_health import schema_health_all
+        _sh_box.clear()
+        with _sh_box:
+            ui.spinner()
+        rows = await _run.io_bound(schema_health_all)
+        _sh_box.clear()
+        _sev_color = {"HIGH": "text-red-600", "MEDIUM": "text-orange-600",
+                      "LOW": "text-gray-500", "OK": "text-green-700"}
+        with _sh_box:
+            for r in rows:
+                with ui.row().classes("w-full gap-2 items-baseline"):
+                    ui.label(r["collection"]).classes(
+                        "font-medium w-40 shrink-0")
+                    ui.label(r["severity"]).classes(
+                        "w-20 shrink-0 " + _sev_color.get(r["severity"], ""))
+                    ui.label(f"{r['check']}: {r['detail']}").classes(
+                        "text-sm")
+    ui.button("Run schema health check", on_click=_run_health).props(
+        "outline")
 
 
 # ===========================================================================

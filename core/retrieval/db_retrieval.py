@@ -608,14 +608,19 @@ def search_enum_values(
               -- prefix match: 'ISIN' must find 'ISINNumber' (exact-only
               -- silently missed after the fix_tags re-ingest, 2026-08-05)
               OR LOWER(e.enum_name) LIKE LOWER(%s)
-              OR LOWER(COALESCE(e.enum_description, '')) LIKE LOWER(%s)
+              -- separator-normalized: 'multi leg' must match 'multi-leg'
+              -- in names and descriptions (2026-08-05)
+              OR REPLACE(LOWER(COALESCE(e.enum_description, '')), '-', ' ')
+                 LIKE REPLACE(LOWER(%s), '-', ' ')
+              OR REPLACE(LOWER(e.enum_name), '-', ' ')
+                 LIKE REPLACE(LOWER(%s), '-', ' ')
           )
         LIMIT %s
     """
     rows = fetchall(
         sql,
         (collection_name, search_text, search_text, f"{search_text}%",
-         f"%{search_text}%", limit)
+         f"%{search_text}%", f"%{search_text}%", limit)
     )
 
     points = []

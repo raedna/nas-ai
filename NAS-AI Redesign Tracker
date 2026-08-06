@@ -1203,3 +1203,44 @@ Expectations made corpus-relative: AG-03 (~4972), PP-02 (weak list w/ 38
 leading accepted), MI-02 (mushy accepted, both jobs required).
 QUEUED: tag_range derived field (standard/user_defined, boundary 5000
 declared) + standard-first tie-break for generic FIX name questions.
+
+## Halo triage briefs (queued 2026-08-05, three gated phases)
+
+Phase 1 — triage ON DEMAND: given a ticket id, assemble the issue and
+produce a brief: similar past tickets by about-vector similarity
+(solution chunks surfaced first, sources named) + relevant kb/obsidian
+docs via the normal pipeline. Gate: brief quality on tickets whose
+answers are known. Phase 2 — inbox: poll (config interval) runs the
+incremental sync, status=New (declared list) auto-triages ONCE (triage
+log), Triage tab lists briefs. Ingestion still happens normally — the
+brief is an additional product, not a replacement. Phase 3 — write-back:
+POST the brief to Halo as a private note (needs API write scope; decide
+after 1+2). Cost ~30s LLM per new ticket.
+
+## KB from Halo API (queued 2026-08-05)
+
+kb_docs currently ingests a STALE CSV export (KB_Articles 2026-02-25).
+Halo hosts the KB — pull articles via the API (KBArticle endpoint) the
+way tickets sync: incremental, combined JSON per article, same
+write-if-changed discipline. Keeps kb fresh; retires the manual export.
+Design questions: field mapping vs the CSV schema (ids must stay stable
+— feedback/cache/cross-links key on them), images/attachments in article
+bodies, active/inactive filtering at fetch time.
+
+## Astro fossil hunt + self-service auditing CLOSED (2026-08-06)
+
+DL-06/DL-10 root causes, all fixed + subset-eval green: fossil schema
+(v_mag riding the type role, messier_id buried in other -> Edit Schema +
+force re-ingest); alias rows beside data rows -> same-identifier entity
+merge before synthesis; label-free renders -> payload-text fallback in
+both structured templates; EXACT-IDENTITY override on the RRF confidence
+gate ('NGC 2064' == identifier is certain regardless of score dilution
+across 7947 ngc rows); metadata_enum_values_cap 20 -> 30 (config) so
+astro's 26 type codes enumerate and 'galaxies'->Gx aliases can ground
+(8,682 counted). NEW: Schema Health section in Validation tab —
+one-button audit of every collection for the fossil diseases (null
+names, label-free rows, numeric type roles, null ids, stale schema
+columns). Also this batch: concept-from-about, tab reorder, chat
+scroll-area + auto-scroll, ghost-collection purge in delete, enum
+prefix + separator matching, reverse-enum completeness header +
+config limit, listings with id AND name, glossary-to-synthesis.

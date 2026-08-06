@@ -73,8 +73,7 @@
       "open": "New"
     },
     "astro_catalog": {
-      "galaxies": "Gx",
-      "galaxy": "Gx"
+      "galaxies": "Gx"
     }
   },
   "about_guard_margin": 0.03,
@@ -86,7 +85,7 @@
   },
   "glossary": {
     "ctm": {
-      "means": "Central Trade Manager (Omgeo/DTCC) — the post-trade matching system. A SEPARATE system from Charles River/CRD.",
+      "means": "Central Trade Manager (Omgeo/DTCC) \u2014 the post-trade matching system. A SEPARATE system from Charles River/CRD.",
       "same_as": [
         "central trade manager"
       ]
@@ -106,7 +105,7 @@
       ]
     },
     "pb filename": {
-      "means": "the prime broker's original file name for a recon file — stored as the record's alias field ('Also known as')",
+      "means": "the prime broker's original file name for a recon file \u2014 stored as the record's alias field ('Also known as')",
       "same_as": [
         "prime broker filename",
         "pb file name"
@@ -144,6 +143,5 @@
     "merges"
   ],
   "concept_from_about": true,
-  "reverse_enum_limit": 30,
-  "metadata_enum_values_cap": 30
+  "reverse_enum_limit": 30
 }

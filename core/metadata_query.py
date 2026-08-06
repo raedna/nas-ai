@@ -92,8 +92,8 @@ def _field_values(collection: str, fields: set, df_keys=frozenset()) -> Dict[str
                 (collection,))
         else:
             rows = fetchall(
-                f"SELECT DISTINCT {expr} AS v FROM chunks WHERE collection_name = %s AND {expr} IS NOT NULL ORDER BY v LIMIT 25",
-                (collection,))
+                f"SELECT DISTINCT {expr} AS v FROM chunks WHERE collection_name = %s AND {expr} IS NOT NULL ORDER BY v LIMIT %s",
+                (collection, _enum_cap() + 1))
         vals = [str(r["v"]) for r in rows if r["v"]]
         if len(vals) == 1:
             fields.discard(f)
@@ -105,9 +105,23 @@ def _field_values(collection: str, fields: set, df_keys=frozenset()) -> Dict[str
         # The field stays queryable; its values just aren't enumerated.
         if any(len(v) > 80 for v in vals):
             continue
-        if 0 < len(vals) <= 20:
+        if 0 < len(vals) <= _enum_cap():
             values[f] = vals
     return values
+
+
+def _enum_cap() -> int:
+    """Max distinct values a field may have and still be ENUMERATED for
+    the spec prompt + alias injection (config metadata_enum_values_cap).
+    Was hardcoded 20 — astro_catalog's type has 26 codes, so 'galaxies'
+    -> Gx could never ground (2026-08-06)."""
+    try:
+        import json as _j
+        from core.paths import SYSTEM_CONFIG_PATH as _p
+        with open(_p, "r", encoding="utf-8") as f:
+            return int(_j.load(f).get("metadata_enum_values_cap", 30))
+    except Exception:
+        return 30
 
 def _collection_schema(collection: str) -> Dict:
     """Union of ALL stored schemas for a collection (role -> source columns).
@@ -903,18 +917,28 @@ def run_metadata_query(collection: str, question: str, intent_mode: str = None) 
                 # schema column mirrors the chunk identifier (recon) render
                 # identically.
                 _disp = tf
+                _id_disp = "identifier"
+                try:
+                    _id_cols = _collection_schema(collection).get("identifier") or []
+                    _all_fields, _dfk = fields, df_keys
+                    for _c in _id_cols:
+                        if _c in _all_fields and _c != "identifier":
+                            _id_disp = _field_expr(_c, _dfk)
+                            break
+                except Exception:
+                    pass
                 if tf == "identifier":
-                    try:
-                        _id_cols = _collection_schema(collection).get("identifier") or []
-                        _all_fields, _dfk = fields, df_keys
-                        for _c in _id_cols:
-                            if _c in _all_fields and _c != "identifier":
-                                _disp = _field_expr(_c, _dfk)
-                                break
-                    except Exception:
-                        _disp = tf
+                    _disp = _id_disp
+                # name-target listings carry the identifier too ('which
+                # tags are about multi-leg' must show tag NUMBERS, user
+                # request 2026-08-06); identifier-target listings keep
+                # their prior shape
+                _id_sel = (f"COALESCE({_id_disp}, identifier) AS id0, "
+                           if tf == "primary_name" else
+                           f"{tf} AS id0, ")
                 rows = fetchall(
-                    f"SELECT DISTINCT {tf} AS v0, COALESCE({_disp}, {tf}) AS v, "
+                    f"SELECT DISTINCT {_id_sel}{tf} AS v0, "
+                    f"COALESCE({_disp}, {tf}) AS v, "
                     f"{_companion} AS c FROM chunks "
                     f"WHERE {where} AND {tf} IS NOT NULL ORDER BY v LIMIT 200",
                     tuple(params))
@@ -939,7 +963,7 @@ def run_metadata_query(collection: str, question: str, intent_mode: str = None) 
                     # display value when they differ ('959 — AuctionType —
                     # desc', user request 2026-08-05) — a bare name loses
                     # the tag number, a bare number loses the name.
-                    _v0 = str(r.get("v0") or "")
+                    _v0 = str(r.get("id0") or r.get("v0") or "")
                     _vd = str(r["v"])
                     # prefix-related = the display DERIVES from the raw id
                     # (halo '44539-a17' -> '44539'): keep hiding the

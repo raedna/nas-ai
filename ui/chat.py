@@ -35,10 +35,18 @@ def render_chat_panel():
         ui.button("Delete", on_click=lambda: _delete_current()).props("flat color=negative")
         ui.space()
 
-    log = ui.column().classes("w-full gap-2 mt-2")
+    # Conversation lives in a viewport-height scroll area; the input row
+    # sits BELOW it — always visible, page never scrolls (user request
+    # 2026-08-05). Auto-scroll keeps the newest answer in view.
+    scroll = ui.scroll_area().classes(
+        "w-full h-[calc(100vh-230px)] border rounded")
+    with scroll:
+        log = ui.column().classes("w-full gap-2 p-2")
 
-    with ui.row().classes(
-            "w-full items-center gap-2 sticky bottom-0 bg-white z-10 py-2"):
+    def _scroll_bottom():
+        ui.timer(0.05, lambda: scroll.scroll_to(percent=1.0), once=True)
+
+    with ui.row().classes("w-full items-center gap-2 bg-white py-2"):
         msg = ui.input(placeholder="Ask anything…").props("outlined dense clearable").classes("flex-grow")
         send = ui.button("Send").props("unelevated")
 
@@ -46,6 +54,7 @@ def render_chat_panel():
         with log:
             with ui.card().classes("self-end bg-blue-50 max-w-2xl"):
                 ui.label(text)
+        _scroll_bottom()
 
     def _render_stored_assistant(m):
         """Rehydrate a persisted assistant message (text + payload images)."""
@@ -67,6 +76,7 @@ def render_chat_panel():
                 _render_user(m["content"])
             else:
                 _render_stored_assistant(m)
+        _scroll_bottom()
 
     def _refresh_dropdown():
         opts = _session_options()
@@ -246,6 +256,8 @@ def render_chat_panel():
                          f"{s.get('match_type')} {float(s.get('confidence') or 0):.2f}")
                 with ui.expansion(label).classes("w-full"):
                     render_related_section(s)
+
+        _scroll_bottom()
 
     send.on_click(do_send)
     msg.on("keydown.enter", do_send)

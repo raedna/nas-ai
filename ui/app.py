@@ -29,9 +29,11 @@ from ui.memories import render_memories_panel  # noqa: E402
 from ui import entry_page  # noqa: E402,F401  (registers the /entry/{chunk_id} full-article page)
 
 # Tab order — query tabs first, admin next, debug/remaining after.
+# Order = user's workflow (2026-08-05): daily surfaces first, admin last.
 TABS = [
-    "Collections", "Ask", "Chat", "Memories", "Analysis", "Ingestion", "Knowledge Graph",
-    "Validation", "SQL Inspector", "System Config", "Data Prep", "Debug",
+    "Chat", "Ask", "Analysis", "Ingestion", "Collections", "Memories",
+    "Validation", "SQL Inspector", "Knowledge Graph", "Data Prep",
+    "Debug", "System Config",
 ]
 
 

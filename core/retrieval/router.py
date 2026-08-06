@@ -287,7 +287,10 @@ def _synthesize_relationship_answer(
 
 
 def _synthesize_reverse_enum_answer(matches: List[Dict], collection_name: str) -> str:
-    lines = []
+    # count header: 'which tags can...' is a COMPLETENESS question — the
+    # answer states how many owners matched so partial narration is
+    # visible (user request 2026-08-05)
+    lines = [f"{len(matches)} match(es):", ""]
 
     for item in matches:
         payload = item.get("payload") or {}
@@ -518,7 +521,17 @@ def route_query(
     ## Confidence check — if top RRF score is below threshold return top 5
     from core.system_config import load_system_config
     CONFIDENCE_THRESHOLD = load_system_config().get("retrieval_confidence_threshold", 0.105)
-    if doc_type == "structured" and getattr(best, "score", 0.0) < CONFIDENCE_THRESHOLD:
+    # EXACT IDENTITY overrides score confidence: 'NGC 2064' matching the
+    # top record's identifier verbatim is certain regardless of RRF
+    # dilution (7947 'ngc' rows shrank the fused score below threshold and
+    # the right answer got a 'No exact match' banner — DL-10, 2026-08-06).
+    _qn_ex = normalize_simple_text(question)
+    _exact_identity = bool(_qn_ex) and _qn_ex in (
+        normalize_simple_text(str(payload.get("identifier") or "")),
+        normalize_simple_text(str(payload.get("primary_name") or "")),
+    )
+    if (doc_type == "structured" and not _exact_identity
+            and getattr(best, "score", 0.0) < CONFIDENCE_THRESHOLD):
         top5 = points[:5]
         lines = [f"No exact match found for '{question}'. Closest results:"]
         for p in top5:
@@ -563,6 +576,22 @@ def route_query(
     ## For chunked document payloads, enrich by merging nearby/same-section chunks
     if doc_type not in ("structured", "entity_row"):
         payload = build_fuller_doc_payload(collection, payload) or payload
+    elif doc_type == "entity_row" and payload.get("identifier"):
+        # Same-identifier rows are ONE entity: catalogs carry sparse alias
+        # rows ('Whirlpool galaxy') beside the data row (NGC 5194) — the
+        # alias row won the rerank and rendered its emptiness (DL-06,
+        # 2026-08-06). Merge before synthesis.
+        try:
+            _fp_er = fetch_points_by_identifier(
+                collection, payload.get("identifier"), limit=20)
+            if _fp_er and len(_fp_er) > 1:
+                _merged_er = merge_payloads_for_identifier(
+                    _fp_er, payload.get("identifier"))
+                if _merged_er:
+                    _merged_er["_question"] = question
+                    payload = _merged_er
+        except Exception as _me_er:
+            print(f"RETRIEVAL entity merge skipped: {_me_er}")
     payload["_chunk_db_id"] = _best_chunk_db_id
     route_query._last_answer_payload = payload
     answer = synthesize_answer(payload, roles, collection)
@@ -1101,8 +1130,16 @@ def run_query_with_method(
         candidate = _extract_reverse_lookup_candidate(question, field_maps)
 
         if candidate:
+            try:
+                import json as _json_rel
+                from core.paths import SYSTEM_CONFIG_PATH as _SCP_REL
+                with open(_SCP_REL, "r", encoding="utf-8") as _frel:
+                    _rel_lim = int(_json_rel.load(_frel).get(
+                        "reverse_enum_limit", 30))
+            except Exception:
+                _rel_lim = 30
             enum_matches = reverse_lookup_by_enum_value(
-                collection, candidate, limit=10
+                collection, candidate, limit=_rel_lim
             )
 
             if enum_matches:
