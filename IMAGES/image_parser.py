@@ -64,6 +64,35 @@ def _run_ocr(img: Image.Image, enable_ocr: bool = False) -> str:
     if not enable_ocr:
         return ""
 
+    # RapidOCR first (the Analysis tab's engine — markedly better than
+    # tesseract on screenshots; unified 2026-08-07, user request), with
+    # the original pytesseract path as fallback.
+    try:
+        import tempfile, os
+        from core.analysis.ocr.rapidocr_adapter import ocr_image_with_rapidocr
+        with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as _tf:
+            img.save(_tf.name)
+            _tmp = _tf.name
+        try:
+            _res = ocr_image_with_rapidocr(_tmp)
+        finally:
+            try:
+                os.unlink(_tmp)
+            except Exception:
+                pass
+        _txt = ""
+        if isinstance(_res, dict):
+            _txt = str(_res.get("text") or _res.get("ocr_text") or "")
+            if not _txt and isinstance(_res.get("blocks"), list):
+                _txt = "\n".join(str(b.get("text") or "")
+                                 for b in _res["blocks"])
+        elif isinstance(_res, str):
+            _txt = _res
+        if _txt.strip():
+            return _safe_str(_txt)
+    except Exception as _re_err:
+        print(f"[OCR] rapidocr unavailable, tesseract fallback: {_re_err}")
+
     if pytesseract is None:
         return ""
 

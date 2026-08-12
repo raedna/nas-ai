@@ -175,7 +175,7 @@ def render_chat_panel():
                             ui.label(r["label"]).classes(
                                 "font-medium w-32 shrink-0")
                             ui.label(r.get("brief") or "").classes("text-sm")
-        elif kind == "doc" and isinstance(raw, str) and raw.strip() and raw.strip() != content.strip():
+        elif kind in ("doc", "analytical") and isinstance(raw, str) and raw.strip() and raw.strip() != content.strip():
             # Concise answer, then the full entry (with its images) in an expander.
             render_answer(card, content, [], show_ocr=True)
             with card:
@@ -185,6 +185,10 @@ def render_chat_panel():
         else:
             render_answer(card, content, build_image_items(payload), show_ocr=True)
         with card:
+            if isinstance(resp, dict) and resp.get("answer_kind") == "analytical":
+                ui.label("Analysis — interprets and connects the manual "
+                         "beyond quoted text").classes(
+                    "text-xs text-purple-700 font-medium mt-1")
             if isinstance(resp, dict) and resp.get("method") == "verified_cache":
                 with ui.row().classes("items-center gap-2 mt-1"):
                     ui.label(f"✓ verified answer · {resp.get('verified_at', '')}"

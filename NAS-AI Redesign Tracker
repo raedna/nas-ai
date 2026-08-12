@@ -1244,3 +1244,16 @@ columns). Also this batch: concept-from-about, tab reorder, chat
 scroll-area + auto-scroll, ghost-collection purge in delete, enum
 prefix + separator matching, reverse-enum completeness header +
 config limit, listings with id AND name, glossary-to-synthesis.
+
+## Deployment-era items (queued 2026-08-07, address once deployment shape is known)
+
+Friendly infrastructure errors: LM Studio unreachable (port 1234
+connection refused) should read "LM Studio server unreachable — is it
+running with the embedding model loaded?" instead of a urllib3 wall;
+same treatment for Postgres-down and Halo-API-down. ACCOUNTS & ACCESS:
+grows UI-04 (auth gate) into real design — user accounts, per-collection
+access (who may see halo_tickets vs kb), per-feature rights (ingestion/
+config/SQL admin vs chat-only users), how feedback/memory attach to the
+asking user (votes and memory notes are currently global). Decide
+deployment first: single-box NAS service vs multi-user server changes
+every answer.

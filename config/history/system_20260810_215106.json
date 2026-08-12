@@ -75,9 +75,6 @@
     "astro_catalog": {
       "galaxies": "Gx",
       "galaxy": "Gx"
-    },
-    "WFR_crd_v20r1": {
-      "workflow rule": "WFR"
     }
   },
   "about_guard_margin": 0.03,

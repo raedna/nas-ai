@@ -33,6 +33,18 @@ The retrieved data is a document or procedure. Give a CONCISE, DIRECT answer to 
 - If the answer is not in the retrieved data, say so plainly.
 Never mention that you are an AI language model — you are NAS-AI."""
 
+
+ANALYTICAL_GROUNDED_SYSTEM_PROMPT = """You are NAS-AI, an intelligent offline assistant for financial and astronomical operations.
+
+The RETRIEVED DATA below comes from a technical manual. The user's question may not be answered verbatim anywhere — your task is to ANALYZE the material and CONSTRUCT the answer it supports:
+- Connect related sections: reference tables, field definitions, and procedures combine into working instructions.
+- When building a procedure, present numbered steps, and after each step name the manual section or field definition it relies on (e.g. "(per the Input Event definition)").
+- MANDATORY tagging: end EVERY step with [stated] when the manual says it explicitly, or [inferred] when you are constructing beyond the text. An answer without these tags is wrong.
+- NEVER assign a meaning to a field or column name that the manual does not give it. Naming a real column while inventing its purpose is fabrication — if you need a field whose purpose is undocumented, say so.
+- If the mechanism the user asks for does not exist in the material (e.g. an action type that cannot do what they want), SAY THAT FIRST, then offer the closest documented alternatives. A confident procedure for an undocumented capability is the worst possible answer.
+- Stay inside the retrieved material: no outside knowledge of the product; if a needed piece is genuinely absent, name the gap precisely.
+Never mention that you are an AI language model — you are NAS-AI."""
+
 # Related sections with similarity >= this are merged into the main answer.
 # Below this threshold they appear as collapsible "Related" items.
 RELATED_MERGE_THRESHOLD = 0.80
@@ -1411,9 +1423,14 @@ def generate_conversational_response(question: str, history: list, retrieved_ans
       intentionally omits most of the document text).
     - No retrieved_answer: CHAT_SYSTEM_PROMPT free-form conversation.
     """
-    is_doc = (answer_kind == "doc")
+    is_doc = (answer_kind in ("doc", "analytical"))
     if not retrieved_answer:
         system_prompt = CHAT_SYSTEM_PROMPT
+    elif answer_kind == "analytical":
+        # per-collection declared mode (collections.json answer_mode):
+        # manuals whose value IS interpretation — construct answers from
+        # reference material, cite sections, label the contract
+        system_prompt = ANALYTICAL_GROUNDED_SYSTEM_PROMPT
     elif is_doc:
         system_prompt = DOC_GROUNDED_SYSTEM_PROMPT
     else:
@@ -1464,7 +1481,8 @@ def generate_conversational_response(question: str, history: list, retrieved_ans
             "temperature": 0.2 if retrieved_answer else 0.7,
             "max_tokens": 2048,
         }
-        resp = requests.post(url, json=payload, timeout=60)
+        resp = requests.post(url, json=payload,
+                             timeout=int(cfg.get("timeout", 60)))
         resp.raise_for_status()
         llm_response = resp.json()["choices"][0]["message"]["content"].strip()
         # Faithfulness guard only for structured/verbatim answers — a concise doc
@@ -1480,7 +1498,12 @@ def generate_conversational_response(question: str, history: list, retrieved_ans
             return _baseline
         return llm_response
 
-    except Exception:
+    except Exception as _syn_err:
+        # LOUD failure — a silent raw fallback cost a full debugging round
+        # (2026-08-07: LM Studio rejected an over-context prompt in 0.5s
+        # and nothing said why)
+        print(f"[SYNTHESIS] LLM call failed ({type(_syn_err).__name__}): "
+              f"{str(_syn_err)[:200]} — returning raw retrieved context")
         _baseline = primary_answer or retrieved_answer
         if _baseline:
             return _baseline
@@ -1593,6 +1616,77 @@ def _is_empty_answer_text(t: str) -> bool:
     return (not t.strip()) or any(m in t for m in (
         "No answer found", "No record found", "couldn't find",
         "No matching records"))
+
+
+def _analytical_context(collection: str, query_run: dict,
+                        budget: int) -> str:
+    """Analytical collections reason over DOCUMENTS, not chunks (user
+    design 2026-08-07): a manual's knowledge is deliberately spread across
+    files — overview holds concepts, creating holds procedure, reference
+    holds fields. Tier 1: the whole collection when it fits the budget.
+    Tier 2: complete text of the top documents by retrieval relevance,
+    budget-capped. Returns '' when assembly fails (caller keeps the
+    normal chunk context)."""
+    try:
+        from core.db import fetchall
+        total = fetchall(
+            "SELECT COALESCE(SUM(LENGTH(nlp_text)), 0) AS n FROM chunks "
+            "WHERE collection_name = %s", (collection,))[0]["n"]
+        docs_order = []
+        if total and total <= budget:
+            rows = fetchall(
+                "SELECT source_file, string_agg(nlp_text, E'\n\n' "
+                "ORDER BY id) AS body FROM chunks "
+                "WHERE collection_name = %s GROUP BY source_file "
+                "ORDER BY source_file", (collection,))
+            docs_order = [(r["source_file"], r["body"]) for r in rows]
+            print(f"[ANALYTICAL] tier-1 full collection: {collection} "
+                  f"({len(docs_order)} docs, {total} chars)")
+        else:
+            # tier 2: the winning doc first, then related docs, full text
+            # each, until the budget objects
+            _pl = query_run.get("answer_payload") or {}
+            _first = _pl.get("source_file")
+            _cand = [f for f in [_first] if f]
+            for r in (query_run.get("related_sections") or []):
+                _sf = r.get("source_file")
+                if _sf and _sf not in _cand:
+                    _cand.append(_sf)
+            # fill remaining budget with the collection's OTHER documents —
+            # a manual's answer spans files even when relevance signals
+            # don't say so (2026-08-07: tier 2 fed ONE doc and the analyst
+            # starved)
+            _others = fetchall(
+                "SELECT DISTINCT source_file FROM chunks "
+                "WHERE collection_name = %s ORDER BY source_file",
+                (collection,))
+            for _o in _others:
+                if _o["source_file"] and _o["source_file"] not in _cand:
+                    _cand.append(_o["source_file"])
+            used = 0
+            for sf in _cand[:8]:
+                rows = fetchall(
+                    "SELECT string_agg(nlp_text, E'\n\n' ORDER BY id) "
+                    "AS body FROM chunks WHERE collection_name = %s "
+                    "AND source_file = %s", (collection, sf))
+                body = (rows[0]["body"] or "") if rows else ""
+                if not body:
+                    continue
+                if used + len(body) > budget and docs_order:
+                    break
+                docs_order.append((sf, body[:budget - used]))
+                used += min(len(body), budget - used)
+            if docs_order:
+                print(f"[ANALYTICAL] tier-2 top documents: {collection} "
+                      f"({len(docs_order)} docs, {used} chars)")
+        if not docs_order:
+            return ""
+        return "\n\n".join(
+            f"===== DOCUMENT: {sf} =====\n{body}"
+            for sf, body in docs_order)
+    except Exception as _e:
+        print(f"[ANALYTICAL] assembly failed, chunk context kept: {_e}")
+        return ""
 
 
 def _ticket_summary(question: str):
@@ -1819,6 +1913,22 @@ def chat_turn(question: str, history: list, available_collections: list,
         # or an honest miss.
         import re as _re_ch
         _cw = [w for w in _re_ch.findall(r"[a-z0-9]{3,}", question.lower())]
+        # Since tickets (emails) joined the corpus, casual English became
+        # "corpus-owned" — 'hello, how are you' routed to retrieval
+        # (2026-08-07). Smalltalk + noise vocabularies (declared) are
+        # excluded from BOTH the ownership test and the length count.
+        try:
+            from core.query_helpers import load_doc_query_hints as _ldqh_ch
+            _hints_ch = _ldqh_ch()
+            _noise_ch = set()
+            for _k_ch in ("stopwords", "question_words",
+                          "discovery_noise_words", "generic_terms",
+                          "smalltalk_words"):
+                _noise_ch.update(
+                    str(x).lower() for x in _hints_ch.get(_k_ch, []))
+        except Exception:
+            _noise_ch = set()
+        _cw = [w for w in _cw if w not in _noise_ch]
         _corpus_owned = []
         if _cw:
             try:
@@ -1992,6 +2102,21 @@ def chat_turn(question: str, history: list, available_collections: list,
     # Answer kind drives synthesis: structured records render verbatim (faithfulness
     # guard on); document/procedural answers get a concise, focused synthesis.
     answer_kind = classify_answer_kind(query_run.get("method"), query_run.get("answer_payload"))
+    # Per-collection declared answer mode (collections.json answer_mode
+    # 'analytical', 2026-08-07): manuals whose value IS interpretation
+    # upgrade doc answers to the analytical contract — construct from
+    # reference material, cite sections, visibly labeled in the UI.
+    if answer_kind == "doc" and collection:
+        try:
+            import json as _json_am
+            from core.paths import COLLECTIONS_PATH as _CP_AM
+            with open(_CP_AM, "r", encoding="utf-8") as _fam:
+                _mode_am = (_json_am.load(_fam).get(collection, {})
+                            or {}).get("answer_mode")
+            if str(_mode_am or "").lower() == "analytical":
+                answer_kind = "analytical"
+        except Exception:
+            pass
 
     # Split related sections: high-confidence → merge into answer, low-confidence → show as related
     import json as _json
@@ -2154,6 +2279,22 @@ def chat_turn(question: str, history: list, available_collections: list,
             print("DEBUG retrieved len before append:", len(retrieved))
         if extra_parts:
             retrieved = primary_answer  # LLM only sees primary; context appended post-LLM
+
+    # Analytical collections reason over DOCUMENTS: swap the chunk context
+    # for the assembled collection (tier 1) or top documents (tier 2) —
+    # the manual's knowledge is spread across files by design (2026-08-07).
+    if answer_kind == "analytical" and collection:
+        try:
+            import json as _json_ac
+            from core.paths import SYSTEM_CONFIG_PATH as _SCP_AC
+            with open(_SCP_AC, "r", encoding="utf-8") as _fac:
+                _budget_ac = int(_json_ac.load(_fac).get(
+                    "analytical_context_budget", 50000))
+        except Exception:
+            _budget_ac = 50000
+        _ctx_ac = _analytical_context(collection, query_run, _budget_ac)
+        if _ctx_ac:
+            retrieved = _ctx_ac
 
     if DEBUG:
         print("DEBUG retrieved snippet:", retrieved[:200])

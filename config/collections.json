@@ -65,7 +65,8 @@
     "notes": "Should be OCR",
     "filters": {
       "field_filters": []
-    }
+    },
+    "answer_mode": "analytical"
   },
   "docx_test": {
     "path": "/Users/raednasr/Documents/OmniVista/Case Studies/OmniVista_WhitePaper_RN_ModernizingAdmin_250901.docx",
@@ -235,5 +236,20 @@
     "source_label": "FIX Dictionaries",
     "routing_description": "This collection contains the fix dictionary for versions 4.2 and 4.4.  The  files contain tags, enum, components and user defined Tags of the Fix Protocol and are used in transmitting the messages between traders and brokers",
     "notes": ""
+  },
+  "WFR_crd_v20r1": {
+    "path": "/Users/raednasr/Documents/OmniVista/CRD_Manual_exerpts/V20r1_WFR",
+    "allowed_filetypes": [
+      "pdf"
+    ],
+    "allowed_extensions": [],
+    "exclude_dirs": [],
+    "exclude_extensions": [],
+    "asset_search_roots": [],
+    "source_label": "WFR_v20r1",
+    "routing_description": "This collection contains the CRD Manual pages for creating, editing and working with Charles River OMS Workflow Rules.",
+    "notes": "",
+    "answer_mode": "analytical",
+    "routing_mode": "on_demand"
   }
 }

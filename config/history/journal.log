@@ -1,2 +1,3 @@
 2026-08-06T20:35:17 [ui] set value_aliases.astro_catalog.galaxies = "Gx"
 2026-08-06T20:35:39 [ui] set value_aliases.astro_catalog.galaxy = "Gx"
+2026-08-10T21:51:06 [ui] set value_aliases.WFR_crd_v20r1.workflow rule = "WFR"

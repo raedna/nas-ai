@@ -66,7 +66,24 @@ def render_collections_panel():
                        label="Filter mode").props("outlined dense").classes("w-full")
     f_values = ui.input("Values (comma-separated)").props("outlined dense").classes("w-full")
 
-    label_in = ui.input("Source label (optional)").props("outlined dense").classes("w-full")
+    with ui.row().classes("w-full gap-2 mb-12"):
+        answer_mode_in = ui.select(
+            ["faithful", "analytical"], value="faithful",
+            label="Answer mode").props(
+            'outlined dense hint="analytical: answers CONSTRUCT from the material (manuals) — interpretive, labeled in chat. faithful: quote-bound (default)."'
+        ).classes("w-56")
+        routing_mode_in = ui.select(
+            ["auto", "on_demand"], value="auto",
+            label="Routing mode").props(
+            'outlined dense hint="on_demand: only searched when named or when widening earns it (archives)."'
+        ).classes("w-48")
+        about_scan_in = ui.select(
+            ["auto", "all", "off"], value="auto",
+            label="About scan").props(
+            'outlined dense hint="all: scan every entry (prose stored as rows). off: records/images. auto: doc-shaped only."'
+        ).classes("w-40")
+
+    label_in = ui.input("Source label (optional)").props('outlined dense hint="Display name shown under answers as \'Source: X\' (e.g. \'Kb Docs\'). Defaults to the collection name if empty."').classes("w-full mb-4")
     desc_in = ui.textarea("Routing description (required)").props('outlined dense hint="What this collection KNOWS — used by chat routing to decide when to search here. Write it like an answer to: what questions should come to this data?"').classes("w-full")
     notes_in = ui.textarea("Notes").props("outlined dense").classes("w-full")
     save_msg = ui.label("").classes("text-sm")
@@ -110,6 +127,9 @@ def render_collections_panel():
         excl_dirs.value = ", ".join(cfg.get("exclude_dirs", cfg.get("exclude_folders", [])) or [])
         excl_ext.value = ", ".join(cfg.get("exclude_extensions", []) or [])
         asset_roots.value = "\n".join(cfg.get("asset_search_roots", []) or [])
+        answer_mode_in.value = cfg.get("answer_mode", "faithful")
+        routing_mode_in.value = cfg.get("routing_mode", "auto")
+        about_scan_in.value = cfg.get("about_scan", "auto")
         label_in.value = cfg.get("source_label", "")
         desc_in.value = cfg.get("routing_description", "")
         notes_in.value = cfg.get("notes", "")
@@ -131,7 +151,15 @@ def render_collections_panel():
         if not nm or not (path_in.value or "").strip():
             ui.notify("Name and path are required", type="warning")
             return
-        cfg = {
+        # MERGE-preserving save: keys this form doesn't show (or that
+        # future versions add) must survive a save — the schema-save
+        # lesson, applied here 2026-08-07.
+        from core.ui_data import load_collections_config as _lcc
+        try:
+            cfg = dict((_lcc() or {}).get(nm) or {})
+        except Exception:
+            cfg = {}
+        cfg.update({
             "path": path_in.value.strip(),
             "allowed_filetypes": ft_in.value or [],
             "allowed_extensions": _csv(allow_ext.value),
@@ -141,7 +169,14 @@ def render_collections_panel():
             "source_label": (label_in.value or "").strip(),
             "routing_description": (desc_in.value or "").strip(),
             "notes": (notes_in.value or "").strip(),
-        }
+        })
+        for _k, _w, _dflt in (("answer_mode", answer_mode_in, "faithful"),
+                              ("routing_mode", routing_mode_in, "auto"),
+                              ("about_scan", about_scan_in, "auto")):
+            if _w.value and _w.value != _dflt:
+                cfg[_k] = _w.value
+            else:
+                cfg.pop(_k, None)
         if enable_filters.value and (f_field.value or "").strip() and _csv(f_values.value):
             cfg["filters"] = {"field_filters": [{
                 "field": f_field.value.strip(),
